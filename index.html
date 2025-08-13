@@ -1,7 +1,163 @@
-<!DOCTYPE html>
-<html>
-	<body>
-	<h1>Yuanchen Wang</h1>
-	<p>Personal Website.</p>
-	</body>
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yuanchen Wang — Portfolio</title>
+  <meta name="description" content="Portfolio of YC Wang — aspiring game developer with a background in psychology, neuroscience, and biomedical informatics." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="toolbar" style="justify-content: space-between;">
+        <div>
+          <h1 style="margin-bottom:.1rem;">Yuanchen Wang</h1>
+          <p class="tagline">Aspiring game developer — MSCS (Game Dev) at USC; background in psychology, neuroscience, and biomedical informatics.</p>
+          <p class="contact">
+            <strong>Contact:</strong>
+            <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
+            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a>
+          </p>
+        </div>
+        <div>
+          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
+        </div>
+      </div>
+
+      <nav aria-label="Sections">
+        <a href="#projects">Projects</a>
+        <a href="#skills">Skills</a>
+        <a href="#education">Education</a>
+        <a href="#publications">Publications</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="skills">
+        <h2>Skills</h2>
+        <div class="two-col">
+          <div>
+            <h3>Game Development</h3>
+            <p><span class="pill">Unity</span><span class="pill">Godot</span><span class="pill">Java</span><span class="pill">C#</span><span class="pill">C++</span></p>
+            <h3>Programming &amp; Tools</h3>
+            <p><span class="pill">Python</span><span class="pill">Linux shell</span><span class="pill">C</span><span class="pill">R</span><span class="pill">MATLAB</span><span class="pill">SQL (basic)</span><span class="pill">CSS</span><span class="pill">HTML</span><span class="pill">PHP</span><span class="pill">Onshape CAD</span><span class="pill">Robotics (basic)</span><span class="pill">Docker</span><span class="pill">GitHub</span><span class="pill">Project management</span></p>
+          </div>
+          <div>
+            <h3>Research &amp; Interfaces</h3>
+            <p>DPI eye-tracking (Dual Purkinje Image, Fourward Technologies) and VICON motion capture; HCI, data visualization, applied ML.</p>
+            <h3>Languages</h3>
+            <p><span class="pill">Chinese (Native)</span><span class="pill">English (Proficient)</span><span class="pill">German (Elementary)</span></p>
+          </div>
+        </div>
+      </section>
+
+
+      <section id="projects">
+        <h2>Projects</h2>
+        
+        <article class="project-card">
+          <h3>Nothing Can Go Wrong — Godot — <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a></h3>
+          <div class="project-media">
+            <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener"><img src="images/nothing.png" alt="Nothing Can Go Wrong — screenshot" /></a>
+          </div>
+          <details>
+            <summary>More details</summary>
+            <p>Nothing Can Go Wrong is a design exploration in indirect control and consequence-driven planning. Instead of piloting the protagonist moment-to-moment, players chart a route and then watch their plan unfold, for better or worse, as environmental objects react in surprising ways. The appeal—and the difficulty—comes from predicting emergent interactions while still feeling empowered by a plan that was yours. My responsibilities covered concept ideation, systems design, engineering, and integration of artist-created assets in Godot. The core loop began with a lightweight pathing tool, but the heart of the experience emerged from environmental ‘verbs’: train tracks, whirlpools, spring pads, trapdoors, and chain reactions that could delight or derail. Balancing readability with surprise required strict rules and juicy feedback—consistent physics, generous telegraphs, and sound/particle cues that help the player learn the world’s grammar. Difficulty tuning was driven by data rather than guesswork; I exposed parameters for step-timing windows, impulse strength, and trigger sequencing, allowing tight loops of test–tweak–test within the jam’s limited timeframe. The art pass focused on clarity and charm: silhouettes that read at a glance, restrained palettes, and motion that communicates function. We achieved a polished, playable demo on schedule and ranked in the top 20% overall. Post-jam, I’d extend the system with better text and visual explanation so players can gradually learn the mechanics, add optional objectives for mastery, and implement robust replays to encourage sharing. Most importantly, the project validated a personal design interest: agency through foresight. When players laugh at a plan that almost worked—and instantly want to iterate—you’ve got a loop worth growing.</p>
+          </details>
+        </article>
+        <article class="project-card">
+          <h3>Gyrotris — Godot — <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener">Play on itch.io</a></h3>
+          <div class="project-media">
+            <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener"><img src="images/gyrotris.png" alt="Gyrotris — screenshot" /></a>
+          </div>
+          <details>
+            <summary>More details</summary>
+            <p>Gyrotris is a sci-fi puzzle game that reimagines the core mechanics of Tetris through the addition of rotating boards and dynamic gravity. Set aboard a spaceship trapped in the gravitational pull of a black hole, the player’s task is to clear unstable cargo while managing an unpredictable gravity core. The game’s twist lies in periodic board rotations, random obstacles from space debris, and the use of limited repair robots to fix holes in the board. These hazards puncture the grid at timed intervals or after clearing lines, preventing pieces from settling normally.
+              
+            Developed entirely by me for Untitled Game Jam #100, Gyrotris was built in Godot Engine 4.3 with pixel art assets created in Piskel. This was my first complete game, and I handled all design, programming, and art. Core mechanics include classic Tetris-like piece movement and rotation, enhanced by environmental challenges. Additional features such as time-stop (holding SHIFT while rotating the board) give players strategic breathing room, while repair robots—earned by clearing rows—offer recovery options.
+              
+            Though the UI and animation are minimal, Gyrotris demonstrates my ability to merge familiar mechanics with new twists, implement functional prototypes quickly, and iterate based on feedback. Planned improvements include animating board rotation for clarity and deciding whether holes should rotate with the board. Gyrotris ultimately reflects my focus on transforming established game formulas into distinctive, engaging experiences.</p>
+          </details>
+        </article>
+        <article class="project-card">
+          <h3>Aegis Sword — Onshape CAD — <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener">View on Onshape CAD</a></h3>
+          <div class="project-media">
+            <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener"><img src="images/sword.png" alt="Aegis Sword — render" /></a>
+          </div>
+          <details>
+            <summary>More details</summary>
+            <p>The Aegis Sword project is a detailed 3D replication of the weapon from Xenoblade Chronicles 2, completed as the final project for EAS 143: Introduction to Solid Modeling at the University of Rochester. Using OnShape CAD, I reproduced its intricate, asymmetrical design—symbolizing the character Pyra’s fragmented past—by applying modular modeling techniques for clean topology and precise detailing. This work refined my skills in translating abstract artistic concepts into production-ready assets, balancing visual fidelity with structural practicality. The techniques developed here form a strong foundation for creating immersive, story-driven 3D assets in future game development projects.</p>
+          </details>
+        </article>
+      </section>
+
+      <section id="education">
+        <h2>Education</h2>
+        <article>
+          <h3>University of Southern California — M.S. Computer Science (Game Development)</h3>
+          <p class="meta">Aug 2025 – May 2027 &middot; Core courses: 3‑D Graphics &amp; Rendering; Interactive Design &amp; Production; Game Design Workshop.</p>
+        </article>
+        <article>
+          <h3>Harvard Medical School — Master of Biomedical Informatics</h3>
+          <p class="meta">Aug 2021 – Dec 2022 &middot; Core courses: Machine Learning; Applied Bayesian Analysis; System Development for Computational Science.</p>
+        </article>
+        <article>
+          <h3>University of Rochester — B.S. Brain &amp; Cognitive Science; B.A. Psychology (Minor: CS)</h3>
+          <p class="meta">Aug 2017 – May 2021 &middot; Core courses: Discrete Mathematics; Data Structures &amp; Algorithms; Computation &amp; Formal Systems; Artificial Intelligence; Intro to Solid Modeling; Intro to Web Development.</p>
+        </article>
+      </section>
+
+      <section id="publications">
+        <h2>Publications</h2>
+        <ul class="pubs">
+          <li>Huang, J., He, Y., Chen, Z., Cai, Q., Wang, Y., Qi, Y. & Wu, H. Interweaving Time and Justice: Unraveling the Neurocognitive Mechanisms of Delayed Punishment in Second- and Third-Party Contexts. Under Review.</li><li>Wang, Y., Guo, Y., Wang, Z., Yu, L., Yan, Y., & Gu, Z. (2024). Enhancing semantic segmentation in chest X-ray images through image preprocessing: ps-KDE for pixel-wise substitution by kernel density estimation. PLOS ONE, 19(6), e0299623. <a href="https://doi.org/10.1371/journal.pone.0299623" target="_blank" rel="noopener">doi:10.1371/journal.pone.0299623</a></li><li>Wang, Y., Wang, R., & Wu, H. (2022). The role of oxytocin in modulating self/other distinction in human brain: a pharmacological fMRI study. Cerebral Cortex. <a href="https://doi.org/10.1093/cercor/bhac167" target="_blank" rel="noopener">doi:10.1093/cercor/bhac167</a></li><li>Cao, S., Qi, Y, Huang, Q., Wang, Y., Han, X., Liu, X., & Wu, H. (2021). Emerging Infectious Outbreak Inhibits Pain Empathy Mediated Prosocial Willingness. SSRN. <a href="https://doi.org/10.2139/ssrn.3793565" target="_blank" rel="noopener">doi:10.2139/ssrn.3793565</a></li><li>Wang, Yuanchen (2020). Bridging the models on the localization of hippocampal functions. FBB 2020. <a href="https://doi.org/10.23977/fbb2020.034" target="_blank" rel="noopener">doi:10.23977/fbb2020.034</a></li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2025 Yuanchen Wang — Text-focused HTML portfolio. Last updated 2025-08-13.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Theme initialization
+    const root = document.documentElement;
+    const saved = localStorage.getItem('yc-theme');
+    if (saved === 'light' || saved === 'dark') {
+      root.setAttribute('data-theme', saved);
+    } else {
+      const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+      const defaultTheme = prefersDark ? 'dark' : 'light';
+      root.setAttribute('data-theme', defaultTheme);
+      localStorage.setItem('yc-theme', defaultTheme);
+    }
+
+    // Toggle handler
+    const btn = document.getElementById('themeToggle');
+    function currentTheme() {
+      const v = root.getAttribute('data-theme');
+      if (v === 'auto') {
+        return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      return v;
+    }
+    function setTheme(mode) {
+      root.setAttribute('data-theme', mode);
+      localStorage.setItem('yc-theme', mode);
+    }
+    btn.addEventListener('click', () => {
+      const cur = currentTheme();
+      setTheme(cur === 'dark' ? 'light' : 'dark');
+      btn.blur();
+    });
+    // React to OS theme changes if the user hasn't set a preference explicitly
+    if (!saved) {
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        setTheme(e.matches ? 'dark' : 'light');
+      });
+    }
+  </script>
+</body>
 </html>
