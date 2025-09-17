@@ -17,7 +17,8 @@
           <p class="contact">
             <strong>Contact:</strong>
             <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
-            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a>
+            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a> &middot;
+            <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
           </p>
         </div>
         <div>
@@ -100,6 +101,19 @@
             <p>The Aegis Sword project is a detailed 3D replication of the weapon from Xenoblade Chronicles 2, completed as the final project for EAS 143: Introduction to Solid Modeling at the University of Rochester. Using OnShape CAD, I reproduced its intricate, asymmetrical design—symbolizing the character Pyra’s fragmented past—by applying modular modeling techniques for clean topology and precise detailing. This work refined my skills in translating abstract artistic concepts into production-ready assets, balancing visual fidelity with structural practicality. The techniques developed here form a strong foundation for creating immersive, story-driven 3D assets in future game development projects.</p>
           </details>
         </article>
+        <article class="project-card" id="flip-game">
+          <h3>Flip Card Minigame</h3>
+          <p class="meta">Match pairs of my project images. Click two cards at a time.</p>
+          <div class="flip-ui" role="toolbar" aria-label="Flip game controls">
+            <div class="flip-stats">
+              <span id="flip-moves" aria-live="polite">Moves: 0</span>
+              <span id="flip-time" aria-live="polite">Time: 0s</span>
+            </div>
+            <button id="flip-reset" class="toggle" type="button" aria-label="Reset flip game">Reset</button>
+          </div>
+          <div class="flip-grid" id="flip-grid" aria-live="polite"></div>
+          <div class="flip-message" id="flip-message" hidden>Great! You matched them all 🎉</div>
+        </article>
       </section>
 
       <section id="education">
@@ -127,7 +141,7 @@
     </main>
 
     <footer>
-      <p>© 2025 Yuanchen Wang — Text-focused HTML portfolio. Last updated 2025-08-13.</p>
+      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
     </footer>
   </div>
 
@@ -168,6 +182,115 @@
         setTheme(e.matches ? 'dark' : 'light');
       });
     }
+
+    // Flip card minigame
+    (function () {
+      const grid = document.getElementById('flip-grid');
+      if (!grid) return;
+
+      const images = [
+        { key: 'nothing', src: 'images/nothing.png', alt: 'Nothing Can Go Wrong — screenshot' },
+        { key: 'gyrotris', src: 'images/gyrotris.png', alt: 'Gyrotris — screenshot' },
+        { key: 'ad', src: 'images/AD.png', alt: 'Automatic Differentiation Toolbox' },
+        { key: 'sword', src: 'images/sword.png', alt: 'Aegis Sword — render' }
+      ];
+
+      const movesEl = document.getElementById('flip-moves');
+      const timeEl = document.getElementById('flip-time');
+      const resetBtn = document.getElementById('flip-reset');
+      const msgEl = document.getElementById('flip-message');
+
+      let firstCard = null;
+      let secondCard = null;
+      let lock = false;
+      let moves = 0;
+      let matchedPairs = 0;
+      let startTime = null;
+      let timerId = null;
+
+      function updateMoves() { if (movesEl) movesEl.textContent = 'Moves: ' + moves; }
+      function updateTime() {
+        if (!timeEl) return;
+        if (!startTime) { timeEl.textContent = 'Time: 0s'; return; }
+        const secs = Math.floor((Date.now() - startTime) / 1000);
+        timeEl.textContent = 'Time: ' + secs + 's';
+      }
+      function startTimerIfNeeded() {
+        if (timerId) return;
+        startTime = Date.now();
+        timerId = setInterval(updateTime, 1000);
+        updateTime();
+      }
+      function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+      function shuffle(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
+
+      function buildDeck() {
+        const pairs = images.flatMap(img => [{ ...img }, { ...img }]);
+        return shuffle(pairs);
+      }
+      function createCard(cardData) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'flip-card';
+        btn.setAttribute('data-key', cardData.key);
+        btn.setAttribute('aria-label', 'Hidden card');
+        btn.innerHTML =
+          '<div class="flip-card-inner">' +
+            '<div class="flip-card-front"><span aria-hidden="true">?</span></div>' +
+            '<div class="flip-card-back"><img src="' + cardData.src + '" alt="' + cardData.alt + '"></div>' +
+          '</div>';
+        btn.addEventListener('click', () => onCardClick(btn));
+        return btn;
+      }
+      function resetGame() {
+        lock = false;
+        firstCard = null;
+        secondCard = null;
+        moves = 0;
+        matchedPairs = 0;
+        updateMoves();
+        stopTimer();
+        startTime = null;
+        updateTime();
+        if (msgEl) msgEl.hidden = true;
+        grid.innerHTML = '';
+        const deck = buildDeck();
+        deck.forEach(data => grid.appendChild(createCard(data)));
+      }
+      function onCardClick(btn) {
+        if (lock) return;
+        if (btn.classList.contains('is-flipped') || btn.classList.contains('is-matched')) return;
+
+        startTimerIfNeeded();
+        btn.classList.add('is-flipped');
+
+        if (!firstCard) { firstCard = btn; return; }
+
+        secondCard = btn;
+        moves += 1; updateMoves();
+
+        const isMatch = firstCard.getAttribute('data-key') === secondCard.getAttribute('data-key');
+        if (isMatch) {
+          firstCard.classList.add('is-matched');
+          secondCard.classList.add('is-matched');
+          firstCard.disabled = true;
+          secondCard.disabled = true;
+          firstCard = null; secondCard = null;
+          matchedPairs += 1;
+          if (matchedPairs === images.length) { stopTimer(); if (msgEl) msgEl.hidden = false; }
+        } else {
+          lock = true;
+          setTimeout(() => {
+            firstCard.classList.remove('is-flipped');
+            secondCard.classList.remove('is-flipped');
+            firstCard = null; secondCard = null; lock = false;
+          }, 700);
+        }
+      }
+
+      if (resetBtn) resetBtn.addEventListener('click', resetGame);
+      resetGame();
+    })();
   </script>
 </body>
 </html>

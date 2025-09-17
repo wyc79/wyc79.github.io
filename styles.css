@@ -84,3 +84,19 @@ details > summary { cursor: pointer; color: var(--link); font-weight: 600; }
 details > summary::-webkit-details-marker { display: none; }
 
 
+/* Flip card minigame */
+.flip-ui { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.flip-stats { display: flex; gap: 1rem; color: var(--muted); }
+.flip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
+@media (max-width: 520px) { .flip-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.flip-card { position: relative; width: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); padding: 0; cursor: pointer; box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
+.flip-card:disabled { cursor: default; opacity: .9; }
+.flip-card { appearance: none; border: 1px solid var(--border); }
+.flip-card-inner { position: absolute; inset: 0; border-radius: inherit; transform-style: preserve-3d; transition: transform .45s ease; }
+.flip-card.is-flipped .flip-card-inner, .flip-card.is-matched .flip-card-inner { transform: rotateY(180deg); }
+.flip-card-front, .flip-card-back { position: absolute; inset: 0; border-radius: inherit; backface-visibility: hidden; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.flip-card-front { background: linear-gradient(135deg, var(--card), transparent); border: 1px dashed var(--border); color: var(--muted); font-weight: 600; }
+.flip-card-back { transform: rotateY(180deg); background: var(--bg); }
+.flip-card-back img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.flip-message { margin-top: .5rem; color: var(--accent); font-weight: 600; }
