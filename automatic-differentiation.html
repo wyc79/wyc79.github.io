@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Automatic Differentiation Toolbox — Yuanchen Wang</title>
+  <meta name="description" content="Automatic Differentiation Toolbox — a Python package for forward-mode automatic differentiation" />
+  <link rel="icon" type="image/png" href="images/wyc.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="toolbar" style="justify-content: space-between;">
+        <div>
+          <h1 style="margin-bottom:.1rem;"><a href="index.html"><img src="images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Yuanchen Wang</h1>
+          <p class="tagline">Aspiring game developer — MSCS (Game Dev) at USC; background in psychology, neuroscience, and biomedical informatics.</p>
+          <p class="contact">
+            <strong>Contact:</strong>
+            <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
+            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a> &middot;
+            <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
+          </p>
+        </div>
+        <div>
+          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
+          <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
+        </div>
+      </div>
+
+    </header>
+
+    <main>
+      <section>
+        <h2>Automatic Differentiation (AD) Toolbox</h2>
+        <p class="meta"><strong>Python</strong> — <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a></p>
+        
+        <div class="project-media" style="margin: 1.5rem 0;">
+          <img src="images/AD.png" alt="Automatic Differentiation, test.pypi.org" />
+        </div>
+
+        <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <p>The Automatic Differentiation Toolbox is a Python package built collaboratively by a five-member team to implement forward-mode automatic differentiation. Our approach combined chain rule logic and dual number operations to enable precise, efficient derivative calculations without numerical instability. My contributions included scripting, designing and executing comprehensive unit tests to validate core functionality, remove redundant code, and ensure the package remained lightweight and maintainable. I worked closely with teammates through regular check-ins, code reviews, and debugging sessions, integrating individual modules into a cohesive, production-ready tool. Throughout the process, I documented implementation details and design rationale to support clarity, collaboration, and future extension of the package.</p>
+        </article>
+
+        <p style="margin-top: 1.5rem;"><a href="index.html#projects">← Back to Projects</a></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Theme initialization
+    const root = document.documentElement;
+    const saved = localStorage.getItem('yc-theme');
+    if (saved === 'light' || saved === 'dark') {
+      root.setAttribute('data-theme', saved);
+    } else {
+      const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+      const defaultTheme = prefersDark ? 'dark' : 'light';
+      root.setAttribute('data-theme', defaultTheme);
+      localStorage.setItem('yc-theme', defaultTheme);
+    }
+
+    // Toggle handler
+    const btn = document.getElementById('themeToggle');
+    function currentTheme() {
+      const v = root.getAttribute('data-theme');
+      if (v === 'auto') {
+        return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      return v;
+    }
+    function setTheme(mode) {
+      root.setAttribute('data-theme', mode);
+      localStorage.setItem('yc-theme', mode);
+    }
+    btn.addEventListener('click', () => {
+      const cur = currentTheme();
+      setTheme(cur === 'dark' ? 'light' : 'dark');
+      btn.blur();
+    });
+    // React to OS theme changes if the user hasn't set a preference explicitly
+    if (!saved) {
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        setTheme(e.matches ? 'dark' : 'light');
+      });
+    }
+  </script>
+</body>
+</html>
+
