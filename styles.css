@@ -50,6 +50,9 @@ body {
   color: var(--fg);
   background: radial-gradient(1200px 1200px at 20% -10%, rgba(11,87,208,.06), transparent 40%), var(--bg);
 }
+body, section, nav a, .toggle, .project-card, .project-media, .pill, .flip-card, .flip-card-front, .flip-card-back {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
 .wrap { max-width: 980px; margin: 0 auto; padding: 2rem 1rem 5rem; }
 header { margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
 h1 { font-size: 2rem; margin: 0 0 .25rem; color: var(--accent); }
@@ -75,6 +78,15 @@ a { color: var(--link); }
 .projects-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; overflow: visible; }
 @media (min-width: 800px) { 
   .projects-grid { grid-template-columns: 1fr 1fr; }
+}
+.projects-grid--minor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (min-width: 800px) {
+  .projects-grid--minor {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 .project-card { 
   display:grid; 

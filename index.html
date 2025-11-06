@@ -59,30 +59,32 @@
       <section id="projects">
         <h2>Projects</h2>
         <div class="projects-grid">
-        <article class="project-card">
-          <h3>Nothing Can Go Wrong — Godot — <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a></h3>
-          <div class="project-media">
-            <a href="nothing-can-go-wrong.html"><img src="images/nothing.png" alt="Nothing Can Go Wrong — screenshot" /></a>
-          </div>
-        </article>
-        <article class="project-card">
-          <h3>Gyrotris — Godot — <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener">Play on itch.io</a></h3>
-          <div class="project-media">
-            <a href="gyrotris.html"><img src="images/gyrotris.png" alt="Gyrotris — screenshot" /></a>
-          </div>
-        </article>
-        <article class="project-card">
-          <h3>Automatic Differentiation (AD) Toolbox — Python — <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a></h3>
-          <div class="project-media">
-            <a href="automatic-differentiation.html"><img src="images/AD.png" alt="Automatic Differentiation, test.pypi.org" /></a>
-          </div>
-        </article>
-        <article class="project-card">
-          <h3>Aegis Sword — Onshape CAD — <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener">View on Onshape CAD</a></h3>
-          <div class="project-media">
-            <a href="aegis-sword.html"><img src="images/sword.png" alt="Aegis Sword — render" /></a>
-          </div>
-        </article>
+          <article class="project-card">
+            <h3>Nothing Can Go Wrong — Godot — <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a></h3>
+            <div class="project-media">
+              <a href="nothing-can-go-wrong.html"><img src="images/nothing_thumbnail.jpg" alt="Nothing Can Go Wrong — screenshot" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Automatic Differentiation (AD) Toolbox — Python — <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a></h3>
+            <div class="project-media">
+              <a href="automatic-differentiation.html"><img src="images/AD_thumbnail.png" alt="Automatic Differentiation, test.pypi.org" /></a>
+            </div>
+          </article>
+        </div>
+        <div class="projects-grid projects-grid--minor">
+          <article class="project-card">
+            <h3>Gyrotris — Godot — <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener">Play on itch.io</a></h3>
+            <div class="project-media">
+              <a href="gyrotris.html"><img src="images/gyrotris_thumbnail.png" alt="Gyrotris — screenshot" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Aegis Sword — Onshape CAD — <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener">View on Onshape CAD</a></h3>
+            <div class="project-media">
+              <a href="aegis-sword.html"><img src="images/sword_thumbnail.png" alt="Aegis Sword — render" /></a>
+            </div>
+          </article>
         </div>
         <article class="project-card" id="flip-game">
           <h3>Flip Card Minigame</h3>
@@ -177,10 +179,10 @@
       if (!grid) return;
 
       const images = [
-        { key: 'nothing', src: 'images/nothing.png', alt: 'Nothing Can Go Wrong — screenshot' },
-        { key: 'gyrotris', src: 'images/gyrotris.png', alt: 'Gyrotris — screenshot' },
-        { key: 'ad', src: 'images/AD.png', alt: 'Automatic Differentiation Toolbox' },
-        { key: 'sword', src: 'images/sword.png', alt: 'Aegis Sword — render' }
+        { key: 'nothing', src: 'images/nothing_thumbnail.jpg', alt: 'Nothing Can Go Wrong — screenshot' },
+        { key: 'gyrotris', src: 'images/gyrotris_thumbnail.png', alt: 'Gyrotris — screenshot' },
+        { key: 'ad', src: 'images/AD_thumbnail.png', alt: 'Automatic Differentiation Toolbox' },
+        { key: 'sword', src: 'images/sword_thumbnail.png', alt: 'Aegis Sword — render' }
       ];
 
       const movesEl = document.getElementById('flip-moves');
