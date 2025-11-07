@@ -7,8 +7,9 @@
   <meta name="description" content="Portfolio of YC Wang — aspiring game developer with a background in psychology, neuroscience, and biomedical informatics." />
   <link rel="icon" type="image/png" href="images/wyc.png" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
 </head>
-<body>
+<body id="top">
   <div class="wrap">
     <header>
       <div class="toolbar" style="justify-content: space-between;">
@@ -27,14 +28,17 @@
           <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
         </div>
       </div>
-
-      <nav aria-label="Sections">
-        <a href="#skills">Skills</a>
-        <a href="#projects">Projects</a>
-        <a href="#education">Education</a>
-        <a href="#publications">Publications</a>
-      </nav>
     </header>
+
+    <nav class="site-nav" aria-label="Sections">
+      <a href="#top" class="nav-logo" aria-label="Return to top" title="Back to top">
+        <img src="images/wyc.png" alt="Yuanchen Wang logo" />
+      </a>
+      <a href="#skills">Skills</a>
+      <a href="#projects">Projects</a>
+      <a href="#education">Education</a>
+      <a href="#publications">Publications</a>
+    </nav>
 
     <main>
       <section id="skills">
@@ -60,13 +64,15 @@
         <h2>Projects</h2>
         <div class="projects-grid">
           <article class="project-card">
-            <h3>Nothing Can Go Wrong — Godot — <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a></h3>
+            <h3>Nothing Can Go Wrong | Game Designer &amp; Programmer</h3>
+            <p class="meta">A design exploration in indirect control and consequence-driven planning.</p>
             <div class="project-media">
               <a href="nothing-can-go-wrong.html"><img src="images/nothing_thumbnail.jpg" alt="Nothing Can Go Wrong — screenshot" /></a>
             </div>
           </article>
           <article class="project-card">
-            <h3>Automatic Differentiation (AD) Toolbox — Python — <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a></h3>
+            <h3>Automatic Differentiation (AD) Toolbox | Python Developer &amp; QA Lead</h3>
+            <p class="meta">A Python package for forward-mode automatic differentiation.</p>
             <div class="project-media">
               <a href="automatic-differentiation.html"><img src="images/AD_thumbnail.png" alt="Automatic Differentiation, test.pypi.org" /></a>
             </div>
@@ -74,13 +80,13 @@
         </div>
         <div class="projects-grid projects-grid--minor">
           <article class="project-card">
-            <h3>Gyrotris — Godot — <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener">Play on itch.io</a></h3>
+            <h3>Gyrotris | Solo Game Developer</h3>
             <div class="project-media">
               <a href="gyrotris.html"><img src="images/gyrotris_thumbnail.png" alt="Gyrotris — screenshot" /></a>
             </div>
           </article>
           <article class="project-card">
-            <h3>Aegis Sword — Onshape CAD — <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener">View on Onshape CAD</a></h3>
+            <h3>Aegis Sword | CAD Modeler</h3>
             <div class="project-media">
               <a href="aegis-sword.html"><img src="images/sword_thumbnail.png" alt="Aegis Sword — render" /></a>
             </div>
