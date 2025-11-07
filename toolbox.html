@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Toolbox</title>
+  <link rel="icon" type="image/png" href="images/wyc.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Ensure generated SVG fills its container even if global CSS sets svg{height:auto} */
+    #wc-container > svg { width: 100% !important; height: 100% !important; display: block; }
+  </style>
+</head>
+<body id="top">
+  <div class="wrap">
+    <header>
+      <h1 style="margin-bottom:.1rem;"><a href="index.html"><img src="images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Toolbox</h1>
+    </header>
+    <main>
+      <section>
+        <h2>Word Cloud Generator</h2>
+        <p class="meta">Paste text below and click Generate.</p>
+        <label for="wc-input" class="visually-hidden">Text input</label>
+        <textarea id="wc-input" rows="12" style="width:100%;" placeholder="Paste or type text here...">Nothing Can Go Wrong is a design exploration in indirect control and consequence-driven planning. Instead of piloting the protagonist moment-to-moment, players design a route and then watch their plan unfold, for better or worse, as environmental objects react in surprising ways. The appeal—and the difficulty—comes from predicting emergent interactions while still feeling empowered by a plan that was yours. My responsibilities covered concept ideation, systems design, engineering, and integration of artist-created assets in Godot. The core loop began with a lightweight pathing tool, but the heart of the experience emerged from environmental 'verbs': train tracks, whirlpools, spring pads, trapdoors, and chain reactions that could delight or derail. Balancing readability with surprise required strict rules and effective feedback animation that help the player learn the world's grammar. Difficulty tuning was driven by data rather than guesswork; I exposed parameters for moving speeds, impulse strength, and trigger sequencing, allowing tight loops of test–tweak–test within the jam's limited timeframe. The art pass focused on clarity and charm: silhouettes that read at a glance, restrained palettes, and motion that communicates function. We achieved a polished, playable demo on schedule and ranked in the top 20% overall. Post-jam, I'd extend the system with better text and visual explanation so players can gradually learn the mechanics, add optional objectives for mastery, and implement robust replays to encourage sharing. Most importantly, the project validated a personal design interest: agency through foresight. When players laugh at a plan that almost worked—and instantly want to iterate—you've got a loop worth growing.</textarea>
+        <div style="margin-top:.5rem; display:flex; gap:.75rem; align-items:center; flex-wrap: wrap;">
+          <label><input type="checkbox" id="wc-one-per-line" /> One word per line</label>
+          <label>Max words: <input type="number" id="wc-max" min="10" max="1000" value="200" style="width:6rem;" /></label>
+          <label>Rotation: <select id="wc-rotate"><option value="0">0°</option><option value="90">0°/90°</option></select></label>
+          <label>Scale: <select id="wc-scale"><option value="sqrt">√n</option><option value="linear">n</option><option value="log">log n</option></select></label>
+          <button class="toggle" id="wc-generate" type="button">Generate</button>
+          <button class="toggle" id="wc-download" type="button" disabled>Download SVG</button>
+          <button class="toggle" id="wc-download-png" type="button" disabled>Download PNG</button>
+        </div>
+        <div id="wc-container" style="width:100%; border: 1px dashed var(--border, #ccc); margin-top: .75rem;"></div>
+        <p class="meta" style="margin-top:.75rem;">Reference: <a href="https://www.jasondavies.com/wordcloud/" target="_blank" rel="noopener">Jason Davies’ Word Cloud</a></p>
+      </section>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-cloud/build/d3.layout.cloud.min.js"></script>
+  <script src="scripts/wordcloud.js"></script>
+</body>
+</html>
+
+
