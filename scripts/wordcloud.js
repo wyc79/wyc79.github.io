@@ -117,6 +117,7 @@
     const scale = Math.min(Math.max(rawScale, 0.5), 5);
     const centerX = (bounds[0].x + bounds[1].x) / 2;
     const centerY = (bounds[0].y + bounds[1].y) / 2;
+    // SVG applies transform functions right-to-left: first move content to origin, then scale, then move to viewport center.
     return `translate(${width / 2},${height / 2}) scale(${scale}) translate(${-centerX},${-centerY})`;
   }
 
