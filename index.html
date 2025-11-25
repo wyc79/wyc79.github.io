@@ -81,6 +81,12 @@
         </div>
         <div class="projects-grid projects-grid--minor">
           <article class="project-card">
+            <h3>Game Design Workshop | Class Project Series</h3>
+            <div class="project-media">
+              <a href="game-design-workshop.html"><img src="images/ctin488_thumbnail.png" alt="Game Design Workshop" /></a>
+            </div>
+          </article>
+          <article class="project-card">
             <h3>Gyrotris | Solo Game Developer</h3>
             <div class="project-media">
               <a href="gyrotris.html"><img src="images/gyrotris_thumbnail.png" alt="Gyrotris — screenshot" /></a>
@@ -189,7 +195,8 @@
         { key: 'nothing', src: 'images/nothing_thumbnail.jpg', alt: 'Nothing Can Go Wrong — screenshot' },
         { key: 'gyrotris', src: 'images/gyrotris_thumbnail.png', alt: 'Gyrotris — screenshot' },
         { key: 'ad', src: 'images/AD_thumbnail.png', alt: 'Automatic Differentiation Toolbox' },
-        { key: 'sword', src: 'images/sword_thumbnail.png', alt: 'Aegis Sword — render' }
+        { key: 'sword', src: 'images/sword_thumbnail.png', alt: 'Aegis Sword — render' },
+        { key: 'workshop', src: 'images/ctin488_thumbnail.png', alt: 'Game Design Workshop' }
       ];
 
       const movesEl = document.getElementById('flip-moves');
@@ -208,14 +215,14 @@
       function updateMoves() { if (movesEl) movesEl.textContent = 'Moves: ' + moves; }
       function updateTime() {
         if (!timeEl) return;
-        if (!startTime) { timeEl.textContent = 'Time: 0s'; return; }
-        const secs = Math.floor((Date.now() - startTime) / 1000);
+        if (!startTime) { timeEl.textContent = 'Time: 0.00s'; return; }
+        const secs = ((Date.now() - startTime) / 1000).toFixed(2);
         timeEl.textContent = 'Time: ' + secs + 's';
       }
       function startTimerIfNeeded() {
         if (timerId) return;
         startTime = Date.now();
-        timerId = setInterval(updateTime, 1000);
+        timerId = setInterval(updateTime, 10);
         updateTime();
       }
       function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
