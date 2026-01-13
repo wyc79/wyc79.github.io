@@ -8,6 +8,7 @@
   <link rel="icon" type="image/png" href="images/wyc.png" />
   <link rel="stylesheet" href="styles.css" />
   <script src="scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
+  <script src="scripts/theme.js"></script>
 </head>
 <body id="top">
   <div class="wrap">
@@ -38,7 +39,7 @@
       <a href="#projects">Projects</a>
       <a href="#education">Education</a>
       <a href="#publications">Publications</a>
-      <a href="toolbox.html">Toolbox</a>
+      <a href="pages/toolbox.html">Toolbox</a>
     </nav>
 
     <main>
@@ -47,9 +48,9 @@
         <div class="two-col">
           <div>
             <h3>Game Development</h3>
-            <p><span class="pill">Unity</span><span class="pill">Godot</span><span class="pill">Java</span><span class="pill">C#</span><span class="pill">C++</span></p>
+            <p><span class="pill">UE5</span><span class="pill">Unity</span><span class="pill">Godot</span><span class="pill">C#</span><span class="pill">C++</span></p>
             <h3>Programming &amp; Tools</h3>
-            <p><span class="pill">Python</span><span class="pill">Linux shell</span><span class="pill">C</span><span class="pill">R</span><span class="pill">MATLAB</span><span class="pill">SQL</span><span class="pill">CSS</span><span class="pill">HTML</span><span class="pill">PHP</span><span class="pill">Onshape CAD</span><span class="pill">Robotics (basic)</span><span class="pill">Docker</span><span class="pill">GitHub</span><span class="pill">Project management</span></p>
+            <p><span class="pill">Python</span><span class="pill">Linux shell</span><span class="pill">R</span><span class="pill">C</span><span class="pill">MATLAB</span><span class="pill">Java</span><span class="pill">SQL</span><span class="pill">CSS</span><span class="pill">HTML</span><span class="pill">PHP</span><span class="pill">Onshape CAD</span><span class="pill">Robotics (basic)</span><span class="pill">Docker</span><span class="pill">GitHub</span><span class="pill">Project management</span></p>
           </div>
           <div>
             <h3>Research &amp; Interfaces</h3>
@@ -63,39 +64,63 @@
 
       <section id="projects">
         <h2>Projects</h2>
+        <h3>Game Development Projects</h3>
         <div class="projects-grid">
+          <article class="project-card">
+            <h3>Cemented Dreams | Combat Designer &amp; Level Designer</h3>
+            <p class="meta">A design exploration in indirect control and consequence-driven planning.</p>
+            <div class="project-media">
+              <a href="pages/nothing-can-go-wrong.html"><img src="images/CD_thumbnail.png" alt="Cemented Dreams — screenshot" /></a>
+            </div>
+          </article>
           <article class="project-card">
             <h3>Nothing Can Go Wrong | Game Designer &amp; Programmer</h3>
             <p class="meta">A design exploration in indirect control and consequence-driven planning.</p>
             <div class="project-media">
-              <a href="nothing-can-go-wrong.html"><img src="images/nothing_thumbnail.jpg" alt="Nothing Can Go Wrong — screenshot" /></a>
-            </div>
-          </article>
-          <article class="project-card">
-            <h3>Automatic Differentiation (AD) Toolbox | Python Developer &amp; QA Lead</h3>
-            <p class="meta">A Python package for forward-mode automatic differentiation.</p>
-            <div class="project-media">
-              <a href="automatic-differentiation.html"><img src="images/AD_thumbnail.png" alt="Automatic Differentiation, test.pypi.org" /></a>
+              <a href="pages/nothing-can-go-wrong.html"><img src="images/nothing_thumbnail.jpg" alt="Nothing Can Go Wrong — screenshot" /></a>
             </div>
           </article>
         </div>
         <div class="projects-grid projects-grid--minor">
           <article class="project-card">
-            <h3>Game Design Workshop | Class Project Series</h3>
+            <h3>Code Breaker | Game Developer</h3>
             <div class="project-media">
-              <a href="game-design-workshop.html"><img src="images/ctin488_thumbnail.png" alt="Game Design Workshop" /></a>
+              <a href="pages/gyrotris.html"><img src="images/codebreaker_thumbnail.png" alt="CodeBreaker — screenshot" /></a>
             </div>
           </article>
           <article class="project-card">
             <h3>Gyrotris | Solo Game Developer</h3>
             <div class="project-media">
-              <a href="gyrotris.html"><img src="images/gyrotris_thumbnail.png" alt="Gyrotris — screenshot" /></a>
+              <a href="pages/gyrotris.html"><img src="images/gyrotris_thumbnail.png" alt="Gyrotris — screenshot" /></a>
+            </div>
+          </article>
+        </div>
+        <br>
+        <h3>Other Related Works</h3>
+        <div class="projects-grid projects-grid--minor">
+          <article class="project-card">
+            <h3>Physical Game Prototypes | Designer &amp; Producer</h3>
+            <div class="project-media">
+              <a href="pages/game-design-workshop.html"><img src="images/ctin488_thumbnail.png" alt="Game Design Workshop" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>3D Rendering Project | Engineer</h3>
+            <div class="project-media">
+              <a href="pages/3d-rendering.html"><img src="images/3Drendering_thumbnail.png" alt="3D Rendering Project Video" /></a>
             </div>
           </article>
           <article class="project-card">
             <h3>Aegis Sword | CAD Modeler</h3>
             <div class="project-media">
-              <a href="aegis-sword.html"><img src="images/sword_thumbnail.png" alt="Aegis Sword — render" /></a>
+              <a href="pages/aegis-sword.html"><img src="images/sword_thumbnail.png" alt="Aegis Sword — render" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Automatic Differentiation (AD) Toolbox | Python Developer &amp; QA Lead</h3>
+            <!-- <p class="meta">A Python package for forward-mode automatic differentiation.</p> -->
+            <div class="project-media">
+              <a href="pages/automatic-differentiation.html"><img src="images/AD_thumbnail.png" alt="Automatic Differentiation, test.pypi.org" /></a>
             </div>
           </article>
         </div>
@@ -148,153 +173,6 @@
     </footer>
   </div>
 
-  <script>
-    // Theme initialization
-    const root = document.documentElement;
-    const saved = localStorage.getItem('yc-theme');
-    if (saved === 'light' || saved === 'dark') {
-      root.setAttribute('data-theme', saved);
-    } else {
-      const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
-      const defaultTheme = prefersDark ? 'dark' : 'light';
-      root.setAttribute('data-theme', defaultTheme);
-      localStorage.setItem('yc-theme', defaultTheme);
-    }
-
-    // Toggle handler
-    const btn = document.getElementById('themeToggle');
-    function currentTheme() {
-      const v = root.getAttribute('data-theme');
-      if (v === 'auto') {
-        return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-      return v;
-    }
-    function setTheme(mode) {
-      root.setAttribute('data-theme', mode);
-      localStorage.setItem('yc-theme', mode);
-    }
-    btn.addEventListener('click', () => {
-      const cur = currentTheme();
-      setTheme(cur === 'dark' ? 'light' : 'dark');
-      btn.blur();
-    });
-    // React to OS theme changes if the user hasn't set a preference explicitly
-    if (!saved) {
-      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        setTheme(e.matches ? 'dark' : 'light');
-      });
-    }
-
-    // Flip card minigame
-    (function () {
-      const grid = document.getElementById('flip-grid');
-      if (!grid) return;
-
-      const images = [
-        { key: 'nothing', src: 'images/nothing_thumbnail.jpg', alt: 'Nothing Can Go Wrong — screenshot' },
-        { key: 'gyrotris', src: 'images/gyrotris_thumbnail.png', alt: 'Gyrotris — screenshot' },
-        { key: 'ad', src: 'images/AD_thumbnail.png', alt: 'Automatic Differentiation Toolbox' },
-        { key: 'sword', src: 'images/sword_thumbnail.png', alt: 'Aegis Sword — render' },
-        { key: 'workshop', src: 'images/ctin488_thumbnail.png', alt: 'Game Design Workshop' }
-      ];
-
-      const movesEl = document.getElementById('flip-moves');
-      const timeEl = document.getElementById('flip-time');
-      const resetBtn = document.getElementById('flip-reset');
-      const msgEl = document.getElementById('flip-message');
-
-      let firstCard = null;
-      let secondCard = null;
-      let lock = false;
-      let moves = 0;
-      let matchedPairs = 0;
-      let startTime = null;
-      let timerId = null;
-
-      function updateMoves() { if (movesEl) movesEl.textContent = 'Moves: ' + moves; }
-      function updateTime() {
-        if (!timeEl) return;
-        if (!startTime) { timeEl.textContent = 'Time: 0.00s'; return; }
-        const secs = ((Date.now() - startTime) / 1000).toFixed(2);
-        timeEl.textContent = 'Time: ' + secs + 's';
-      }
-      function startTimerIfNeeded() {
-        if (timerId) return;
-        startTime = Date.now();
-        timerId = setInterval(updateTime, 10);
-        updateTime();
-      }
-      function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
-      function shuffle(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
-
-      function buildDeck() {
-        const pairs = images.flatMap(img => [{ ...img }, { ...img }]);
-        return shuffle(pairs);
-      }
-      function createCard(cardData) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'flip-card';
-        btn.setAttribute('data-key', cardData.key);
-        btn.setAttribute('aria-label', 'Hidden card');
-        btn.innerHTML =
-          '<div class="flip-card-inner">' +
-            '<div class="flip-card-front"><span aria-hidden="true">?</span></div>' +
-            '<div class="flip-card-back"><img src="' + cardData.src + '" alt="' + cardData.alt + '"></div>' +
-          '</div>';
-        btn.addEventListener('click', () => onCardClick(btn));
-        return btn;
-      }
-      function resetGame() {
-        lock = false;
-        firstCard = null;
-        secondCard = null;
-        moves = 0;
-        matchedPairs = 0;
-        updateMoves();
-        stopTimer();
-        startTime = null;
-        updateTime();
-        if (msgEl) msgEl.hidden = true;
-        grid.innerHTML = '';
-        const deck = buildDeck();
-        deck.forEach(data => grid.appendChild(createCard(data)));
-      }
-      function onCardClick(btn) {
-        if (lock) return;
-        if (btn.classList.contains('is-flipped') || btn.classList.contains('is-matched')) return;
-
-        startTimerIfNeeded();
-        btn.classList.add('is-flipped');
-
-        if (!firstCard) { firstCard = btn; return; }
-
-        secondCard = btn;
-        moves += 1; updateMoves();
-
-        const isMatch = firstCard.getAttribute('data-key') === secondCard.getAttribute('data-key');
-        if (isMatch) {
-          firstCard.classList.add('is-matched');
-          secondCard.classList.add('is-matched');
-          firstCard.disabled = true;
-          secondCard.disabled = true;
-          firstCard = null; secondCard = null;
-          matchedPairs += 1;
-          if (matchedPairs === images.length) { stopTimer(); if (msgEl) msgEl.hidden = false; }
-        } else {
-          lock = true;
-          setTimeout(() => {
-            firstCard.classList.remove('is-flipped');
-            secondCard.classList.remove('is-flipped');
-            firstCard = null; secondCard = null; lock = false;
-          }, 700);
-        }
-      }
-
-      if (resetBtn) resetBtn.addEventListener('click', resetGame);
-      resetGame();
-    })();
-  </script>
+  <script src="scripts/flip-game.js"></script>
 </body>
 </html>

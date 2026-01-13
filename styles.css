@@ -265,8 +265,9 @@ details > summary::-webkit-details-marker { display: none; }
 /* Flip card minigame */
 .flip-ui { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .flip-stats { display: flex; gap: 1rem; color: var(--muted); }
-.flip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
-@media (max-width: 520px) { .flip-grid { grid-template-columns: repeat(2, 1fr); } }
+.flip-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+@media (min-width: 640px) { .flip-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .flip-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 
 .flip-card { position: relative; width: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); padding: 0; cursor: pointer; box-shadow: var(--shadow); -webkit-tap-highlight-color: transparent; }
 .flip-card:disabled { cursor: default; opacity: .9; }
