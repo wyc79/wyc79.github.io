@@ -10,12 +10,18 @@
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/theme.js"></script>
 </head>
+
 <body>
   <div class="wrap">
     <header>
       <div class="toolbar" style="justify-content: space-between;">
         <div>
-          <h1 style="margin-bottom:.1rem;"><a href="../index.html"><img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Yuanchen Wang</h1>
+          <h1 style="margin-bottom:.1rem;">
+            <a href="../index.html">
+              <img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" />
+            </a>
+            Yuanchen Wang
+          </h1>
           <p class="tagline">Aspiring game developer — MSCS (Game Dev) at USC; background in psychology, neuroscience, and biomedical informatics.</p>
           <p class="contact">
             <strong>Contact:</strong>
@@ -24,35 +30,78 @@
             <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
           </p>
         </div>
+
         <div>
           <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
           <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
         </div>
       </div>
-
     </header>
 
     <main>
+      <!-- HERO -->
       <section class="project-hero" style="background-image: url('../images/AD.png');">
         <span class="sr-only" role="img" aria-label="Automatic Differentiation Toolbox graphic from test.pypi.org."></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title">Automatic Differentiation (AD) Toolbox</h2>
+
           <div class="project-hero__meta">
             <div class="project-hero__meta-item"><strong>Role:</strong> Python Developer & QA Lead</div>
-            <div class="project-hero__meta-item"><strong>Tool:</strong> Python, PyPI</div>
-            <div class="project-hero__meta-item"><strong>Duration:</strong> Fall 2022 · 3 months</div>
+            <div class="project-hero__meta-item"><strong>Tool:</strong> Python, PyPI, GitHub</div>
+            <div class="project-hero__meta-item"><strong>Duration:</strong> Fall 2022 · 1 semester</div>
           </div>
         </div>
       </section>
 
       <section class="project-body">
-        <p class="meta"><strong>Python</strong> — <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a></p>
 
-        <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <p>The Automatic Differentiation Toolbox is a Python package built collaboratively by a five-member team to implement forward-mode automatic differentiation. Our approach combined chain rule logic and dual number operations to enable precise, efficient derivative calculations without numerical instability. My contributions included scripting, designing and executing comprehensive unit tests to validate core functionality, remove redundant code, and ensure the package remained lightweight and maintainable. I worked closely with teammates through regular check-ins, code reviews, and debugging sessions, integrating individual modules into a cohesive, production-ready tool. Throughout the process, I documented implementation details and design rationale to support clarity, collaboration, and future extension of the package.</p>
-        </article>
+        <p class="meta">
+          <strong>Python</strong> —
+          <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a>
+        </p>
 
-        <p style="margin-top: 1.5rem;"><a href="../index.html#projects">← Back to Projects</a></p>
+        <section style="margin-top: 1.5rem;">
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <h3 style="margin-top: 0;">Why</h3>
+              <p class="meta">Derivatives show up everywhere in optimization, ML, and scientific computing, but the common alternatives are frustrating in practice: <strong>numerical differentiation</strong> can be unstable (step-size tradeoffs), and <strong>symbolic differentiation</strong> can blow up in expression size.</p>
+              <p class="meta">We wanted a small, readable tool that computes <strong>exact derivatives</strong> at runtime, so users can differentiate “normal Python code” without manually applying the chain rule.</p>
+            </div>
+
+            <div>
+              <h3 style="margin-top: 0;">What</h3>
+              <p class="meta">A forward-mode automatic differentiation (AD) Python package built by a <strong>5-person team</strong>. It evaluates user-defined functions and returns derivatives by propagating dual numbers through operator overloads and elementary functions.</p>
+              <p class="meta">The focus was a <strong>clean API</strong>, strong correctness guarantees, and maintainability through a test-first workflow.</p>
+              <p style="margin: 0;"><span class="pill">Python</span><span class="pill">Forward-mode AD</span><span class="pill">Dual Numbers</span><span class="pill">Operator Overloading</span><span class="pill">Unit Testing</span><span class="pill">PyPI</span></p>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+          <h3>How</h3>
+          <h4 style="margin-top: 0;">My contributions (Core AD + QA)</h4>
+          <p class="meta">I implemented key pieces of the forward-mode engine and led QA to keep the package correct as features expanded.</p>
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <ul>
+                <li><strong>Forward-mode engine:</strong> Implemented dual number arithmetic and operator overloading to propagate derivatives through composed expressions.</li>
+                <li><strong>Function composition:</strong> Ensured derivatives flow correctly through chained operations (add/mul/div/pow, etc.) by applying the chain rule consistently across overloaded operators.</li>
+                <li><strong>Refactoring for clarity:</strong> Reduced redundancy and improved readability so teammates could extend the system without breaking core invariants.</li>
+              </ul>
+            </div>
+            <div>
+              <ul>
+                <li><strong>QA leadership:</strong> Designed and executed comprehensive unit tests (core ops + edge cases) to verify numerical correctness and prevent regressions.</li>
+                <li><strong>Debugging &amp; integration:</strong> Coordinated module integration, triaged bugs, and documented design decisions to streamline collaboration.</li>
+                <li><strong>Release readiness:</strong> Helped ensure stable packaging/behavior for publishing on TestPyPI.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <p style="margin-top: 1.5rem;">
+          <a href="../index.html#projects">← Back to Projects</a>
+        </p>
       </section>
     </main>
 
@@ -62,4 +111,3 @@
   </div>
 </body>
 </html>
-

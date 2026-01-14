@@ -39,7 +39,7 @@
           <div class="project-hero__meta">
             <div class="project-hero__meta-item"><strong>Role:</strong> CAD Modeler</div>
             <div class="project-hero__meta-item"><strong>Tool:</strong> Onshape CAD</div>
-            <div class="project-hero__meta-item"><strong>Duration:</strong> Spring 2023 · 4 weeks</div>
+            <div class="project-hero__meta-item"><strong>Duration:</strong> Spring 2021 · 4 weeks</div>
           </div>
         </div>
       </section>
@@ -47,9 +47,49 @@
       <section class="project-body">
         <p class="meta"><strong>Onshape CAD</strong> — <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener">View on Onshape CAD</a></p>
 
-        <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <p>The Aegis Sword project is a detailed 3D replication of the weapon from Xenoblade Chronicles 2, completed as the final project for EAS 143: Introduction to Solid Modeling at the University of Rochester. Using OnShape CAD, I reproduced its intricate, asymmetrical design—symbolizing the character Pyra's fragmented past—by applying modular modeling techniques for clean topology and precise detailing. This work refined my skills in translating abstract artistic concepts into production-ready assets, balancing visual fidelity with structural practicality. The techniques developed here form a strong foundation for creating immersive, story-driven 3D assets in future game development projects.</p>
-        </article>
+        <section style="margin-top: 1.5rem;">
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <h3 style="margin-top: 0;">Why</h3>
+              <p class="meta">I wanted to practice translating a <strong>stylized game prop</strong> into a <strong>clean, manufacturable CAD model</strong>—especially handling asymmetry, layered details, and tight proportion matching from reference.</p>
+              <p class="meta">This was my final project for <strong>EAS 143: Introduction to Solid Modeling (University of Rochester, Spring 2021)</strong>, where the goal was to build accurate parts and assemblies using parametric workflows.</p>
+            </div>
+
+            <div>
+              <h3 style="margin-top: 0;">What</h3>
+              <p class="meta">A detailed 3D CAD replication of the <strong>Aegis Sword</strong> from <em>Xenoblade Chronicles 2</em>, modeled in Onshape with an emphasis on readable silhouette, precise detailing, and assembly-ready structure.</p>
+              <p style="margin: 0;"><span class="pill">Onshape CAD</span><span class="pill">Parametric Modeling</span><span class="pill">Assembly</span><span class="pill">Surface Detailing</span><span class="pill">Reference Matching</span></p>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+          <h3>How</h3>
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <h4 style="margin-top: 0;">Workflow</h4>
+              <ul>
+                <li><strong>Reference breakdown:</strong> Collected screenshots and orthographic-ish angles, then identified key proportions (blade length, guard width, handle thickness) to lock the silhouette early.</li>
+                <li><strong>Modular parts:</strong> Split the sword into repeatable subcomponents (blade core, guard, handle, emblem/ornament), so edits wouldn’t cascade across the whole model.</li>
+                <li><strong>Parametric feature tree:</strong> Used sketches + extrudes/fillets/patterns with named dimensions to keep the model editable during iteration.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 style="margin-top: 0;">Design &amp; detailing</h4>
+              <ul>
+                <li><strong>Asymmetry handling:</strong> Established a consistent datum setup and only mirrored where the design truly repeats; the rest was modeled intentionally off-axis to match the original.</li>
+                <li><strong>Clean edges &amp; readability:</strong> Tuned bevels/fillets to avoid “too sharp” transitions while keeping crisp highlights on the main forms.</li>
+                <li><strong>Assembly mindset:</strong> Modeled as an assembly with part separation in mind (useful for future export, printing, or game-ready retopology workflows).</li>
+              </ul>
+            </div>
+          </div>
+
+          <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-top: 1.25rem;">
+            <h4 style="margin-top: 0;">Result</h4>
+            <p class="meta" style="margin-bottom: 0;">The final model reproduces the sword’s layered structure and distinctive asymmetry, and the modular setup made it straightforward to refine proportions and surface details late in the process.</p>
+          </div>
+        </section>
 
         <p style="margin-top: 1.5rem;"><a href="../index.html#projects">← Back to Projects</a></p>
       </section>

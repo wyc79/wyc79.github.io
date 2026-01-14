@@ -108,6 +108,51 @@
       from {opacity: .4}
       to {opacity: 1}
     }
+  
+    /* Tabs (lightweight W3CSS-style) */
+    .tabs {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: .75rem;
+    }
+    .tablink {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: .55rem .85rem;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform .05s ease, background .2s ease, border-color .2s ease;
+    }
+    .tablink:hover { transform: translateY(-1px); }
+    .tablink.active {
+      background: var(--accent);
+      color: white;
+      border-color: transparent;
+    }
+    .tabcontent { margin-top: 1rem; }
+    .tabcard {
+      background: var(--bg);
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      margin-bottom: 1.25rem;
+    }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 860px) {
+      .grid2 { grid-template-columns: 1fr; }
+    }
+    .bullets { margin: .5rem 0 0 1.1rem; }
+    .mini { margin-top: .75rem; color: var(--muted); font-size: .95rem; }
+
   </style>
 </head>
 <body>
@@ -141,34 +186,194 @@
         </div>
       </section>
 
+      
       <section class="project-body">
-        <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+
+        <article class="card" style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <h3 style="margin-top:0;">CTIN 488 — Game Design Workshop (Fall 2025)</h3>
+          <p>
+            This page documents my work across three studio projects in CTIN 488, a playcentric design course focused on
+            rapid prototyping, playtesting, and iteration toward a clear player experience goal.
+            The semester included an <em>Up the River</em> game mod/variation, a focused <em>Mechanics</em> project, and a
+            team <em>Final Project</em>.
+          </p>
+          <p style="margin:0;">
+            Use the tabs below to see <strong>why</strong> we made each project, <strong>what</strong> we decided to build,
+            and <strong>how</strong> it evolved through design photo journals.
+          </p>
         </article>
 
-        <section class="slideshow-section">
-          <h3>Mechanics</h3>
-          <div class="slideshow-container" id="slideshow-mechanics">
-            <!-- Slides will be inserted here by JavaScript -->
+        <!-- Tabs -->
+        <div class="tabs" role="tablist" aria-label="CTIN 488 projects" style="margin-top: 1.25rem;">
+          <button class="tablink active" role="tab" aria-selected="true" aria-controls="tab-upriver" id="btn-upriver" onclick="openTab(event,'tab-upriver')">Up the River</button>
+          <button class="tablink" role="tab" aria-selected="false" aria-controls="tab-mechanics" id="btn-mechanics" onclick="openTab(event,'tab-mechanics')">Mechanics</button>
+          <button class="tablink" role="tab" aria-selected="false" aria-controls="tab-final" id="btn-final" onclick="openTab(event,'tab-final')">Final Project</button>
+        </div>
+
+        <!-- Up the River Tab -->
+        <section id="tab-upriver" class="tabcontent" role="tabpanel" aria-labelledby="btn-upriver" style="display:block;">
+          <div class="tabcard">
+            <h3 style="margin-top:0;">Up the River — Variation / Game Mod</h3>
+
+            <div class="grid2">
+              <div>
+                <h4>Why</h4>
+                <p>
+                  Build a <strong>variation</strong> on a shared base game (Up the River) by changing constraints and mechanics,
+                  then iterate through structured playtests while keeping a specific experience goal in focus.
+                </p>
+
+                <h4>What</h4>
+                <p>
+                  Our variation reworked the original linear track into a <strong>circular race-to-treasure</strong> loop with
+                  environmental tiles (Wave/Reef), <strong>Pirate</strong> hazards, and a card system that lets players speed up
+                  their ship or hinder others. The intended experience was <strong>pressure + strategy</strong> as players chase points
+                  while avoiding danger.
+                </p>
+              </div>
+
+              <div>
+                <h4>How</h4>
+                <ul class="bullets">
+                  <li><strong>9/21:</strong> First concept — circular track, Port ↔ Treasure Island, Pirate danger, D4 → card draw trigger.</li>
+                  <li><strong>9/23:</strong> Adjusted probabilities and pacing — D4→D6, larger board, 1 pirate→2 pirates, refined cards/rules.</li>
+                  <li><strong>9/24:</strong> Lab playtest — shortened rule text, clarified setup/order, improved card draw incentives (roll 1/6).</li>
+                  <li><strong>9/26:</strong> Internal playtest — reshuffle rule, clearer card effects, reduced playtime (max 3 cards held).</li>
+                  <li><strong>9/30:</strong> Consolidated V2 — finalized board/rules, stronger flow and faster gameplay.</li>
+                </ul>
+
+                <p class="mini">
+                  Design photo journal: <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk6.pdf" target="_blank" rel="noopener">Week 6 Journal (PDF)</a>
+                </p>
+              </div>
+            </div>
           </div>
-          <div class="dots-container" id="dots-mechanics"></div>
+
+          <!-- Keep existing slideshow -->
+          <section class="slideshow-section">
+            <h3>Up The River — Process Slides</h3>
+            <div class="slideshow-container" id="slideshow-upriver">
+              <!-- Slides will be inserted here by JavaScript -->
+            </div>
+            <div class="dots-container" id="dots-upriver"></div>
+          </section>
         </section>
 
-        <section class="slideshow-section">
-          <h3>Up The River</h3>
-          <div class="slideshow-container" id="slideshow-upriver">
-            <!-- Slides will be inserted here by JavaScript -->
+        <!-- Mechanics Tab -->
+        <section id="tab-mechanics" class="tabcontent" role="tabpanel" aria-labelledby="btn-mechanics" style="display:none;">
+          <div class="tabcard">
+            <h3 style="margin-top:0;">Mechanics Project — Focused Mechanic Exploration</h3>
+
+            <div class="grid2">
+              <div>
+                <h4>Why</h4>
+                <p>
+                  Practice <strong>mechanics-first</strong> design: choose a core interaction, prototype fast, and use formal feedback to
+                  refine clarity, pacing, and player interpretation.
+                </p>
+
+                <h4>What</h4>
+                <p>
+                  <strong>Too Bird To Handle</strong> is a silent-coordination bidding game themed around birds courting.
+                  Players coordinate without speaking, trying to read intention and manage risk through a “give or take” style action loop.
+                </p>
+              </div>
+
+              <div>
+                <h4>How</h4>
+                <ul class="bullets">
+                  <li><strong>10/27:</strong> External playtests confirmed theme/art and engagement, but revealed rule clarity gaps (turn structure, “enemy bird”).</li>
+                  <li><strong>10/27:</strong> We renamed “enemy bird” to <strong>Snatcher</strong> and rewrote the rulebook with explicit examples and clearer resolution order.</li>
+                  <li><strong>10/28:</strong> Internal playtests validated the updated rulebook — smoother flow and reduced confusion.</li>
+                  <li><strong>10/29:</strong> Final pass to ensure all assets (cards, board, rules) were consistent for submission.</li>
+                </ul>
+
+                <p class="mini">
+                  Design photo journal: <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk10.pdf" target="_blank" rel="noopener">Week 10 Journal (PDF)</a>
+                </p>
+              </div>
+            </div>
           </div>
-          <div class="dots-container" id="dots-upriver"></div>
+
+          <!-- Keep existing slideshow -->
+          <section class="slideshow-section">
+            <h3>Mechanics — Process Slides</h3>
+            <div class="slideshow-container" id="slideshow-mechanics">
+              <!-- Slides will be inserted here by JavaScript -->
+            </div>
+            <div class="dots-container" id="dots-mechanics"></div>
+          </section>
+        </section>
+
+        <!-- Final Project Tab -->
+        <section id="tab-final" class="tabcontent" role="tabpanel" aria-labelledby="btn-final" style="display:none;">
+          <div class="tabcard">
+            <h3 style="margin-top:0;">Final Project — Original Team Game</h3>
+
+            <div class="grid2">
+              <div>
+                <h4>Why</h4>
+                <p>
+                  The final project is a <strong>free project</strong>: define an original experience goal, build an end-to-end prototype,
+                  and demonstrate playcentric iteration across multiple weeks (rules, components, balance, and presentation).
+                </p>
+
+                <h4>What</h4>
+                <p>
+                  Our team built a competitive survival game centered on <strong>social hierarchy</strong>. Players take on different roles
+                  (upper- to lower-class) and must meet role-specific needs inspired by Maslow’s hierarchy while dealing with threats,
+                  deception, and negotiation as resources flow from top to bottom each round.
+                </p>
+              </div>
+
+              <div>
+                <h4>How</h4>
+                <ul class="bullets">
+                  <li><strong>Week 1:</strong> Core loop established (roles + descending resources). Iterated quickly via internal/external playtests; tightened threat/gun rules.</li>
+                  <li><strong>Week 2:</strong> Thematic + systemic clarity: “pet”→<strong>love</strong>, shifted to <strong>single-winner</strong> victory, improved lower-class agency (starting hand), refined rulebook readability.</li>
+                  <li><strong>Week 3:</strong> Balance pass supported by <strong>200k-trial simulations</strong>; adjusted deck composition and updated win conditions to reduce “accidental” wins.</li>
+                  <li><strong>Week 4:</strong> Presentation polish: finalized slide deck and recorded the final presentation video.</li>
+                </ul>
+
+                <p class="mini">
+                  Design photo journal: <a href="../files/ctin488/Team4-DesignPhotoJournal-FINAL.pdf" target="_blank" rel="noopener">Final Journal (PDF)</a>
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <p style="margin-top: 1.5rem;"><a href="../index.html#projects">← Back to Projects</a></p>
       </section>
+
     </main>
 
     <footer>
       <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-11-24.</p>
     </footer>
   </div>
+
+
+  <script>
+    function openTab(evt, tabId) {
+      const tabs = document.getElementsByClassName("tabcontent");
+      for (let i = 0; i < tabs.length; i++) tabs[i].style.display = "none";
+
+      const links = document.getElementsByClassName("tablink");
+      for (let i = 0; i < links.length; i++) {
+        links[i].classList.remove("active");
+        links[i].setAttribute("aria-selected", "false");
+      }
+
+      const panel = document.getElementById(tabId);
+      if (panel) panel.style.display = "block";
+
+      if (evt && evt.currentTarget) {
+        evt.currentTarget.classList.add("active");
+        evt.currentTarget.setAttribute("aria-selected", "true");
+      }
+    }
+  </script>
 
   <script src="../scripts/ctin488-slideshow.js"></script>
 </body>

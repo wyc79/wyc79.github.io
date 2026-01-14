@@ -38,17 +38,117 @@
           <h2 class="project-hero__title">3D Rendering Project</h2>
           <div class="project-hero__meta">
             <div class="project-hero__meta-item"><strong>Role:</strong> Engineer</div>
+            <div class="project-hero__meta-item"><strong>Tool:</strong> Unity URP, HLSL, C#, GitHub</div>
+            <div class="project-hero__meta-item"><strong>Duration:</strong> Fall 2025 · 1 semester</div>
           </div>
         </div>
       </section>
 
       <section class="project-body">
-        <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <video controls style="width: 100%; border-radius: var(--radius);">
-            <source src="../videos/3D_rendering.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
-        </article>
+        <p class="meta">
+          <strong>Unity URP</strong> —
+          <a href="https://github.com/wyc79/580Project" target="_blank" rel="noopener">View on GitHub</a>
+        </p>
+
+        <section style="margin-top: 1.5rem;">
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <h3 style="margin-top: 0;">Why</h3>
+              <p class="meta">I wanted to get hands-on with real-time rendering beyond "using shaders" — specifically: how procedural textures, custom shading, and world-space masks can be composed into a readable VFX sequence.</p>
+              <p class="meta">This was my final project for <strong>CSCI 580: 3D Graphics and Rendering (USC, Fall 2025)</strong>, where we explored both offline and realtime rendering techniques (rasterization, shading, noise/procedural generation, and pipeline concepts).</p>
+            </div>
+
+            <div>
+              <h3 style="margin-top: 0;">What</h3>
+              <p class="meta">A real-time <strong>asteroid impact</strong> sequence in Unity URP: a procedural asteroid falls onto a terrain, an "impact frame" post-process sells the moment of collision, and an expanding shockwave reveals molten cracks across the ground.</p>
+              <p style="margin: 0;"><span class="pill">Unity URP</span><span class="pill">HLSL</span><span class="pill">C#</span><span class="pill">Procedural Noise</span><span class="pill">World-space Masks</span></p>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+          <h3>How</h3>
+          <h4 style="margin-top: 0;">My contributions (Terrain Transformation)</h4>
+          <p class="meta">I owned the <strong>terrain transformation system</strong> — the lava/crack look and the reveal/fade logic that makes the shockwave "paint" the ground as it expands.</p>
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <ul>
+                <li><strong>Procedural lava &amp; cracks shader (HLSL):</strong> Built a terrain material that blends from normal ground to molten lava using <strong>3D Worley noise</strong> for organic crack boundaries.</li>
+                <li><strong>Corner rounding for Worley junctions:</strong> Standard Worley borders can create sharp, unnatural corners at cell junctions. I used the <strong>third-nearest distance (F3)</strong> to compute a corner metric and widen cracks near junctions, producing rounded lava "veins."</li>
+                <li><strong>Surface micro-detail:</strong> Added controllable normal perturbation (Worley + Perlin-style noise) to avoid a flat/plastic feel and improve lighting response.</li>
+              </ul>
+              <div style="margin-top: 1rem;">
+                <img src="../images/3Drendering_lava.png" alt="Lava rendering" style="width: 100%; border-radius: var(--radius-lg);" />
+                <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
+                  <p style="margin: 0;" class="meta">Demonstration of the rounding corner effect and normal shading on the lava shader. 
+                  <br>(left: not rounded; middle: rounded corners; right: added normal details)</p>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <ul>
+                <li><strong>World-space spherical reveal mask:</strong> Implemented a <code>smoothstep</code>-based mask using distance-to-impact-center with radius + feather controls, then used that mask to lerp between the original terrain and lava shader outputs.</li>
+                <li><strong>C# runtime control:</strong> Drove shader parameters every frame (center, radius, feather) using <strong>MaterialPropertyBlock</strong> so multiple objects can share a material while still receiving per-instance reveal behavior.</li>
+                <li><strong>Fade-out variant:</strong> Implemented a complementary transparent fade shader using the same world-space mask logic (useful for "clearing" geometry inside the shockwave region).</li>
+              </ul>
+              <div style="margin-top: 1rem;">
+                <img src="../images/3Drendering_controlMask.gif" alt="Control mask progression" style="width: 100%; border-radius: var(--radius-lg);" />
+                <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
+                  <p style="margin: 0;" class="meta">Controlled revealation of lava and fade-out shaders. </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+          <h3>Outcomes</h3>
+          
+          <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-bottom: 1.5rem;">
+            <h4 style="margin-top: 0;">Team system context</h4>
+            <p class="meta">This was a 4-person project. While I focused on terrain transformation, the full sequence also includes:</p>
+            <ul>
+              <li><strong>Procedural asteroid generation</strong> (vertex displacement + heightfield-driven normals)</li>
+              <li><strong>Velocity-reactive asteroid lighting</strong> (emission + Fresnel rim "burn")</li>
+              <li><strong>Impact frame post-processing</strong> (edge detection + radial blur + polar noise "speed lines")</li>
+              <li><strong>Shockwave bubble shader</strong> (depth intersection + Fresnel + heat distortion)</li>
+            </ul>
+
+          </div>
+          
+          <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+            <iframe
+              src="https://drive.google.com/file/d/1E8jcsfaWMn5RO8kw6s2tnNYQdFKJUnFa/preview"
+              width="100%"
+              height="480"
+              frameborder="0"
+              allowfullscreen
+              style="border-radius: var(--radius);">
+            </iframe>
+          </article>
+
+          <br>
+
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+              <h4 style="margin-top: 0;">What worked well</h4>
+              <ul style="margin-bottom: 0;">
+                <li><strong>Readable, stylized “lava reveal”:</strong> The world-space mask + Worley cracks made the shockwave feel like it physically alters the terrain.</li>
+                <li><strong>More natural crack topology:</strong> Corner rounding reduced sharp triangular junctions common in basic Worley borders.</li>
+                <li><strong>Reusable control pattern:</strong> MaterialPropertyBlock-based driving is engine-friendly and scales to multiple affected surfaces.</li>
+              </ul>
+            </div>
+
+            <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+              <h4 style="margin-top: 0;">Limitations &amp; next steps</h4>
+              <ul style="margin-bottom: 0;">
+                <li>The micro-normal detail was tricky to balance; in the final render we reduced the detail scale to avoid noisy lighting. Next, I’d tune a sharper normal pattern that still reads cleanly in motion.</li>
+                <li>I’d also like to expose a small “art direction” panel (crack width, junction rounding strength, lava pulse speed) for faster iteration.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
 
         <p style="margin-top: 1.5rem;"><a href="../index.html#projects">← Back to Projects</a></p>
       </section>
@@ -58,6 +158,5 @@
       <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
     </footer>
   </div>
-
 </body>
 </html>
