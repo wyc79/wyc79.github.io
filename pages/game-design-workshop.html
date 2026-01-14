@@ -136,10 +136,11 @@
     }
     .tabcontent { margin-top: 1rem; }
     .tabcard {
-      background: var(--bg);
-      padding: 1.5rem;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border);
+      /* Match the "3d-rendering" aesthetics: no inner white card; let the parent section styling show through */
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      border: 0;
       margin-bottom: 1.25rem;
     }
     .grid2 {
@@ -213,39 +214,52 @@
         <!-- Up the River Tab -->
         <section id="tab-upriver" class="tabcontent" role="tabpanel" aria-labelledby="btn-upriver" style="display:block;">
           <div class="tabcard">
-            <h3 style="margin-top:0;">Up the River — Variation / Game Mod</h3>
+            <h3 style="margin-top:0;">Up the River: Variation / Game Mod</h3>
 
-            <div class="grid2">
+            <!-- Why + What (same row, 2 columns) -->
+            <div class="two-col" style="gap: 1.25rem; align-items: start;">
               <div>
-                <h4>Why</h4>
-                <p>
+                <h4 style="margin-top: 0;">Why</h4>
+                <p class="meta">
                   Build a <strong>variation</strong> on a shared base game (Up the River) by changing constraints and mechanics,
                   then iterate through structured playtests while keeping a specific experience goal in focus.
                 </p>
+              </div>
 
-                <h4>What</h4>
-                <p>
+              <div>
+                <h4 style="margin-top: 0;">What</h4>
+                <p class="meta">
                   Our variation reworked the original linear track into a <strong>circular race-to-treasure</strong> loop with
                   environmental tiles (Wave/Reef), <strong>Pirate</strong> hazards, and a card system that lets players speed up
                   their ship or hinder others. The intended experience was <strong>pressure + strategy</strong> as players chase points
                   while avoiding danger.
                 </p>
               </div>
+            </div>
 
-              <div>
-                <h4>How</h4>
-                <ul class="bullets">
-                  <li><strong>9/21:</strong> First concept — circular track, Port ↔ Treasure Island, Pirate danger, D4 → card draw trigger.</li>
-                  <li><strong>9/23:</strong> Adjusted probabilities and pacing — D4→D6, larger board, 1 pirate→2 pirates, refined cards/rules.</li>
-                  <li><strong>9/24:</strong> Lab playtest — shortened rule text, clarified setup/order, improved card draw incentives (roll 1/6).</li>
-                  <li><strong>9/26:</strong> Internal playtest — reshuffle rule, clearer card effects, reduced playtime (max 3 cards held).</li>
-                  <li><strong>9/30:</strong> Consolidated V2 — finalized board/rules, stronger flow and faster gameplay.</li>
-                </ul>
-
-                <p class="mini">
-                  Design photo journal: <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk6.pdf" target="_blank" rel="noopener">Week 6 Journal (PDF)</a>
-                </p>
+            <!-- How (separate section) -->
+            <div style="margin-top: 1.25rem;">
+              <h4 style="margin-top: 0;">How (weekly iteration)</h4>
+              <div class="weekblocks">
+                <div class="weekblock">
+                  <h5>Week 1 — Core loop + first pass balancing (9/21–9/23)</h5>
+                  <ul>
+                    <li>Defined the core loop: travel between <em>Port</em> and <em>Treasure Island</em> on a circular track, using dice + event cards to create risk/reward decisions.</li>
+                    <li>Iterated quickly on pacing and probability: expanded the board, switched from D4 to D6, increased pirate pressure, and tightened card/rule wording so turns stayed snappy (we focused on pacing/balance tuning + clarity).</li>
+                  </ul>
+                </div>
+                <div class="weekblock">
+                  <h5>Week 2 — Playtest-driven clarity + V2 polish (9/24–9/30)</h5>
+                  <ul>
+                    <li>Ran a lab playtest and rewrote setup/turn order text for clarity; tuned incentives (e.g., when card draws trigger) to reduce “dead” rolls.</li>
+                    <li>Conducted internal playtests to reduce downtime and edge-case confusion (reshuffle rules, clearer card effects, max hand size), then consolidated everything into a cleaner V2 with a faster, smoother flow (we led setup/turn-order + edge-case clarity fixes and helped consolidate the final V2 rules).</li>
+                  </ul>
+                </div>
               </div>
+
+              <!-- <p class="mini">
+                Design photo journal: <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk6.pdf" target="_blank" rel="noopener">Week 6 Journal (PDF)</a>
+              </p> -->
             </div>
           </div>
 
@@ -262,36 +276,66 @@
         <!-- Mechanics Tab -->
         <section id="tab-mechanics" class="tabcontent" role="tabpanel" aria-labelledby="btn-mechanics" style="display:none;">
           <div class="tabcard">
-            <h3 style="margin-top:0;">Mechanics Project — Focused Mechanic Exploration</h3>
+            <h3 style="margin-top:0;">Mechanics Project: Focused Mechanic Exploration</h3>
 
-            <div class="grid2">
+            <!-- Why + What (same row, 2 columns) -->
+            <div class="two-col" style="gap: 1.25rem; align-items: start;">
               <div>
-                <h4>Why</h4>
-                <p>
+                <h4 style="margin-top: 0;">Why</h4>
+                <p class="meta">
                   Practice <strong>mechanics-first</strong> design: choose a core interaction, prototype fast, and use formal feedback to
                   refine clarity, pacing, and player interpretation.
                 </p>
-
-                <h4>What</h4>
-                <p>
-                  <strong>Too Bird To Handle</strong> is a silent-coordination bidding game themed around birds courting.
-                  Players coordinate without speaking, trying to read intention and manage risk through a “give or take” style action loop.
+                <p class="meta">
+                  This project started from <strong>randomly drawn topics</strong>. Our team selected four key words —
+                  <strong>auction</strong>, <strong>versus</strong>, <strong>romance</strong>, and <strong>solution-finding</strong> — and our goal was to turn them into a playable game.
+                </p>
+                <p class="meta" style="margin-bottom: 0;">
+                  We specifically wanted to explore how <strong>auctions</strong> can function as both a competitive system and a narrative device, letting emotional stakes emerge from mechanical choices
+                  (instead of scripted story beats).
                 </p>
               </div>
 
               <div>
-                <h4>How</h4>
-                <ul class="bullets">
-                  <li><strong>10/27:</strong> External playtests confirmed theme/art and engagement, but revealed rule clarity gaps (turn structure, “enemy bird”).</li>
-                  <li><strong>10/27:</strong> We renamed “enemy bird” to <strong>Snatcher</strong> and rewrote the rulebook with explicit examples and clearer resolution order.</li>
-                  <li><strong>10/28:</strong> Internal playtests validated the updated rulebook — smoother flow and reduced confusion.</li>
-                  <li><strong>10/29:</strong> Final pass to ensure all assets (cards, board, rules) were consistent for submission.</li>
-                </ul>
-
-                <p class="mini">
-                  Design photo journal: <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk10.pdf" target="_blank" rel="noopener">Week 10 Journal (PDF)</a>
+                <h4 style="margin-top: 0;">What</h4>
+                <p class="meta">
+                  <strong>Too Bird To Handle</strong> is a silent-coordination bidding game themed around birds courting.
+                  Players coordinate without speaking, trying to read intention and manage risk through a “give or take” style action loop.
+                </p>
+                <p class="meta" style="margin-bottom: 0;">
+                  Built around an <strong>auction-style</strong> interaction, the experience emphasizes <strong>reading intent</strong>, managing risk, and negotiating value under social pressure.
                 </p>
               </div>
+            </div>
+
+            <!-- How (separate section) -->
+            <div style="margin-top: 1.25rem;">
+              <h4 style="margin-top: 0;">How (weekly iteration)</h4>
+              <div class="weekblocks">
+                <div class="weekblock">
+                  <h5>Week 1 — Prompt → playable prototype + first external tests (Week 9)</h5>
+                  <ul>
+                    <li>Used a “yes-and” brainstorm to interpret the prompt, then committed to an <strong>auction-inspired</strong>, <strong>four-player cooperative</strong> direction about birds searching for mates.</li>
+                    <li>Built a minimum playable prototype: sketched resource and bird cards, established clear win/loss conditions, and iterated internally to smooth the difficulty curve (less swingy, more teamwork).</li>
+                    <li>Ran early external playtests and captured the biggest issues: players misread the game as competitive, terminology (“bid/bird”) was confusing, and setup/visibility needed cleaner structure.</li>
+                    <li>Turned playtest feedback into concrete fixes (terminology, setup clarity, table layout), and tightened win/loss wording for faster onboarding.</li>
+                  </ul>
+                </div>
+                <div class="weekblock">
+                  <h5>Week 2 — Clarity pass + visual polish + finalization (Week 10)</h5>
+                  <ul>
+                    <li>Ran additional external playtests that confirmed stronger engagement and pacing, while still highlighting edge-case questions and moments where the rules needed explicit guidance.</li>
+                    <li>Validated changes through internal playtests, then did a final consistency/clarity pass across the rulebook, cards, and board to remove edge cases and improve readability (so the experience matched the intended “silent teamwork” tension).</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- <p class="mini">
+                Design photo journals:
+                <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk9.pdf" target="_blank" rel="noopener">Week 9 (PDF)</a>
+                ·
+                <a href="../files/ctin488/Team3-DesignPhotoJournal-Wk10.pdf" target="_blank" rel="noopener">Week 10 (PDF)</a>
+              </p> -->
             </div>
           </div>
 
@@ -308,37 +352,61 @@
         <!-- Final Project Tab -->
         <section id="tab-final" class="tabcontent" role="tabpanel" aria-labelledby="btn-final" style="display:none;">
           <div class="tabcard">
-            <h3 style="margin-top:0;">Final Project — Original Team Game</h3>
+            <h3 style="margin-top:0;">Final Project: Original Team Game; Role: Producer</h3>
 
-            <div class="grid2">
+            <!-- Why + What (same row, 2 columns) -->
+            <div class="two-col" style="gap: 1.25rem; align-items: start;">
               <div>
-                <h4>Why</h4>
-                <p>
+                <h4 style="margin-top: 0;">Why</h4>
+                <p class="meta">
                   The final project is a <strong>free project</strong>: define an original experience goal, build an end-to-end prototype,
-                  and demonstrate playcentric iteration across multiple weeks (rules, components, balance, and presentation).
+                  and demonstrate <strong>playcentric iteration</strong> across multiple weeks (rules, components, balance, and presentation).
                 </p>
+              </div>
 
-                <h4>What</h4>
-                <p>
+              <div>
+                <h4 style="margin-top: 0;">What</h4>
+                <p class="meta">
                   Our team built a competitive survival game centered on <strong>social hierarchy</strong>. Players take on different roles
                   (upper- to lower-class) and must meet role-specific needs inspired by Maslow’s hierarchy while dealing with threats,
                   deception, and negotiation as resources flow from top to bottom each round.
                 </p>
               </div>
+            </div>
 
-              <div>
-                <h4>How</h4>
-                <ul class="bullets">
-                  <li><strong>Week 1:</strong> Core loop established (roles + descending resources). Iterated quickly via internal/external playtests; tightened threat/gun rules.</li>
-                  <li><strong>Week 2:</strong> Thematic + systemic clarity: “pet”→<strong>love</strong>, shifted to <strong>single-winner</strong> victory, improved lower-class agency (starting hand), refined rulebook readability.</li>
-                  <li><strong>Week 3:</strong> Balance pass supported by <strong>200k-trial simulations</strong>; adjusted deck composition and updated win conditions to reduce “accidental” wins.</li>
-                  <li><strong>Week 4:</strong> Presentation polish: finalized slide deck and recorded the final presentation video.</li>
-                </ul>
+            <!-- How (separate section) -->
+            <div style="margin-top: 1.25rem;">
+              <h4 style="margin-top: 0;">How (weekly iteration)</h4>
+              <ul class="bullets">
+                <li>
+                  <strong>Week 1 — Core loop + first playable:</strong>
+                  We defined the concept, scope, and primary mechanics (roles + descending resources), aligned on the intended player experience,
+                  and built an early prototype for quick internal/external playtests.
+                  We helped lock the core loop and tightened the threat / gun rules based on early feedback.
+                </li>
+                <li>
+                  <strong>Week 2 — Clarity + agency pass:</strong>
+                  We expanded and stabilized systems through playtesting, then improved readability and decision-making:
+                  “pet” → <strong>love</strong>, shifted to a <strong>single-winner</strong> victory condition, increased lower-class agency (starting hand),
+                  and refined the rulebook for fewer edge-case questions.
+                  We drove rule/wording cleanup and helped implement the agency + win-condition revisions.
+                </li>
+                <li>
+                  <strong>Week 3 — Balance with simulation support:</strong>
+                  We ran a focused balance pass supported by <strong>200k-trial simulations</strong>, adjusted deck composition,
+                  and updated win conditions to reduce “accidental” wins, then validated changes via final playtests.
+                  We ran the simulation-backed balance checks and translated results into concrete deck/win-condition updates.
+                </li>
+                <li>
+                  <strong>Week 4 — Presentation polish:</strong>
+                  Finalized the slide deck and recorded the final presentation video.
+                  We supported deck polish and final deliverable prep.
+                </li>
+              </ul>
 
-                <p class="mini">
-                  Design photo journal: <a href="../files/ctin488/Team4-DesignPhotoJournal-FINAL.pdf" target="_blank" rel="noopener">Final Journal (PDF)</a>
-                </p>
-              </div>
+              <!-- <p class="mini">
+                Design photo journal: <a href="../files/ctin488/Team4-DesignPhotoJournal-FINAL.pdf" target="_blank" rel="noopener">Final Journal (PDF)</a>
+              </p> -->
             </div>
           </div>
         </section>
