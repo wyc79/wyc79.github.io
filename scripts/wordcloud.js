@@ -22,7 +22,6 @@
 
   const els = {
     input: document.getElementById('wc-input'),
-    perLine: document.getElementById('wc-one-per-line'),
     max: document.getElementById('wc-max'),
     rotate: document.getElementById('wc-rotate'),
     scale: document.getElementById('wc-scale'),
@@ -64,9 +63,7 @@
 
   function parseInput(raw) {
     const text = (raw || '').toLowerCase();
-    const tokens = els.perLine.checked
-      ? text.split(/\r?\n+/).map(s => s.trim()).filter(Boolean)
-      : text.split(/[^a-z0-9\-']+/i).map(s => s.trim()).filter(Boolean);
+    const tokens = text.split(/[^a-z0-9\-']+/i).map(s => s.trim()).filter(Boolean);
 
     const map = new Map();
     for (const word of tokens) {
@@ -86,13 +83,13 @@
     for (const w of words) {
       const halfW =
         w.x0 !== undefined && w.x1 !== undefined
-          ? Math.max(Math.abs(w.x0), Math.abs(w.x1))
+          ? (w.x1 - w.x0) / 2
           : w.width
           ? w.width / 2
           : Math.max(10, (w.size || 10) * (w.text ? w.text.length : 1) * 0.25);
       const halfH =
         w.y0 !== undefined && w.y1 !== undefined
-          ? Math.max(Math.abs(w.y0), Math.abs(w.y1))
+          ? (w.y1 - w.y0) / 2
           : Math.max(10, w.size || 10);
       const left = w.x - halfW;
       const right = w.x + halfW;
@@ -111,14 +108,16 @@
 
   function buildTransform(width, height, bounds) {
     if (!bounds) return `translate(${width / 2},${height / 2})`;
+  
     const spanX = Math.max(bounds[1].x - bounds[0].x, 1);
     const spanY = Math.max(bounds[1].y - bounds[0].y, 1);
+  
     const rawScale = Math.min((width * 0.9) / spanX, (height * 0.9) / spanY);
     const scale = Math.min(Math.max(rawScale, 0.5), 5);
-    const centerX = (bounds[0].x + bounds[1].x) / 2;
-    const centerY = (bounds[0].y + bounds[1].y) / 2;
-    // SVG applies transform functions right-to-left: first move content to origin, then scale, then move to viewport center.
-    return `translate(${width / 2},${height / 2}) scale(${scale}) translate(${-centerX},${-centerY})`;
+  
+    // d3-cloud words are already positioned around (0,0),
+    // so just move that origin to the SVG center.
+    return `translate(${width / 2},${height / 2}) scale(${scale})`;
   }
 
   function makeFontScale(words, dims) {
@@ -148,26 +147,35 @@
   function renderCloud(words, dims, bounds) {
     const container = els.container;
     container.innerHTML = '';
-
-    const svg = d3.select(container)
+  
+    const wrapper = container.appendChild(document.createElement('div'));
+    wrapper.className = 'wc-svg-wrapper';
+    wrapper.style.width = '100%';
+    wrapper.style.height = dims.height + 'px';
+    wrapper.style.display = 'flex';
+    wrapper.style.justifyContent = 'center';
+    wrapper.style.alignItems = 'center';
+  
+    const svg = d3.select(wrapper)
       .append('svg')
       .attr('id', 'wc-svg')
       .attr('width', dims.width)
       .attr('height', dims.height)
       .attr('viewBox', `0 0 ${dims.width} ${dims.height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet');
-
+  
     const node = svg.node();
-    node.style.setProperty('width', `${dims.width}px`, 'important');
+    node.style.setProperty('max-width', '100%', 'important');
     node.style.setProperty('height', `${dims.height}px`, 'important');
     node.style.setProperty('display', 'block', 'important');
-
+    node.style.setProperty('margin', '0 auto', 'important');
+  
     const actualBounds = bounds || measureBounds(words);
     const transform = buildTransform(dims.width, dims.height, actualBounds);
     const group = svg.append('g').attr('transform', transform);
-
+  
     const color = toColorScale();
-
+  
     const texts = group.selectAll('text')
       .data(words)
       .enter()
@@ -182,9 +190,9 @@
         this.style.setProperty('font-size', `${d.size}px`, 'important');
       })
       .text(d => d.text);
-
+  
     texts.append('title').text(d => `${d.text} (${d.value})`);
-
+  
     currentWords = words;
     currentBounds = actualBounds;
     currentDims = dims;
@@ -201,21 +209,21 @@
       currentWords = null;
       return;
     }
-
-    const width = Math.max(els.container.clientWidth || 0, 960);
-    const height = Math.max(Math.round(width * 0.6), 520);
+  
+    const width = Math.max(els.container.clientWidth || 0, 320);
+    const height = Math.max(Math.round(width * 0.6), 320);
     els.container.style.minHeight = `${height}px`;
-
+  
     const fontScale = makeFontScale(words, { width, height });
     const rotateMode = (els.rotate && els.rotate.value) || '0';
     const rotation = rotateMode === '90'
       ? () => (Math.random() < 0.5 ? 0 : 90)
       : () => 0;
-
+  
     els.container.innerHTML = '<p class="meta">Generating word cloud…</p>';
     els.downloadSvg.disabled = true;
     els.downloadPng.disabled = true;
-
+  
     const layout = cloudFactory()
       .size([width, height])
       .padding(4)
@@ -229,11 +237,11 @@
       .fontSize(d => d.size)
       .spiral('archimedean')
       .timeInterval(10);
-
+  
     layout.on('end', (placed, bounds) => {
       renderCloud(placed, { width, height }, bounds || currentBounds);
     });
-
+  
     layout.start();
   }
 

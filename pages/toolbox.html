@@ -8,8 +8,10 @@
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/theme.js"></script>
   <style>
-    /* Ensure generated SVG fills its container even if global CSS sets svg{height:auto} */
-    #wc-container > svg { width: 100% !important; height: 100% !important; display: block; }
+    /* Generation region: flex so the word cloud (wrapper + SVG) is centered */
+    #wc-container { display: flex; justify-content: center; align-items: center; min-height: 320px; }
+    #wc-container .wc-svg-wrapper { display: block; flex-shrink: 0; }
+    #wc-container .wc-svg-wrapper > svg { width: 100% !important; height: 100% !important; display: block; }
     .tabs { display: flex; flex-direction: column; }
     .tablist { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .tab-button {
@@ -50,16 +52,15 @@
       <section>
         <div class="tabs">
           <div class="tablist" role="tablist" aria-label="Toolbox tabs">
-            <button class="tab-button" role="tab" type="button" id="tab-wordcloud" data-tab-target="panel-wordcloud" aria-controls="panel-wordcloud" aria-selected="true">Word Cloud</button>
-            <button class="tab-button" role="tab" type="button" id="tab-qrcode" data-tab-target="panel-qrcode" aria-controls="panel-qrcode" aria-selected="false">QR Code Generator</button>
+            <button class="tab-button" role="tab" type="button" id="tab-wordcloud" data-tab-target="panel-wordcloud" aria-controls="panel-wordcloud" aria-selected="false">Word Cloud</button>
+            <button class="tab-button" role="tab" type="button" id="tab-qrcode" data-tab-target="panel-qrcode" aria-controls="panel-qrcode" aria-selected="true">QR Code Generator</button>
           </div>
-          <div class="tab-panel" id="panel-wordcloud" role="tabpanel" aria-labelledby="tab-wordcloud" tabindex="0">
+          <div class="tab-panel" id="panel-wordcloud" role="tabpanel" aria-labelledby="tab-wordcloud" tabindex="0" hidden>
             <h2>Word Cloud Generator</h2>
             <p class="meta">Paste text below and click Generate.</p>
             <label for="wc-input" class="visually-hidden">Text input</label>
             <textarea id="wc-input" rows="12" style="width:100%;" placeholder="Paste or type text here...">Nothing Can Go Wrong is a design exploration in indirect control and consequence-driven planning. Instead of piloting the protagonist moment-to-moment, players design a route and then watch their plan unfold, for better or worse, as environmental objects react in surprising ways. The appeal—and the difficulty—comes from predicting emergent interactions while still feeling empowered by a plan that was yours. My responsibilities covered concept ideation, systems design, engineering, and integration of artist-created assets in Godot. The core loop began with a lightweight pathing tool, but the heart of the experience emerged from environmental 'verbs': train tracks, whirlpools, spring pads, trapdoors, and chain reactions that could delight or derail. Balancing readability with surprise required strict rules and effective feedback animation that help the player learn the world's grammar. Difficulty tuning was driven by data rather than guesswork; I exposed parameters for moving speeds, impulse strength, and trigger sequencing, allowing tight loops of test–tweak–test within the jam's limited timeframe. The art pass focused on clarity and charm: silhouettes that read at a glance, restrained palettes, and motion that communicates function. We achieved a polished, playable demo on schedule and ranked in the top 20% overall. Post-jam, I'd extend the system with better text and visual explanation so players can gradually learn the mechanics, add optional objectives for mastery, and implement robust replays to encourage sharing. Most importantly, the project validated a personal design interest: agency through foresight. When players laugh at a plan that almost worked—and instantly want to iterate—you've got a loop worth growing.</textarea>
             <div style="margin-top:.5rem; display:flex; gap:.75rem; align-items:center; flex-wrap: wrap;">
-              <label><input type="checkbox" id="wc-one-per-line" /> One word per line</label>
               <label>Max words: <input type="number" id="wc-max" min="10" max="1000" value="200" style="width:6rem;" /></label>
               <label>Rotation: <select id="wc-rotate"><option value="0">0°</option><option value="90">0°/90°</option></select></label>
               <label>Scale: <select id="wc-scale"><option value="sqrt">√n</option><option value="linear">n</option><option value="log">log n</option></select></label>
@@ -70,25 +71,17 @@
             <div id="wc-container" style="width:100%; border: 1px dashed var(--border, #ccc); margin-top: .75rem;"></div>
             <p class="meta" style="margin-top:.75rem;">Reference: <a href="https://www.jasondavies.com/wordcloud/" target="_blank" rel="noopener">Jason Davies’ Word Cloud</a></p>
           </div>
-          <div class="tab-panel" id="panel-qrcode" role="tabpanel" aria-labelledby="tab-qrcode" tabindex="0" hidden>
+          <div class="tab-panel" id="panel-qrcode" role="tabpanel" aria-labelledby="tab-qrcode" tabindex="0">
             <h2>QR Code Generator</h2>
             <p class="meta">Enter text or a URL below and click Generate.</p>
             <label for="qr-input" class="visually-hidden">QR code text input</label>
             <textarea id="qr-input" rows="6" style="width:100%;" placeholder="Enter text or a URL..."></textarea>
             <div style="margin-top:.5rem; display:flex; gap:.75rem; align-items:center; flex-wrap: wrap;">
-              <label>Size (px): <input type="number" id="qr-size" min="64" max="1024" value="256" style="width:6rem;" /></label>
-              <label>Error correction:
-                <select id="qr-level">
-                  <option value="L">Low (L)</option>
-                  <option value="M" selected>Medium (M)</option>
-                  <option value="Q">Quartile (Q)</option>
-                  <option value="H">High (H)</option>
-                </select>
-              </label>
+              <label>Size (px): <input type="number" id="qr-size" min="64" max="1024" value="512" style="width:6rem;" /></label>
               <button class="toggle" id="qr-generate" type="button">Generate</button>
               <button class="toggle" id="qr-download" type="button" disabled>Download PNG</button>
             </div>
-            <div id="qr-output" style="width:100%; min-height:256px; border: 1px dashed var(--border, #ccc); margin-top: .75rem; display:flex; align-items:center; justify-content:center; padding:1rem;">
+            <div id="qr-output" style="max-width:512px; min-height:160px; border: 1px dashed var(--border, #ccc); margin: .75rem auto 0; display:flex; align-items:center; justify-content:center; padding:1rem;">
               <p class="meta" style="text-align:center;">QR code preview will appear here.</p>
             </div>
             <p class="meta" style="margin-top:.75rem;">Reference: <a href="https://github.com/davidshimjs/qrcodejs" target="_blank" rel="noopener">QRCode.js</a></p>

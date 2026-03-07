@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cemented Dreams — Gameplay Systems — Yuanchen Wang</title>
+  <meta name="description" content="Cemented Dreams — Gameplay systems, combat mechanics, and level design." />
+  <link rel="icon" type="image/png" href="../images/wyc.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
+  <script src="../scripts/theme.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="toolbar" style="justify-content: space-between;">
+        <div>
+          <h1 style="margin-bottom:.1rem;"><a href="../index.html"><img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Yuanchen Wang</h1>
+          <p class="tagline">Aspiring game developer — MSCS (Game Dev) at USC; background in psychology, neuroscience, and biomedical informatics.</p>
+          <p class="contact">
+            <strong>Contact:</strong>
+            <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
+            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a> &middot;
+            <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
+          </p>
+        </div>
+        <div>
+          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
+          <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
+        </div>
+      </div>
+    </header>
+
+<main>
+
+<section class="project-hero" style="background-image: url('../images/CD.png');">
+  <div class="project-hero__content">
+    <h2 class="project-hero__title">Cemented Dreams — Gameplay Systems</h2>
+
+    <div class="project-hero__meta">
+      <div class="project-hero__meta-item">
+        <strong>Role:</strong> Combat Designer · Gameplay Engineer · Level Designer
+      </div>
+
+      <div class="project-hero__meta-item">
+        <strong>Tools:</strong> Unreal Engine 5, C++, Blueprint
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="project-body">
+
+<section style="margin-top:1.5rem;">
+<div class="two-col" style="gap:1.25rem; align-items:start;">
+
+<div>
+<h3 style="margin-top:0;">What</h3>
+
+<p class="meta">
+<strong>Cemented Dreams</strong> is a third-person action game set inside a parasite-infested building.
+Players navigate an infected structure where a mechanical Hive grows through the architecture,
+creating traversal paths and combat spaces.
+</p>
+
+<p class="meta">
+I worked primarily on <strong>combat design, gameplay programming, and level design</strong>,
+building core movement and combat mechanics while coordinating closely with artists and producers.
+</p>
+
+<p class="meta">
+Gameplay systems were implemented using a combination of
+<strong>Unreal Engine C++ gameplay code</strong> and
+<strong>Blueprint-driven iteration</strong>.
+</p>
+
+</div>
+
+
+<div>
+
+<h3 style="margin-top:0;">Main Achievements</h3>
+
+<ul>
+<li>Designed and implemented core combat movement mechanics including <strong>grapple traversal and sliding combat</strong>.</li>
+<li>Built gameplay behaviors using <strong>C++ systems exposed to Blueprint</strong> for rapid iteration.</li>
+<li>Designed a level centered around a <strong>growing parasite Hive simulation</strong> integrated into the building structure.</li>
+<li>Collaborated with artists and producers to align gameplay mechanics with visual direction and milestone goals.</li>
+</ul>
+
+
+<h3 style="margin-top:1rem;">Highlights</h3>
+
+<p style="margin:0;">
+<span class="pill">UE5 Gameplay Programming</span>
+<span class="pill">Combat Systems</span>
+<span class="pill">Grapple Mechanics</span>
+<span class="pill">Movement Design</span>
+<span class="pill">Level Design</span>
+<span class="pill">C++</span>
+<span class="pill">Blueprint</span>
+</p>
+
+</div>
+
+</div>
+</section>
+
+
+<section style="margin-top:1.5rem;">
+
+<h3>How</h3>
+
+<h4 style="margin-top:0;">Combat Design + Gameplay Engineering</h4>
+
+<p class="meta">
+I designed and implemented the player's core movement and combat systems,
+focusing on mobility and responsiveness in tight indoor environments.
+</p>
+
+<ul>
+<li>Implemented gameplay behaviors such as <strong>grapple traversal, sliding movement, and aim-assist targeting</strong>.</li>
+
+<li>Integrated player input, animation states, and physics interactions through
+<strong>C++ gameplay components and Blueprint interfaces</strong>.</li>
+
+<li>Exposed key combat parameters to designers through Blueprint to enable
+<strong>rapid tuning of movement feel and combat pacing</strong>.</li>
+
+<li>Worked closely with artists and producers to ensure mechanics supported
+the intended combat rhythm and player flow.</li>
+</ul>
+
+<p class="meta" style="margin-top:1rem;"><strong>Grapple traversal</strong></p>
+<iframe src="https://drive.google.com/file/d/18MloGueUhsugaT3NTPr-ZMTGBdJwklMX/preview" width="640" height="360" allow="autoplay" title="Cemented Dreams — grapple traversal"></iframe>
+
+<p class="meta" style="margin-top:1rem;"><strong>Aim-assist targeting</strong></p>
+<iframe src="https://drive.google.com/file/d/1PBuQ87tH9YwVS1G207XPQ7vYSPKdGGkL/preview" width="640" height="360" allow="autoplay" title="Cemented Dreams — aim assist"></iframe>
+
+
+<h4>Level Design — Hive Simulation</h4>
+
+<p class="meta">
+I designed a level centered around a parasitic Hive structure growing inside a building,
+creating traversal paths and combat arenas through environmental transformation.
+</p>
+
+<ul>
+
+<li>The central <strong>Hive structure</strong> grows into the building while cables from the structure attempt to strangle it.</li>
+
+<li>At cable contact points, the Hive generates <strong>hexagonal platforms</strong> that players can traverse.</li>
+
+<li>Entrances into the Hive are <strong>torn open by structural cables</strong>, creating layered vertical gameplay spaces.</li>
+
+<li>A critical <strong>injection point</strong> forms around a cable that pierces the Hive wall, granting players the <strong>grapple ability</strong>.</li>
+
+</ul>
+
+<p class="meta">
+This level structure links narrative worldbuilding with traversal mechanics,
+turning the parasite's growth into both a visual motif and a gameplay system.
+</p>
+
+</section>
+
+
+<p style="margin-top:1.5rem;">
+<a href="https://www.cemented-dreams.com/" target="_blank" rel="noopener">Visit the official game site →</a>
+</p>
+
+<p style="margin-top:1rem;">
+<a href="../index.html#projects">← Back to Projects</a>
+</p>
+
+</section>
+
+</main>
+
+
+<footer>
+<p>© 2025 Yuanchen Wang — Portfolio</p>
+</footer>
+
+</div>
+</body>
+</html>

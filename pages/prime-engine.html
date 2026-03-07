@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prime Engine — Engine Systems Implementation — Yuanchen Wang</title>
+  <meta name="description" content="Prime Engine — Engine Systems Implementation (frustum culling, physics/collision, debug visualization)." />
+  <link rel="icon" type="image/png" href="../images/wyc.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
+  <script src="../scripts/theme.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="toolbar" style="justify-content: space-between;">
+        <div>
+          <h1 style="margin-bottom:.1rem;"><a href="../index.html"><img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Yuanchen Wang</h1>
+          <p class="tagline">Aspiring game developer — MSCS (Game Dev) at USC; background in psychology, neuroscience, and biomedical informatics.</p>
+          <p class="contact">
+            <strong>Contact:</strong>
+            <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
+            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a> &middot;
+            <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
+          </p>
+        </div>
+        <div>
+          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
+          <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="project-hero" style="background-image: url('../images/prime_engine.png');">
+        <span class="sr-only" role="img" aria-label="Prime Engine — Engine Systems Implementation"></span>
+        <div class="project-hero__content">
+          <h2 class="project-hero__title">Prime Engine — Engine Systems Implementation</h2>
+          <div class="project-hero__meta">
+            <div class="project-hero__meta-item"><strong>Role:</strong> Engine Programmer</div>
+            <div class="project-hero__meta-item"><strong>Tool:</strong> C++, Prime Engine</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-body">
+        <section style="margin-top: 1.5rem;">
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div>
+              <h3 style="margin-top: 0;">What</h3>
+              <p class="meta">This project involved modifying and extending <strong>Prime Engine</strong>, a minimal C++ game engine used for gameplay and rendering experiments.</p>
+              <p class="meta">I implemented several engine-level systems, including:</p>
+              <ul>
+                <li>View frustum culling for rendering optimization</li>
+                <li>Collision detection and physics movement (move-and-slide with gravity)</li>
+                <li>Debug visualization tools for bounding volumes</li>
+              </ul>
+              <p class="meta">Working inside the engine required understanding its <strong>component system</strong>, <strong>event system</strong>, and <strong>scene graph</strong> structure in order to integrate new features without breaking the existing architecture.</p>
+            </div>
+
+            <div>
+              <h3 style="margin-top: 0;">Main Achievements</h3>
+              <ul>
+                <li><strong>Learned and navigated a large C++ codebase</strong> for a minimal custom game engine.</li>
+                <li><strong>Implemented view frustum culling</strong> for rendering optimization.</li>
+                <li><strong>Implemented a basic physics system</strong> with collision and sliding response.</li>
+              </ul>
+
+              <h3 style="margin-top: 1rem;">Highlights</h3>
+              <p style="margin: 0;">
+                <span class="pill">Frustum culling</span>
+                <span class="pill">Physics engine</span>
+                <span class="pill">Collision &amp; sliding</span>
+                <span class="pill">Debug visualization</span>
+                <span class="pill">C++</span>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-top: 1.5rem;">
+          <h3>How</h3>
+
+          <h4 style="margin-top: 0;">Frustum Culling</h4>
+          <p class="meta">To reduce unnecessary rendering work, I implemented view frustum culling using bounding boxes.</p>
+          <p class="meta"><strong>Steps:</strong></p>
+          <ul>
+            <li>Compute the <strong>world-space bounding box</strong> of each mesh instance.</li>
+            <li>Transform the box corners into <strong>clip space</strong> using the projection–view matrix.</li>
+            <li>Test the box against the <strong>six planes</strong> of the camera frustum.</li>
+            <li>If all corners lie outside any plane, the object is marked as <strong>culled</strong> and skipped during rendering.</li>
+          </ul>
+          <p class="meta">I also added <strong>debug rendering for bounding boxes</strong> to visually verify the correctness of the culling logic. This significantly reduced the number of objects sent to the renderer when many objects were outside the camera view.</p>
+
+          <div class="diagram-card">
+            <h3>Frustum Culling Pipeline</h3>
+            <svg viewBox="0 0 900 180" aria-label="Frustum culling pipeline diagram" role="img" style="font-family: Arial, sans-serif;">
+              <rect x="0" y="0" width="900" height="180" rx="16" fill="#ffffff"/>
+              <!-- Boxes -->
+              <rect x="20" y="50" width="150" height="60" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="95" y="78" text-anchor="middle" font-size="16" font-weight="bold">Mesh Instance</text>
+              <text x="95" y="98" text-anchor="middle" font-size="13">world bounding box</text>
+
+              <rect x="220" y="50" width="150" height="60" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="295" y="78" text-anchor="middle" font-size="16" font-weight="bold">Transform</text>
+              <text x="295" y="98" text-anchor="middle" font-size="13">corners to clip space</text>
+
+              <rect x="420" y="50" width="150" height="60" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="495" y="78" text-anchor="middle" font-size="16" font-weight="bold">Frustum Test</text>
+              <text x="495" y="98" text-anchor="middle" font-size="13">6 plane checks</text>
+
+              <rect x="680" y="20" width="120" height="50" rx="12" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
+              <text x="740" y="50" text-anchor="middle" font-size="15" font-weight="bold">Cull</text>
+
+              <rect x="680" y="95" width="120" height="50" rx="12" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
+              <text x="740" y="125" text-anchor="middle" font-size="15" font-weight="bold">Render</text>
+
+              <!-- Arrows -->
+              <line x1="170" y1="80" x2="220" y2="80" stroke="#555" stroke-width="2"/>
+              <polygon points="220,80 210,74 210,86" fill="#555"/>
+
+              <line x1="370" y1="80" x2="420" y2="80" stroke="#555" stroke-width="2"/>
+              <polygon points="420,80 410,74 410,86" fill="#555"/>
+
+              <line x1="570" y1="80" x2="680" y2="45" stroke="#555" stroke-width="2"/>
+              <polygon points="680,45 670,39 670,51" fill="#555"/>
+
+              <line x1="570" y1="80" x2="680" y2="120" stroke="#555" stroke-width="2"/>
+              <polygon points="680,120 670,114 670,126" fill="#555"/>
+
+              <!-- Decision labels -->
+              <rect x="570" y="40" width="100" height="18" rx="6" fill="#ffffff" fill-opacity="0.92"/>
+              <rect x="570" y="100" width="100" height="18" rx="6" fill="#ffffff" fill-opacity="0.92"/>
+              <text x="670" y="52" text-anchor="end" font-size="12" fill="#444">outside any plane</text>
+              <text x="670" y="112" text-anchor="end" font-size="12" fill="#444">intersects / inside</text>
+
+              <!-- Caption -->
+              <text x="450" y="168" text-anchor="middle" font-size="13" fill="#444">
+                Bounding box corners are transformed and tested against the camera frustum to skip off-screen objects.
+              </text>
+            </svg>
+          </div>
+
+          <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+            <iframe
+              src="https://drive.google.com/file/d/1o4g69Rd9gCBT53ukR5wB5XppZknEPFap/preview"
+              class="embed-frame"
+              allowfullscreen
+              loading="lazy"
+              title="Frustum culling demo"
+              style="border-radius: var(--radius);">
+            </iframe>
+          </article>
+
+          <h4>Physics and Collision System</h4>
+          <p class="meta">I implemented a simple collider system supporting <strong>sphere</strong> and <strong>box</strong> colliders attached to game objects.</p>
+          <p class="meta"><strong>Each frame:</strong></p>
+          <ul>
+            <li>Colliders update their world-space position from the owning object's transform.</li>
+            <li>When an object attempts to move, the engine checks for collisions at the candidate position.</li>
+            <li>If collisions occur, the movement vector is projected onto the collision plane, removing the component that pushes into the surface.</li>
+            <li>The remaining movement causes the object to <strong>slide naturally</strong> along obstacles.</li>
+          </ul>
+
+          <h4>Gravity</h4>
+          <p class="meta">For objects affected by gravity:</p>
+          <ul>
+            <li>Vertical velocity is updated each frame using gravitational acceleration.</li>
+            <li>The vertical component of movement is applied to the object.</li>
+            <li>If ground support is detected, vertical velocity resets to prevent continuous downward acceleration.</li>
+          </ul>
+          <p class="meta">This produces natural falling behavior while preventing objects from penetrating the ground.</p>
+
+          <div class="diagram-card">
+            <h3>Physics: Move-and-Slide with Gravity</h3>
+            <svg viewBox="0 0 960 220" aria-label="Move-and-slide with gravity diagram" role="img" style="font-family: Arial, sans-serif;">
+              <rect x="0" y="0" width="960" height="220" rx="16" fill="#ffffff"/>
+              <!-- Step boxes -->
+              <rect x="20" y="70" width="150" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="95" y="98" text-anchor="middle" font-size="16" font-weight="bold">Input Move</text>
+              <text x="95" y="118" text-anchor="middle" font-size="13">desired displacement</text>
+
+              <rect x="210" y="70" width="150" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="285" y="98" text-anchor="middle" font-size="16" font-weight="bold">Apply Gravity</text>
+              <text x="285" y="118" text-anchor="middle" font-size="13">update vertical velocity</text>
+
+              <rect x="400" y="70" width="150" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="475" y="98" text-anchor="middle" font-size="16" font-weight="bold">Collision Query</text>
+              <text x="475" y="118" text-anchor="middle" font-size="13">check candidate position</text>
+
+              <rect x="590" y="25" width="150" height="55" rx="12" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
+              <text x="665" y="57" text-anchor="middle" font-size="15" font-weight="bold">No Hit → Move</text>
+
+              <rect x="590" y="115" width="170" height="65" rx="12" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
+              <text x="675" y="143" text-anchor="middle" font-size="15" font-weight="bold">Hit Surface</text>
+              <text x="675" y="163" text-anchor="middle" font-size="13">remove normal component</text>
+
+              <rect x="800" y="115" width="140" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="870" y="143" text-anchor="middle" font-size="15" font-weight="bold">Slide</text>
+              <text x="870" y="163" text-anchor="middle" font-size="13">move along tangent</text>
+
+              <!-- Arrows -->
+              <line x1="170" y1="102" x2="210" y2="102" stroke="#555" stroke-width="2"/>
+              <polygon points="210,102 200,96 200,108" fill="#555"/>
+
+              <line x1="360" y1="102" x2="400" y2="102" stroke="#555" stroke-width="2"/>
+              <polygon points="400,102 390,96 390,108" fill="#555"/>
+
+              <line x1="550" y1="102" x2="590" y2="55" stroke="#555" stroke-width="2"/>
+              <polygon points="590,55 580,57 586,65" fill="#555"/>
+
+              <line x1="550" y1="102" x2="590" y2="145" stroke="#555" stroke-width="2"/>
+              <polygon points="590,145 585,132 578,142" fill="#555"/>
+
+              <line x1="760" y1="147" x2="800" y2="147" stroke="#555" stroke-width="2"/>
+              <polygon points="800,147 790,141 790,153" fill="#555"/>
+
+              <!-- Gravity arrow -->
+              <line x1="285" y1="30" x2="285" y2="65" stroke="#666" stroke-width="2" stroke-dasharray="5,5"/>
+              <polygon points="285,65 279,55 291,55" fill="#666"/>
+              <text x="300" y="48" font-size="13" fill="#444">gravity</text>
+
+              <!-- Caption -->
+              <text x="480" y="208" text-anchor="middle" font-size="13" fill="#444">
+                Candidate movement is tested for collisions; if blocked, the engine cancels motion into the surface and keeps the tangential part for sliding.
+              </text>
+            </svg>
+          </div>
+
+          <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+            <iframe
+              src="https://drive.google.com/file/d/1QkewL6zE7OKMXuDi66uD4CKJyC7uZUs-/preview"
+              class="embed-frame"
+              allowfullscreen
+              loading="lazy"
+              title="Physics move-and-slide demo"
+              style="border-radius: var(--radius);">
+            </iframe>
+          </article>
+        </section>
+
+        <p style="margin-top: 1.5rem;"><a href="../index.html#projects">← Back to Projects</a></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
+    </footer>
+  </div>
+</body>
+</html>

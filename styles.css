@@ -130,6 +130,30 @@ a { color: var(--link); }
 @media (min-width: 800px) { 
   .projects-grid { grid-template-columns: 1fr 1fr; }
 }
+.project-card--wide { grid-column: 1 / -1; }
+
+/* Inline diagrams (SVG) */
+.diagram-card {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  overflow: hidden; /* prevents tiny overflow on mobile */
+}
+.diagram-card h3 { margin-top: 0; }
+.diagram-card svg { width: 100%; height: auto; display: block; }
+@media (max-width: 640px) {
+  .diagram-card { padding: .85rem; }
+}
+.embed-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: var(--radius);
+  display: block;
+}
 .projects-grid--minor {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
@@ -138,6 +162,27 @@ a { color: var(--link); }
 @media (min-width: 800px) {
   .projects-grid--minor {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* 4x4 project grid: one 2x2 (regular) + four 1x1 (minor) fill the space */
+.projects-grid--4x4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (min-width: 800px) {
+  .projects-grid--4x4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.project-card--2x2 {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+@media (min-width: 800px) {
+  .projects-grid--4x4 .project-card--2x2 {
+    grid-column: span 2;
+    grid-row: span 2;
   }
 }
 /* Extra spacing between minor projects grid and the flip-game card */

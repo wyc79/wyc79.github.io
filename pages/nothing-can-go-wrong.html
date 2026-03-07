@@ -3,63 +3,187 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nothing Can Go Wrong — Yuanchen Wang</title>
-  <meta name="description" content="Nothing Can Go Wrong — a design exploration in indirect control and consequence-driven planning" />
+  <title>Nothing Can Go Wrong — Game Jam Project — Yuanchen Wang</title>
+  <meta name="description" content="Nothing Can Go Wrong — fast-paced game jam project built in Godot." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/theme.js"></script>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="toolbar" style="justify-content: space-between;">
-        <div>
-          <h1 style="margin-bottom:.1rem;"><a href="../index.html"><img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Yuanchen Wang</h1>
-          <p class="tagline">Aspiring game developer — MSCS (Game Dev) at USC; background in psychology, neuroscience, and biomedical informatics.</p>
-          <p class="contact">
-            <strong>Contact:</strong>
-            <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
-            <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a> &middot;
-            <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
-          </p>
-        </div>
-        <div>
-          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
-          <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
-        </div>
+<div class="wrap">
+
+<header>
+  <div class="toolbar" style="justify-content: space-between;">
+    <div>
+      <h1 style="margin-bottom:.1rem;">
+        <a href="../index.html">
+          <img src="../images/wyc.png" alt="" style="height:1.2em; vertical-align:middle; margin-right:.3em;" />
+        </a>
+        Yuanchen Wang
+      </h1>
+      <p class="tagline">Gameplay programmer — MSCS Game Development at USC</p>
+      <p class="contact">
+        <strong>Contact:</strong>
+        <a href="mailto:ywang217@usc.edu" rel="me">ywang217@usc.edu</a> &middot;
+        <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LinkedIn</a> &middot;
+        <a href="https://github.com/wyc79" target="_blank" rel="noopener">GitHub Page</a>
+      </p>
+    </div>
+    <div>
+      <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
+      <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
+    </div>
+  </div>
+</header>
+
+
+<main>
+
+<section class="project-hero" style="background-image: url('../images/nothing.png');">
+  <div class="project-hero__content">
+
+    <h2 class="project-hero__title">Nothing Can Go Wrong</h2>
+
+    <div class="project-hero__meta">
+      <div class="project-hero__meta-item">
+        <strong>Role:</strong> Primary Programmer
       </div>
 
-    </header>
+      <div class="project-hero__meta-item">
+        <strong>Tools:</strong> Godot 4, GDScript
+      </div>
+    </div>
 
-    <main>
-      <section class="project-hero" style="background-image: url('../images/nothing.png');">
-        <span class="sr-only" role="img" aria-label="Screenshot from Nothing Can Go Wrong highlighting the indirect control puzzle interface."></span>
-        <div class="project-hero__content">
-          <h2 class="project-hero__title">Nothing Can Go Wrong</h2>
-          <div class="project-hero__meta">
-            <div class="project-hero__meta-item"><strong>Role:</strong> Systems Designer & Programmer</div>
-            <div class="project-hero__meta-item"><strong>Tool:</strong> Godot 4, Jam Toolkit</div>
-            <div class="project-hero__meta-item"><strong>Duration:</strong> May 2024 · 2 week jam</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="project-body">
-        <p class="meta"><strong>Godot</strong> — <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a></p>
-
-        <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <p>Nothing Can Go Wrong is a design exploration in indirect control and consequence-driven planning. Instead of piloting the protagonist moment-to-moment, players design a route and then watch their plan unfold, for better or worse, as environmental objects react in surprising ways. The appeal—and the difficulty—comes from predicting emergent interactions while still feeling empowered by a plan that was yours. My responsibilities covered concept ideation, systems design, engineering, and integration of artist-created assets in Godot. The core loop began with a lightweight pathing tool, but the heart of the experience emerged from environmental 'verbs': train tracks, whirlpools, spring pads, trapdoors, and chain reactions that could delight or derail. Balancing readability with surprise required strict rules and effective feedback animation that help the player learn the world's grammar. Difficulty tuning was driven by data rather than guesswork; I exposed parameters for moving speeds, impulse strength, and trigger sequencing, allowing tight loops of test–tweak–test within the jam's limited timeframe. The art pass focused on clarity and charm: silhouettes that read at a glance, restrained palettes, and motion that communicates function. We achieved a polished, playable demo on schedule and ranked in the top 20% overall. Post-jam, I'd extend the system with better text and visual explanation so players can gradually learn the mechanics, add optional objectives for mastery, and implement robust replays to encourage sharing. Most importantly, the project validated a personal design interest: agency through foresight. When players laugh at a plan that almost worked—and instantly want to iterate—you've got a loop worth growing.</p>
-        </article>
-
-        <p style="margin-top: 1.5rem;"><a href="../index.html#projects">← Back to Projects</a></p>
-      </section>
-    </main>
-
-    <footer>
-      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
-    </footer>
   </div>
+</section>
+
+
+<section class="project-body">
+
+<p class="meta">
+  <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a>
+</p>
+
+<section style="margin-top:1.5rem;">
+<div class="two-col" style="gap:1.25rem; align-items:start;">
+
+
+<div>
+
+<h3 style="margin-top:0;">What</h3>
+
+<p class="meta">
+<strong>Nothing Can Go Wrong</strong> is a fast-paced game created during a game jam,
+where the goal was to design and ship a complete playable experience within a very short development cycle.
+</p>
+
+<p class="meta">
+I served as the <strong>primary programmer</strong>, responsible for implementing the core gameplay systems,
+player controls, and game logic while integrating assets created by teammates.
+</p>
+
+<p class="meta">
+The project focused on rapid iteration and experimentation while maintaining a stable,
+playable build throughout the jam.
+</p>
+
+</div>
+
+
+<div>
+
+<h3 style="margin-top:0;">Main Achievements</h3>
+
+<ul>
+
+<li>Implemented the core gameplay systems and player control logic.</li>
+
+<li>Integrated game mechanics, UI feedback, and input systems using Godot.</li>
+
+<li>Rapidly iterated on gameplay mechanics under strict time constraints.</li>
+
+<li>Delivered a polished playable build within the game jam deadline.</li>
+
+</ul>
+
+
+<h3 style="margin-top:1rem;">Highlights</h3>
+
+<p style="margin:0;">
+<span class="pill">Godot</span>
+<span class="pill">GDScript</span>
+<span class="pill">Gameplay Programming</span>
+<span class="pill">Rapid Prototyping</span>
+<span class="pill">Game Jam</span>
+</p>
+
+</div>
+
+</div>
+</section>
+
+
+
+<section style="margin-top:1.5rem;">
+
+<h3>How</h3>
+
+<h4 style="margin-top:0;">Rapid Gameplay Implementation</h4>
+
+<p class="meta">
+Because of the short jam timeline, the main engineering goal was to build
+gameplay systems that were simple, modular, and easy to iterate on.
+</p>
+
+<ul>
+
+<li>Implemented core gameplay mechanics and player control logic using <strong>Godot and GDScript</strong>.</li>
+
+<li>Built systems that connected input handling, game state, and player feedback.</li>
+
+<li>Structured scripts so new mechanics could be quickly added or adjusted during playtesting.</li>
+
+</ul>
+
+
+
+<h4>Rapid Iteration and Debugging</h4>
+
+<p class="meta">
+Game jams require constant iteration and quick problem solving.
+The development process involved frequent playtesting and adjustment
+to ensure the game remained fun and stable.
+</p>
+
+<ul>
+
+<li>Iterated on gameplay mechanics based on quick playtest feedback.</li>
+
+<li>Debugged gameplay issues and optimized scripts to maintain smooth performance.</li>
+
+<li>Ensured the game remained stable while new features were added rapidly.</li>
+
+</ul>
+
+
+</section>
+
+
+
+<p style="margin-top:1.5rem;">
+<a href="../index.html#projects">← Back to Projects</a>
+</p>
+
+
+</section>
+</main>
+
+
+<footer>
+<p>© 2025 Yuanchen Wang — Portfolio</p>
+</footer>
+
+</div>
 </body>
 </html>
-

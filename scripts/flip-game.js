@@ -7,7 +7,8 @@
     { key: 'cemented-dreams', src: 'images/CD_thumbnail.png', alt: 'Cemented Dreams — screenshot' },
     { key: 'codebreaker', src: 'images/codebreaker_thumbnail.png', alt: 'CodeBreaker — screenshot' },
     { key: 'workshop', src: 'images/ctin488_thumbnail.png', alt: 'Game Design Workshop' },
-    { key: '3Drendering', src: 'images/3Drendering_thumbnail.png', alt: '3D Rendering Project Video' }
+    { key: '3Drendering', src: 'images/3Drendering_thumbnail.png', alt: '3D Rendering Project Video' },
+    { key: 'prime-engine', src: 'images/prime_engine_thumbnail.png', alt: 'Prime Engine — Engine Systems Implementation' }
   ];
 
   function initFlipGame() {

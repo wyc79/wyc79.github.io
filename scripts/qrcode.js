@@ -76,7 +76,6 @@
   const qr = {
     input: document.getElementById('qr-input'),
     size: document.getElementById('qr-size'),
-    level: document.getElementById('qr-level'),
     generate: document.getElementById('qr-generate'),
     download: document.getElementById('qr-download'),
     output: document.getElementById('qr-output'),
@@ -87,7 +86,7 @@
   if (hasQrElements) {
     const MIN_SIZE = 64;
     const MAX_SIZE = 1024;
-    const DEFAULT_SIZE = 256;
+    const DEFAULT_SIZE = 512;
 
     function clampSize(value) {
       const numeric = Math.round(Number(value));
@@ -100,13 +99,6 @@
     function showMessage(message) {
       qr.output.innerHTML = `<p class="meta" style="text-align:center;">${message}</p>`;
       qr.download.disabled = true;
-    }
-
-    function getLevelConstant(levelKey) {
-      if (!window.QRCode || !window.QRCode.CorrectLevel) {
-        return null;
-      }
-      return window.QRCode.CorrectLevel[levelKey] ?? null;
     }
 
     function ensureLibrary() {
@@ -156,12 +148,7 @@
         qr.size.value = size;
       }
 
-      const levelKey = (qr.level.value || 'M').toUpperCase();
-      const levelConstant = getLevelConstant(levelKey);
-      if (!levelConstant) {
-        showMessage('Error correction level is unavailable.');
-        return;
-      }
+      const correctLevel = (window.QRCode && window.QRCode.CorrectLevel && window.QRCode.CorrectLevel.M) || 0;
 
       qr.output.innerHTML = '';
       try {
@@ -171,7 +158,7 @@
           height: size,
           colorDark: '#000000',
           colorLight: '#ffffff',
-          correctLevel: levelConstant,
+          correctLevel: correctLevel,
         });
         enableDownloadWhenReady();
       } catch (error) {
