@@ -353,114 +353,111 @@ details > summary::-webkit-details-marker { display: none; }
   overflow: hidden;
   display: flex;
   align-items: center;
+  justify-content: center;
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
 }
-.p3-video {
+.p3-canvas {
   position: absolute;
   inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  opacity: 0.4;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   pointer-events: none;
+  display: block;
 }
-.p3-video-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(900px 600px at 20% 30%, rgba(36, 64, 150, 0.35), transparent 60%),
-    radial-gradient(700px 500px at 80% 70%, rgba(120, 30, 60, 0.28), transparent 60%),
-    linear-gradient(180deg, #05081a 0%, #02040c 100%);
-  opacity: 0.9;
-  animation: p3-bg-drift 18s ease-in-out infinite alternate;
-}
-@keyframes p3-bg-drift {
-  0%   { background-position: 0% 0%, 100% 100%, 0 0; filter: hue-rotate(0deg); }
-  100% { background-position: 10% 20%, 85% 80%, 0 0; filter: hue-rotate(-10deg); }
-}
-.p3-circle {
-  position: absolute;
-  right: -15vw; top: 50%;
-  transform: translateY(-50%);
-  width: 65vw; height: 65vw;
-  max-width: 700px; max-height: 700px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #0d2560 0%, #060d2a 60%, transparent 100%);
-  z-index: 1;
-  pointer-events: none;
-}
-.p3-bg-word {
-  position: absolute;
-  bottom: -2vw; left: -1vw;
-  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
-  font-size: clamp(140px, 22vw, 300px);
-  color: rgba(255,255,255,0.04);
-  letter-spacing: -8px;
-  pointer-events: none;
-  z-index: 2;
-  white-space: nowrap;
-  user-select: none;
-  font-weight: 400;
-}
-.p3-scanlines {
-  position: absolute; inset: 0;
-  background-image: repeating-linear-gradient(
-    0deg, transparent, transparent 3px,
-    rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px
-  );
-  z-index: 3;
-  pointer-events: none;
-}
-.p3-mask {
-  position: absolute; inset: 0;
-  background: linear-gradient(to right, rgba(4,6,15,0.85) 0%, rgba(4,6,15,0.4) 50%, transparent 100%);
-  z-index: 4;
-  pointer-events: none;
-}
-.p3-stripe  { position:absolute; right:0;  top:0; bottom:0; width:5px; background:#c4001a; z-index:10; }
-.p3-stripe2 { position:absolute; right:9px; top:0; bottom:0; width:2px; background:rgba(196,0,26,0.22); z-index:10; }
-
 .p3-menu {
   position: relative;
   z-index: 20;
-  padding: 48px 0 48px 48px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   max-width: 100%;
+  padding: 16px 32px;
+  /* Compact — rows can visually overlap via their inner .p3-rot transforms
+     without affecting their axis-aligned hit areas. */
+  gap: 2px;
 }
 
+/* .p3-row is the INTERACTION box. It stays axis-aligned (no transform) so
+   its hit area is a simple rectangle that never overlaps neighbors. */
 .p3-row {
   position: relative;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  line-height: 1;
+  display: block;
   text-decoration: none;
-  opacity: 0;
-  transform: translateX(-36px);
-  transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.22,1,0.36,1);
-  padding: 2px 0;
-}
-.p3-row.mounted {
-  opacity: 1;
-  transform: translateX(0);
+  line-height: 1;
+  padding: 1px 40px 1px 12px;
 }
 
-.p3-highlight {
-  position: absolute;
-  left: -48px; top: 50%;
-  transform: translateY(-50%) scaleX(0);
-  transform-origin: left center;
-  background: #f38493;
-  z-index: 0;
-  transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
+/* .p3-rot is the VISUAL layer. The tilt and translateY shift live here so
+   the row's hit area stays clean while the label + SVG composition can lean
+   and drift freely. pointer-events: none makes the visual subtree invisible
+   to hit-testing — events land on the <a> parent. */
+.p3-rot {
+  --tilt: 0deg;
+  --shift: 0px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transform: translate(-36px, var(--shift)) rotate(var(--tilt));
+  transform-origin: center center;
+  transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.22,1,0.36,1);
   pointer-events: none;
 }
-.p3-row.active .p3-highlight {
-  transform: translateY(-50%) scaleX(1);
+.p3-row.mounted .p3-rot {
+  opacity: 1;
+  transform: translate(0, var(--shift)) rotate(var(--tilt));
 }
+
+/* The old CSS wedge pseudo-element approach was replaced by an SVG composition
+   (see .p3-hero below). Keep the wrapper element as a no-op so existing JS can
+   still reference it without layout effects. */
+.p3-highlight { display: none; }
+
+/* SVG-based highlighted-item composition. One .p3-hero per row, positioned
+   absolutely over the label and sized via inline style from the JS builder.
+   Contains: shadow text, top red wedge, bottom pink wedge, dark base text, and
+   a bright text layer clipped to the top wedge so the letters read brighter
+   where the banner covers them and darker where it doesn't. */
+.p3-hero {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(0, -50%);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  z-index: 2;
+  /* Pointer events are nailed off on the whole SVG subtree so the banner
+     never steals hovers from adjacent rows. Only the parent <a> handles hits. */
+  pointer-events: none;
+}
+.p3-hero, .p3-hero * { pointer-events: none; }
+.p3-label { pointer-events: none; }
+/* Active row floats above neighbors so its SVG, which extends past the row
+   box, can't visually or behaviorally interfere with the stack. */
+.p3-row.active { z-index: 5; }
+.p3-row.active .p3-hero { opacity: 1; }
+.p3-row.active .p3-label { visibility: hidden; }
+
+.p3-hero-svg {
+  display: block;
+  overflow: visible;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.p3-hero-text {
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-rendering: geometricPrecision;
+}
+.p3-hero-shadow  { fill: #060206; opacity: 0.55; }
+.p3-hero-dark    { fill: #8a1427; }
+.p3-hero-bright  { fill: #ffffff; }
+.p3-hero-wedge-top    { fill: #c4001a; filter: drop-shadow(0 8px 22px rgba(196, 0, 26, 0.35)); }
+.p3-hero-wedge-bottom { fill: #f38493; }
 
 .p3-label {
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
@@ -470,12 +467,19 @@ details > summary::-webkit-details-marker { display: none; }
   line-height: 0.85;
   position: relative;
   z-index: 1;
-  transition: color 0.12s ease, opacity 0.12s ease;
+  opacity: var(--p3-idle-opacity, 1);
+  transition: color 0.12s ease, opacity 0.12s ease, transform 0.18s ease;
   font-weight: 400;
   text-shadow: 0 2px 14px rgba(0,0,0,0.35);
 }
-.p3-row.active .p3-label { color: #ffffff; }
-.p3-row:hover:not(.active) .p3-label { color: #4a82c8; }
+/* Hover / keyboard-focus / keyboard-active all share the same label treatment. */
+.p3-row:hover .p3-label,
+.p3-row:focus-visible .p3-label,
+.p3-row.active .p3-label {
+  color: #ffffff;
+  opacity: 1;
+  transform: translateX(6px);
+}
 
 .p3-hint {
   position: absolute;
@@ -504,8 +508,7 @@ details > summary::-webkit-details-marker { display: none; }
 /* Responsive scaling — label font-size set inline via JS is treated as px base;
    we scale it down on narrow viewports using transform-origin on the menu. */
 @media (max-width: 760px) {
-  .p3-menu { padding: 40px 0 40px 28px; transform: scale(0.72); transform-origin: left center; }
-  .p3-highlight { left: -28px; }
+  .p3-menu { padding: 24px; transform: scale(0.72); transform-origin: center center; }
 }
 @media (max-width: 480px) {
   .p3-menu { transform: scale(0.52); }
@@ -572,6 +575,73 @@ details > summary::-webkit-details-marker { display: none; }
   color: #fff;
   border-bottom-color: #c4001a;
 }
+/* Theme toggle is styled to match the brand-links aesthetic — same font,
+   spacing, and underline-on-hover treatment — so it reads as part of that
+   row rather than a foreign UI control. Theme-aware text color overrides
+   below handle the white-on-white case under light theme. */
+.p3-theme-toggle {
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: rgba(255,255,255,0.55);
+  padding: 4px 2px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.p3-theme-toggle:hover,
+.p3-theme-toggle:focus-visible {
+  color: #fff;
+  border-bottom-color: #c4001a;
+  outline: none;
+}
+/* Light theme: the brand-links area sits over a white sphere/page, so the
+   default translucent-white treatment becomes invisible. Switch to a
+   readable dark ink, keep the red accent for the hover underline. */
+html[data-theme="light"] .p3-brand-links a,
+html[data-theme="light"] .p3-theme-toggle {
+  color: rgba(20,20,24,0.65);
+}
+html[data-theme="light"] .p3-brand-links a:hover,
+html[data-theme="light"] .p3-theme-toggle:hover,
+html[data-theme="light"] .p3-theme-toggle:focus-visible {
+  color: #14151a;
+}
+
+/* Light-theme overrides for the rest of the landing UI: brand plate, menu
+   labels, and the keyboard hint all default to white-on-dark. Switch to
+   dark inks so they read on the white page. The active/hover label state
+   also flips from white to a dark wine red (the active row's red SVG banner
+   keeps the white-text-over-red treatment, which still reads correctly). */
+html[data-theme="light"] .p3-brand,
+html[data-theme="light"] .p3-brand-name {
+  color: #14151a;
+}
+html[data-theme="light"] .p3-brand img {
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.18));
+}
+html[data-theme="light"] .p3-brand-sub {
+  color: rgba(20,20,24,0.55);
+}
+html[data-theme="light"] .p3-label {
+  color: #5c1a23;
+  text-shadow: 0 2px 14px rgba(0,0,0,0.08);
+}
+html[data-theme="light"] .p3-row:hover .p3-label,
+html[data-theme="light"] .p3-row:focus-visible .p3-label,
+html[data-theme="light"] .p3-row.active .p3-label {
+  color: #14151a;
+}
+html[data-theme="light"] .p3-hint-row {
+  color: rgba(20,20,24,0.45);
+}
+html[data-theme="light"] .p3-hint-key {
+  color: rgba(20,20,24,0.7);
+  border-color: rgba(20,20,24,0.25);
+  background: rgba(255,255,255,0.6);
+}
 @media (max-width: 600px) {
   .p3-brand { top: 16px; left: 20px; }
   .p3-brand img { height: 28px; }
@@ -580,10 +650,19 @@ details > summary::-webkit-details-marker { display: none; }
   .p3-brand-links { top: 16px; right: 20px; font-size: 11px; gap: 10px; }
 }
 
-/* Persona-menu body should be pitch-dark (no white gutters from the
-   default body gradient) and should hide scrollbars unless needed. */
+/* Persona-menu body. Theme-aware: pitch-black in dark, pure white in light.
+   The WebGL canvas paints over this, but the body color is what shows briefly
+   before the canvas inits and serves as a fallback when WebGL is unavailable. */
 .p3-body {
-  background: #04060f;
+  background: #000000;
   color: #fff;
+}
+html[data-theme="light"] .p3-body,
+html[data-theme="light"] .p3-root {
+  background: #ffffff;
+}
+html[data-theme="dark"] .p3-body,
+html[data-theme="dark"] .p3-root {
+  background: #000000;
 }
 

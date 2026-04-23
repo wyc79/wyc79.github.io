@@ -5,14 +5,13 @@
   const root = document.documentElement;
   const saved = localStorage.getItem('yc-theme');
 
-  // Initialize theme on page load
+  // Initialize theme on page load. New visitors default to light; OS preference
+  // is no longer auto-applied so the site has a predictable first impression.
   if (saved === 'light' || saved === 'dark') {
     root.setAttribute('data-theme', saved);
   } else {
-    const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
-    const defaultTheme = prefersDark ? 'dark' : 'light';
-    root.setAttribute('data-theme', defaultTheme);
-    localStorage.setItem('yc-theme', defaultTheme);
+    root.setAttribute('data-theme', 'light');
+    localStorage.setItem('yc-theme', 'light');
   }
 
   // Wait for DOM to be ready

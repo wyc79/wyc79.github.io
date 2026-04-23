@@ -12,16 +12,7 @@
 </head>
 <body id="top" class="p3-body">
   <section class="p3-root" aria-label="Landing menu">
-    <!-- Optional background video: uncomment and drop a file at bg.mp4 to enable.
-    <video class="p3-video" src="bg.mp4" autoplay loop muted playsinline></video>
-    -->
-    <div class="p3-video-bg" aria-hidden="true"></div>
-    <div class="p3-circle"></div>
-    <div class="p3-bg-word">PORTFOLIO</div>
-    <div class="p3-scanlines"></div>
-    <div class="p3-mask"></div>
-    <div class="p3-stripe"></div>
-    <div class="p3-stripe2"></div>
+    <canvas id="p3-sphere" class="p3-canvas" aria-hidden="true"></canvas>
 
     <div class="p3-brand">
       <img src="images/wyc.png" alt="Yuanchen Wang logo" />
@@ -35,6 +26,7 @@
       <a href="mailto:ywang217@usc.edu">EMAIL</a>
       <a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LINKEDIN</a>
       <a href="https://github.com/wyc79" target="_blank" rel="noopener">GITHUB</a>
+      <button type="button" id="themeToggle" class="p3-theme-toggle" aria-label="Toggle theme">THEME</button>
     </div>
 
     <nav class="p3-menu" aria-label="Primary sections"></nav>
@@ -45,6 +37,7 @@
     </div>
   </section>
 
+  <script src="scripts/p3-sphere.js"></script>
   <script src="scripts/p3-menu.js"></script>
 </body>
 </html>

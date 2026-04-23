@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(jobs)",
+      "Bash(node --check scripts/p3-sphere.js)",
+      "Bash(node --check scripts/p3-menu.js)"
+    ]
+  }
+}

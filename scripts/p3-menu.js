@@ -1,23 +1,152 @@
 (function () {
   'use strict';
 
+  // Per-item design data:
+  //   tilt     — fixed rotation (deg) on the VISUAL layer only; the <a>'s hit
+  //              area stays axis-aligned.
+  //   shift    — fixed translateY (px) on the visual layer so tabs can overlap
+  //              visually without overlapping hitboxes.
+  //   wedge    — polygon variant params so no two rows share the same silhouette:
+  //              baseTop/baseBot set the left base height,
+  //              leanBot pushes the bottom-left corner inward (angled left edge),
+  //              tipY places the tip, tipScale lengthens the right taper,
+  //              backOffX is NEGATIVE so the pink back layer peeks to the LEFT,
+  //              backOffY sets its vertical drop.
   var ITEMS = [
-    { id: 'projects',     label: 'PROJECTS',     href: 'pages/projects.html',     fontSize: 130, offsetX: 0,  offsetY: 0  },
-    { id: 'skills',       label: 'SKILLS',       href: 'pages/skills.html',       fontSize: 118, offsetX: 44, offsetY: -6 },
-    { id: 'education',    label: 'EDUCATION',    href: 'pages/education.html',    fontSize: 102, offsetX: 22, offsetY: -6 },
-    { id: 'publications', label: 'PUBLICATIONS', href: 'pages/publications.html', fontSize: 82,  offsetX: 60, offsetY: -4 },
-    { id: 'toolbox',      label: 'TOOLBOX',      href: 'pages/toolbox.html',      fontSize: 74,  offsetX: 28, offsetY: -4 },
-    { id: 'github',       label: 'GITHUB',       href: 'https://github.com/wyc79', fontSize: 66, offsetX: 12, offsetY: -2, external: true }
+    { id: 'projects',     label: 'PROJECTS',     href: 'pages/projects.html',     fontSize: 96, offsetX: 0,  offsetY: 0, tilt: -3.0, shift:  0,
+      wedge: { baseTop: -0.04, baseBot: 1.00, leanBot: 0.18, tipY: 0.48, tipScale: 1.45, backOffX: -0.045, backOffY: 0.09 } },
+    { id: 'skills',       label: 'SKILLS',       href: 'pages/skills.html',       fontSize: 88, offsetX: 44, offsetY: 0, tilt:  4.0, shift: -4,
+      wedge: { baseTop: -0.02, baseBot: 0.95, leanBot: 0.22, tipY: 0.40, tipScale: 1.60, backOffX: -0.055, backOffY: 0.07 } },
+    { id: 'education',    label: 'EDUCATION',    href: 'pages/education.html',    fontSize: 76, offsetX: 22, offsetY: 0, tilt: -2.0, shift:  2,
+      wedge: { baseTop: -0.06, baseBot: 1.05, leanBot: 0.15, tipY: 0.55, tipScale: 1.30, backOffX: -0.035, backOffY: 0.12 } },
+    { id: 'publications', label: 'PUBLICATIONS', href: 'pages/publications.html', fontSize: 62, offsetX: 60, offsetY: 0, tilt:  5.0, shift: -4,
+      wedge: { baseTop:  0.00, baseBot: 0.98, leanBot: 0.25, tipY: 0.42, tipScale: 1.55, backOffX: -0.050, backOffY: 0.08 } },
+    { id: 'toolbox',      label: 'TOOLBOX',      href: 'pages/toolbox.html',      fontSize: 56, offsetX: 28, offsetY: 0, tilt: -4.0, shift:  3,
+      wedge: { baseTop: -0.05, baseBot: 1.04, leanBot: 0.20, tipY: 0.38, tipScale: 1.35, backOffX: -0.045, backOffY: 0.13 } },
+    { id: 'github',       label: 'GITHUB',       href: 'https://github.com/wyc79', fontSize: 50, offsetX: 12, offsetY: 0, tilt:  3.0, shift: -2, external: true,
+      wedge: { baseTop: -0.02, baseBot: 0.97, leanBot: 0.16, tipY: 0.52, tipScale: 1.50, backOffX: -0.035, backOffY: 0.10 } }
   ];
 
-  // Polygon clip-path generators — each returns an angular Persona-style shape.
-  var CLIP_SHAPES = [
-    function (w, h) { return 'polygon(0px ' + (h*0.06) + 'px, ' + (w - h*0.55) + 'px 0px, ' + w + 'px ' + (h*0.42) + 'px, ' + (w - h*0.18) + 'px ' + h + 'px, 0px ' + (h*0.94) + 'px)'; },
-    function (w, h) { return 'polygon(' + (h*0.12) + 'px 0px, ' + (w - h*0.30) + 'px ' + (h*0.04) + 'px, ' + w + 'px ' + (h*0.50) + 'px, ' + (w - h*0.08) + 'px ' + h + 'px, 0px ' + (h*0.88) + 'px)'; },
-    function (w, h) { return 'polygon(0px ' + (h*0.10) + 'px, ' + (w - h*0.40) + 'px 0px, ' + w + 'px ' + (h*0.45) + 'px, ' + (w - h*0.25) + 'px ' + h + 'px, ' + (h*0.05) + 'px ' + (h*0.90) + 'px)'; },
-    function (w, h) { return 'polygon(' + (h*0.08) + 'px ' + (h*0.02) + 'px, ' + (w - h*0.22) + 'px 0px, ' + w + 'px ' + (h*0.55) + 'px, ' + (w - h*0.35) + 'px ' + h + 'px, 0px ' + (h*0.82) + 'px)'; },
-    function (w, h) { return 'polygon(0px 0px, ' + (w - h*0.45) + 'px ' + (h*0.05) + 'px, ' + w + 'px ' + (h*0.38) + 'px, ' + (w - h*0.12) + 'px ' + (h*0.98) + 'px, ' + (h*0.10) + 'px ' + h + 'px)'; }
-  ];
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // Build the highlighted-item SVG composition for one row:
+  //   [shadow text][top red wedge][bottom pink wedge][dark base text][bright text, clipped to top wedge]
+  // The top wedge is drawn behind the text but the bright text layer is clipped
+  // to the top wedge, so the uncovered portion of each letter shows the dark
+  // base fill while the covered portion shows the bright fill — no blend modes.
+  function buildHeroSvg(entry) {
+    var fs    = entry.item.fontSize;
+    var label = entry.item.label;
+    var w     = entry.item.wedge;
+
+    // Use the live label box so the wedge length actually matches the font
+    // render (Bebas Neue width estimates are lossy).
+    var lblRect = entry.label.getBoundingClientRect();
+    var labelW  = Math.max(lblRect.width, fs * 0.5 * label.length);
+
+    // Asymmetric padding:
+    //   LEFT  — tight, plus a small margin for the pink back wedge to peek out
+    //           without getting clipped.
+    //   RIGHT — long taper room; tipScale makes some tabs reach farther.
+    var padLeft  = Math.max(fs * 0.11, 14);
+    var padRight = Math.max(fs * 0.55 * w.tipScale, 48);
+    var padY     = Math.max(fs * 0.28, 22);
+    var svgW     = labelW + padLeft + padRight;
+    var svgH     = fs + padY * 2;
+
+    var textX = padLeft;
+    var textY = padY + fs * 0.85;
+
+    // --- Front red wedge: 3-point triangle with an inward-leaning LEFT edge.
+    //   top-left corner at x=0
+    //   bottom-left corner pushed inward by (fs * leanBot)
+    //   tip at the far right
+    // The slanted left edge reads as a sharp angled entry rather than a block.
+    var topPts = [
+      [0,                 padY + fs * w.baseTop],
+      [svgW,              padY + fs * w.tipY],
+      [fs * w.leanBot,    padY + fs * w.baseBot]
+    ];
+
+    // --- Back pink wedge: same silhouette, offset LEFT (negative backOffX) and
+    //     slightly DOWN so a larger strip is exposed on the left/back edge.
+    //     Rendered BEFORE the red so the red covers most of it.
+    var backOffX = fs * w.backOffX;   // negative → left reveal
+    var backOffY = fs * w.backOffY;
+    var botPts = topPts.map(function (p) {
+      return [p[0] + backOffX, p[1] + backOffY];
+    });
+
+    var ptsStr = function (pts) {
+      return pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    };
+    var topPtsStr = ptsStr(topPts);
+    var botPtsStr = ptsStr(botPts);
+
+    var clipId = 'p3hero-clip-' + entry.item.id;
+    var shadowDx = Math.max(3, fs * 0.04);
+    var shadowDy = Math.max(4, fs * 0.06);
+
+    // Build as markup then parse — lets us keep the structure readable and
+    // avoids the SVG-innerHTML namespace quirks in older browsers.
+    var svgMarkup = [
+      '<svg xmlns="', SVG_NS, '" class="p3-hero-svg" ',
+        'viewBox="0 0 ', svgW, ' ', svgH, '" ',
+        'width="', svgW, '" height="', svgH, '" ',
+        'aria-hidden="true">',
+        '<defs>',
+          '<clipPath id="', clipId, '">',
+            '<polygon points="', topPtsStr, '"/>',
+          '</clipPath>',
+        '</defs>',
+        // Shadow text — offset behind everything for depth.
+        '<text class="p3-hero-text p3-hero-shadow" ',
+          'x="', (textX + shadowDx).toFixed(1), '" ',
+          'y="', (textY + shadowDy).toFixed(1), '" ',
+          'font-size="', fs, '">', escapeXml(label), '</text>',
+        // Back pink wedge — drawn first so it sits BEHIND the red one, with
+        // only a small sliver exposed around the lower-right edge.
+        '<polygon class="p3-hero-wedge-bottom" points="', botPtsStr, '"/>',
+        // Front red wedge — sits on top, covering most of the pink.
+        '<polygon class="p3-hero-wedge-top" points="', topPtsStr, '"/>',
+        // Dark base text over the wedges (visible where bright layer does not cover).
+        '<text class="p3-hero-text p3-hero-dark" ',
+          'x="', textX.toFixed(1), '" y="', textY.toFixed(1), '" ',
+          'font-size="', fs, '">', escapeXml(label), '</text>',
+        // Bright text clipped to the top wedge — only the covered portion reads bright.
+        '<g clip-path="url(#', clipId, ')">',
+          '<text class="p3-hero-text p3-hero-bright" ',
+            'x="', textX.toFixed(1), '" y="', textY.toFixed(1), '" ',
+            'font-size="', fs, '">', escapeXml(label), '</text>',
+        '</g>',
+      '</svg>'
+    ].join('');
+
+    var parser = new DOMParser();
+    var doc    = parser.parseFromString(svgMarkup, 'image/svg+xml');
+    var svgEl  = doc.documentElement;
+
+    entry.hero.innerHTML = '';
+    entry.hero.appendChild(svgEl);
+    entry.hero.style.width  = svgW + 'px';
+    entry.hero.style.height = svgH + 'px';
+    // .p3-hero is absolutely positioned inside .p3-rot. The label sits at
+    // x=0 of .p3-rot, and the SVG's internal text sits at x=padLeft, so we
+    // offset the hero by -padLeft to align the two.
+    entry.hero.style.left = (-padLeft) + 'px';
+    entry.hero.style.top  = '50%';
+    entry.hero.style.transform = 'translate(0, -50%)';
+    entry.heroBuilt = true;
+  }
+
+  function escapeXml(s) {
+    return String(s).replace(/[<>&'"]/g, function (c) {
+      return c === '<' ? '&lt;' :
+             c === '>' ? '&gt;' :
+             c === '&' ? '&amp;' :
+             c === "'" ? '&apos;' : '&quot;';
+    });
+  }
 
   function buildMenu(root) {
     var menu = root.querySelector('.p3-menu');
@@ -28,6 +157,9 @@
     var active = 0;
 
     ITEMS.forEach(function (item, i) {
+      // <a> owns the hit area and stays axis-aligned — no rotation applied
+      // here, so hitboxes never overlap their neighbors regardless of how
+      // much the visual layer leans.
       var a = document.createElement('a');
       a.className = 'p3-row';
       a.href = item.href;
@@ -38,6 +170,15 @@
       a.style.marginLeft = item.offsetX + 'px';
       a.style.marginTop  = item.offsetY + 'px';
 
+      // .p3-rot is the VISUAL layer. It carries the tilt and the translateY
+      // shift. CSS transforms don't affect layout, so the <a>'s hit area
+      // stays the same whether or not .p3-rot leans or slides.
+      var rot = document.createElement('div');
+      rot.className = 'p3-rot';
+      rot.style.setProperty('--tilt',  (item.tilt  || 0) + 'deg');
+      rot.style.setProperty('--shift', (item.shift || 0) + 'px');
+
+      // Kept in the DOM for backward-compatible styling — hidden by CSS.
       var hl = document.createElement('div');
       hl.className = 'p3-highlight';
 
@@ -46,33 +187,37 @@
       label.style.fontSize = item.fontSize + 'px';
       label.textContent = item.label;
 
-      a.appendChild(hl);
-      a.appendChild(label);
+      // SVG composition wrapper. Filled by buildHeroSvg once the label has
+      // been measured (after fonts load).
+      var hero = document.createElement('div');
+      hero.className = 'p3-hero';
 
+      rot.appendChild(hl);
+      rot.appendChild(label);
+      rot.appendChild(hero);
+      a.appendChild(rot);
+
+      // Unified "highlighted index": hover, keyboard focus, click, and arrow
+      // keys all drive the same `active` state.
       a.addEventListener('mouseenter', function () { setActive(i); });
       a.addEventListener('focus',      function () { setActive(i); });
+      a.addEventListener('click',      function () { setActive(i); });
 
       menu.appendChild(a);
-      rows.push({ row: a, highlight: hl, label: label, item: item });
+      rows.push({ row: a, rot: rot, highlight: hl, label: label, hero: hero, item: item, heroBuilt: false });
     });
 
-    function sizeHighlight(entry, idx) {
-      // Measure the actual rendered label rather than estimating from text length.
-      var rect = entry.label.getBoundingClientRect();
-      var w = Math.max(80, rect.width + 80);
-      var h = Math.max(20, rect.height * 1.02);
-      entry.highlight.style.width  = w + 'px';
-      entry.highlight.style.height = h + 'px';
-      var clipFn = CLIP_SHAPES[idx] || CLIP_SHAPES[0];
-      entry.highlight.style.clipPath = clipFn(w, h);
-      entry.highlight.style.webkitClipPath = clipFn(w, h);
+    function buildAllHeroes() {
+      rows.forEach(function (entry) {
+        buildHeroSvg(entry);
+      });
     }
 
     function updateStyles() {
       rows.forEach(function (entry, i) {
         var dist = Math.abs(i - active);
         var opacity = (i === active) ? 1 : Math.max(0.18, 1 - dist * 0.38);
-        entry.label.style.opacity = opacity;
+        entry.row.style.setProperty('--p3-idle-opacity', opacity);
         if (i === active) entry.row.classList.add('active');
         else              entry.row.classList.remove('active');
       });
@@ -105,27 +250,25 @@
     }
 
     document.addEventListener('keydown', function (e) {
-      // Only respond to arrow/enter when the hero is roughly in view.
       var heroRect = root.getBoundingClientRect();
-      var visible = heroRect.bottom > 120 && heroRect.top < window.innerHeight * 0.6;
+      var visible  = heroRect.bottom > 120 && heroRect.top < window.innerHeight * 0.6;
       if (!visible) return;
       if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(active - 1); }
       if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
       if (e.key === 'Enter')     { e.preventDefault(); activateCurrent(); }
     });
 
-    function sizeAll() {
-      rows.forEach(function (entry, i) { sizeHighlight(entry, i); });
-    }
-
-    // Initial sizing (after fonts load if possible).
-    sizeAll();
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(sizeAll).catch(function () {});
-    }
-    window.addEventListener('resize', sizeAll);
-
     updateStyles();
+
+    // Build SVGs after labels have laid out at least once.
+    function whenReady() {
+      buildAllHeroes();
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(whenReady).catch(whenReady);
+    } else {
+      setTimeout(whenReady, 60);
+    }
 
     // Staggered mount-in.
     setTimeout(function () {
@@ -143,7 +286,6 @@
   }
 
   function init() {
-    // Inject Bebas Neue font (once).
     if (!document.getElementById('p3-bebas-font')) {
       var link = document.createElement('link');
       link.id = 'p3-bebas-font';
