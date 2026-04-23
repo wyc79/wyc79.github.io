@@ -1,14 +1,17 @@
 (function () {
+  // When the flip game is embedded on a page under /pages/, image paths must
+  // climb one directory. Detect this once and prefix every src.
+  const IMG_BASE = /\/pages\//.test(location.pathname) ? '../' : '';
   const images = [
-    { key: 'nothing', src: 'images/nothing_thumbnail.jpg', alt: 'Nothing Can Go Wrong — screenshot' },
-    { key: 'gyrotris', src: 'images/gyrotris_thumbnail.png', alt: 'Gyrotris — screenshot' },
-    { key: 'ad', src: 'images/AD_thumbnail.png', alt: 'Automatic Differentiation Toolbox' },
-    { key: 'sword', src: 'images/sword_thumbnail.png', alt: 'Aegis Sword — render' },
-    { key: 'cemented-dreams', src: 'images/CD_thumbnail.png', alt: 'Cemented Dreams — screenshot' },
-    { key: 'codebreaker', src: 'images/codebreaker_thumbnail.png', alt: 'CodeBreaker — screenshot' },
-    { key: 'workshop', src: 'images/ctin488_thumbnail.png', alt: 'Game Design Workshop' },
-    { key: '3Drendering', src: 'images/3Drendering_thumbnail.png', alt: '3D Rendering Project Video' },
-    { key: 'prime-engine', src: 'images/prime_engine_thumbnail.png', alt: 'Prime Engine — Engine Systems Implementation' }
+    { key: 'nothing', src: IMG_BASE + 'images/nothing_thumbnail.jpg', alt: 'Nothing Can Go Wrong — screenshot' },
+    { key: 'gyrotris', src: IMG_BASE + 'images/gyrotris_thumbnail.png', alt: 'Gyrotris — screenshot' },
+    { key: 'ad', src: IMG_BASE + 'images/AD_thumbnail.png', alt: 'Automatic Differentiation Toolbox' },
+    { key: 'sword', src: IMG_BASE + 'images/sword_thumbnail.png', alt: 'Aegis Sword — render' },
+    { key: 'cemented-dreams', src: IMG_BASE + 'images/CD_thumbnail.png', alt: 'Cemented Dreams — screenshot' },
+    { key: 'codebreaker', src: IMG_BASE + 'images/codebreaker_thumbnail.png', alt: 'CodeBreaker — screenshot' },
+    { key: 'workshop', src: IMG_BASE + 'images/ctin488_thumbnail.png', alt: 'Game Design Workshop' },
+    { key: '3Drendering', src: IMG_BASE + 'images/3Drendering_thumbnail.png', alt: '3D Rendering Project Video' },
+    { key: 'prime-engine', src: IMG_BASE + 'images/prime_engine_thumbnail.png', alt: 'Prime Engine — Engine Systems Implementation' }
   ];
 
   function initFlipGame() {

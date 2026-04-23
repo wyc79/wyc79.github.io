@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Projects — Yuanchen Wang</title>
+  <meta name="description" content="Game development and related projects by Yuanchen Wang." />
+  <link rel="icon" type="image/png" href="../images/wyc.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
+  <script src="../scripts/theme.js"></script>
+</head>
+<body id="top">
+  <div class="wrap">
+    <header>
+      <div class="toolbar" style="justify-content: space-between;">
+        <div>
+          <h1 style="margin-bottom:.1rem;"><a href="../index.html"><img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Projects</h1>
+          <p class="tagline">Game development work and related technical projects.</p>
+        </div>
+        <div>
+          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
+          <button class="toggle" id="languageToggle" aria-label="Change language">🌐 中 / EN </button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="site-nav" aria-label="Sections">
+      <a href="../index.html" class="nav-logo" aria-label="Return to landing page" title="Back to home">
+        <img src="../images/wyc.png" alt="Yuanchen Wang logo" />
+      </a>
+      <a href="projects.html" aria-current="page">Projects</a>
+      <a href="skills.html">Skills</a>
+      <a href="education.html">Education</a>
+      <a href="publications.html">Publications</a>
+      <a href="toolbox.html">Toolbox</a>
+    </nav>
+
+    <main>
+      <section id="projects">
+        <h2>Projects</h2>
+        <h3>Game Development Projects</h3>
+        <div class="projects-grid projects-grid--4x4">
+          <article class="project-card project-card--2x2">
+            <h3>Cemented Dreams | Combat Designer &amp; Level Designer</h3>
+            <p class="meta">Third-person platformer in a living building — grapple traversal, combat systems, and Hive level design.</p>
+            <div class="project-media">
+              <a href="cemented-dreams.html"><img src="../images/CD_thumbnail.png" alt="Cemented Dreams — screenshot" /></a>
+            </div>
+          </article>
+          <article class="project-card project-card--2x2">
+            <h3>Nothing Can Go Wrong | Game Designer &amp; Programmer</h3>
+            <p class="meta">A design exploration in indirect control and consequence-driven planning.</p>
+            <div class="project-media">
+              <a href="nothing-can-go-wrong.html"><img src="../images/nothing_thumbnail.jpg" alt="Nothing Can Go Wrong — screenshot" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Code Breaker | Game Developer</h3>
+            <div class="project-media">
+              <a href="codebreaker.html"><img src="../images/codebreaker_thumbnail.png" alt="CodeBreaker — screenshot" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Gyrotris | Solo Game Developer</h3>
+            <div class="project-media">
+              <a href="gyrotris.html"><img src="../images/gyrotris_thumbnail.png" alt="Gyrotris — screenshot" /></a>
+            </div>
+          </article>
+        </div>
+        <br>
+        <h3>Other Related Works</h3>
+        <div class="projects-grid projects-grid--4x4">
+          <article class="project-card project-card--2x2">
+            <h3>Prime Engine — Engine Systems Implementation | Engine Programmer</h3>
+            <p class="meta">Implemented view frustum culling, physics collision + sliding response, and debug visualization for bounding volumes in a minimal C++ engine.</p>
+            <div class="project-media">
+              <a href="prime-engine.html"><img src="../images/prime_engine_thumbnail.png" alt="Prime Engine — Engine Systems Implementation" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Physical Game Prototypes | Designer &amp; Producer</h3>
+            <div class="project-media">
+              <a href="game-design-workshop.html"><img src="../images/ctin488_thumbnail.png" alt="Game Design Workshop" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>3D Rendering Project | Engineer</h3>
+            <div class="project-media">
+              <a href="3d-rendering.html"><img src="../images/3Drendering_thumbnail.png" alt="3D Rendering Project Video" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Aegis Sword | CAD Modeler</h3>
+            <div class="project-media">
+              <a href="aegis-sword.html"><img src="../images/sword_thumbnail.png" alt="Aegis Sword — render" /></a>
+            </div>
+          </article>
+          <article class="project-card">
+            <h3>Automatic Differentiation (AD) Toolbox | Python Developer &amp; QA Lead</h3>
+            <div class="project-media">
+              <a href="automatic-differentiation.html"><img src="../images/AD_thumbnail.png" alt="Automatic Differentiation, test.pypi.org" /></a>
+            </div>
+          </article>
+        </div>
+        <article class="project-card" id="flip-game">
+          <h3>Flip Card Minigame</h3>
+          <p class="meta"><strong>Match pairs of my project images. Click two cards at a time. </strong> Note that if the tabs are not loaded correctly, clear cookies and reload the page. This happens because you might have opened this page before I upload this minigame.</p>
+          <div class="flip-ui" role="toolbar" aria-label="Flip game controls">
+            <div class="flip-stats">
+              <span id="flip-moves" aria-live="polite">Moves: 0</span>
+              <span id="flip-time" aria-live="polite">Time: 0s</span>
+            </div>
+            <button id="flip-reset" class="toggle" type="button" aria-label="Reset flip game">Reset</button>
+          </div>
+          <div class="flip-grid" id="flip-grid" aria-live="polite"></div>
+          <div class="flip-message" id="flip-message" hidden>Great! You matched them all 🎉</div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2025 Yuanchen Wang — HTML portfolio. <a href="../index.html">&larr; Back to home</a></p>
+    </footer>
+  </div>
+
+  <script src="../scripts/flip-game.js"></script>
+</body>
+</html>

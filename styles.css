@@ -339,8 +339,251 @@ details > summary::-webkit-details-marker { display: none; }
 .flip-card-back img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .flip-message { margin-top: .5rem; color: var(--accent); font-weight: 600; }
 
-/* 
+/*
 #wc-container { width: 720px !important; min-width: 720px !important; }
 #wc-container { height: 720px !important; min-height: 720px !important; }
 #wc-container > svg { width: 100% !important; height: 100% !important; display: block; } */
+
+/* ---------- Persona 3 style landing menu ---------- */
+.p3-root {
+  position: relative;
+  width: 100%;
+  min-height: 100svh;
+  background: #04060f;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+}
+.p3-video {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
+  z-index: 0;
+  pointer-events: none;
+}
+.p3-video-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 600px at 20% 30%, rgba(36, 64, 150, 0.35), transparent 60%),
+    radial-gradient(700px 500px at 80% 70%, rgba(120, 30, 60, 0.28), transparent 60%),
+    linear-gradient(180deg, #05081a 0%, #02040c 100%);
+  opacity: 0.9;
+  animation: p3-bg-drift 18s ease-in-out infinite alternate;
+}
+@keyframes p3-bg-drift {
+  0%   { background-position: 0% 0%, 100% 100%, 0 0; filter: hue-rotate(0deg); }
+  100% { background-position: 10% 20%, 85% 80%, 0 0; filter: hue-rotate(-10deg); }
+}
+.p3-circle {
+  position: absolute;
+  right: -15vw; top: 50%;
+  transform: translateY(-50%);
+  width: 65vw; height: 65vw;
+  max-width: 700px; max-height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #0d2560 0%, #060d2a 60%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+.p3-bg-word {
+  position: absolute;
+  bottom: -2vw; left: -1vw;
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: clamp(140px, 22vw, 300px);
+  color: rgba(255,255,255,0.04);
+  letter-spacing: -8px;
+  pointer-events: none;
+  z-index: 2;
+  white-space: nowrap;
+  user-select: none;
+  font-weight: 400;
+}
+.p3-scanlines {
+  position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px
+  );
+  z-index: 3;
+  pointer-events: none;
+}
+.p3-mask {
+  position: absolute; inset: 0;
+  background: linear-gradient(to right, rgba(4,6,15,0.85) 0%, rgba(4,6,15,0.4) 50%, transparent 100%);
+  z-index: 4;
+  pointer-events: none;
+}
+.p3-stripe  { position:absolute; right:0;  top:0; bottom:0; width:5px; background:#c4001a; z-index:10; }
+.p3-stripe2 { position:absolute; right:9px; top:0; bottom:0; width:2px; background:rgba(196,0,26,0.22); z-index:10; }
+
+.p3-menu {
+  position: relative;
+  z-index: 20;
+  padding: 48px 0 48px 48px;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.p3-row {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  text-decoration: none;
+  opacity: 0;
+  transform: translateX(-36px);
+  transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.22,1,0.36,1);
+  padding: 2px 0;
+}
+.p3-row.mounted {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.p3-highlight {
+  position: absolute;
+  left: -48px; top: 50%;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: left center;
+  background: #f38493;
+  z-index: 0;
+  transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
+  pointer-events: none;
+}
+.p3-row.active .p3-highlight {
+  transform: translateY(-50%) scaleX(1);
+}
+
+.p3-label {
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  display: block;
+  color: #2a5ca8;
+  letter-spacing: 2px;
+  line-height: 0.85;
+  position: relative;
+  z-index: 1;
+  transition: color 0.12s ease, opacity 0.12s ease;
+  font-weight: 400;
+  text-shadow: 0 2px 14px rgba(0,0,0,0.35);
+}
+.p3-row.active .p3-label { color: #ffffff; }
+.p3-row:hover:not(.active) .p3-label { color: #4a82c8; }
+
+.p3-hint {
+  position: absolute;
+  bottom: 24px; right: 28px;
+  z-index: 20;
+  display: flex; flex-direction: column;
+  align-items: flex-end; gap: 5px;
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  opacity: 0;
+  transition: opacity 0.5s ease 0.9s;
+}
+.p3-hint.mounted { opacity: 1; }
+.p3-hint-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; letter-spacing: 2px;
+  color: rgba(255,255,255,0.35);
+}
+.p3-hint-key {
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 3px;
+  padding: 1px 7px; font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  background: rgba(0,0,0,0.25);
+}
+
+/* Responsive scaling — label font-size set inline via JS is treated as px base;
+   we scale it down on narrow viewports using transform-origin on the menu. */
+@media (max-width: 760px) {
+  .p3-menu { padding: 40px 0 40px 28px; transform: scale(0.72); transform-origin: left center; }
+  .p3-highlight { left: -28px; }
+}
+@media (max-width: 480px) {
+  .p3-menu { transform: scale(0.52); }
+}
+
+/* Landing-page branding plate */
+.p3-brand {
+  position: absolute;
+  top: 28px;
+  left: 40px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.6s ease 0.1s, transform 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s;
+  pointer-events: none;
+}
+.p3-brand.mounted { opacity: 1; transform: translateY(0); }
+.p3-brand img {
+  height: 36px;
+  width: auto;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  pointer-events: auto;
+}
+.p3-brand-name {
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 22px;
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #fff;
+}
+.p3-brand-sub {
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 12px;
+  letter-spacing: 4px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+.p3-brand-links {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  z-index: 20;
+  display: flex;
+  gap: 14px;
+  font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  opacity: 0;
+  transition: opacity 0.6s ease 0.2s;
+}
+.p3-brand-links.mounted { opacity: 1; }
+.p3-brand-links a {
+  color: rgba(255,255,255,0.55);
+  text-decoration: none;
+  padding: 4px 2px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.p3-brand-links a:hover {
+  color: #fff;
+  border-bottom-color: #c4001a;
+}
+@media (max-width: 600px) {
+  .p3-brand { top: 16px; left: 20px; }
+  .p3-brand img { height: 28px; }
+  .p3-brand-name { font-size: 16px; }
+  .p3-brand-sub { font-size: 10px; }
+  .p3-brand-links { top: 16px; right: 20px; font-size: 11px; gap: 10px; }
+}
+
+/* Persona-menu body should be pitch-dark (no white gutters from the
+   default body gradient) and should hide scrollbars unless needed. */
+.p3-body {
+  background: #04060f;
+  color: #fff;
+}
 
