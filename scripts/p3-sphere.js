@@ -305,9 +305,14 @@
     //   radius   <= viewportWidth  * 0.8  =>  radius <= 0.8 * worldWidth
     var sphereRadius = Math.min(0.4 * worldHeight, 0.8 * worldWidth);
 
-    // Sphere center sits exactly on the right-edge midpoint so only the left
-    // half is visible on screen.
-    var model = mat4TranslateScale(halfW, 0, 0, sphereRadius);
+    // Portrait viewports push the sphere center further right (by half a
+    // radius) so the sphere stops swallowing the left-side menu. Landscape
+    // keeps the original layout — center exactly on the right-edge midpoint,
+    // so only the left half is visible.
+    var portrait = window.innerHeight > window.innerWidth;
+    var centerOffsetWorld = portrait ? sphereRadius * 0.5 : 0;
+    var centerX = halfW + centerOffsetWorld;
+    var model = mat4TranslateScale(centerX, 0, 0, sphereRadius);
 
     // --- Clamped dome lighting ---
     // The light rides a hemisphere centered at the screen's right-edge
@@ -325,11 +330,17 @@
     var vw = window.innerWidth;
     var vh = window.innerHeight;
 
+    // Square pixel → world-unit ratio (used for both the dome-center shift
+    // below and the mouse-offset conversion further down).
+    var pxToWorld = worldWidth / vw;
+
     // Smoothed mouse back in pixel coords. smoothY is already flipped (top = +1).
     var mouseX_px = (smoothX + 1) * 0.5 * vw;
     var mouseY_px = (1 - smoothY) * 0.5 * vh;
 
-    var domeCx_px = vw;           // RIGHT screen edge (X)
+    // Dome center follows the (possibly shifted) sphere center so the
+    // centered-highlight behavior remains correct on portrait viewports.
+    var domeCx_px = vw + centerOffsetWorld / pxToWorld;
     var domeCy_px = vh * 0.5;     // vertical midpoint (Y)
     var domeR_px  = 0.85 * vw;    // slightly smaller than viewport width
 
@@ -350,8 +361,7 @@
     // 3. Reconstruct dome Z (front-facing hemisphere).
     var dz_px = Math.sqrt(Math.max(0, r2 - dx_px * dx_px - dy_px * dy_px));
 
-    // Convert pixel offsets to world units (square pixels → uniform ratio).
-    var pxToWorld = worldWidth / vw;
+    // Convert pixel offsets to world units (pxToWorld computed above).
     var lX = dx_px * pxToWorld;   // dome-local +X = screen right
     var lY = -dy_px * pxToWorld;  // dome-local +Y = screen up  (flip Y)
     var lZ = dz_px * pxToWorld;   // dome-local +Z = forward along camera axis
@@ -359,7 +369,7 @@
     // 4. Dome basis in world. Forward F is the unit vector from the sphere
     //    center to the camera. Right R and up U complete an orthonormal frame
     //    with world up (0,1,0).
-    var fx = -halfW;
+    var fx = -centerX;
     var fz = eye[2];
     var fLen = Math.sqrt(fx * fx + fz * fz);
     fx /= fLen;
@@ -369,7 +379,7 @@
     //   U = (  0,  1,  0)
 
     // 5. Build world-space light position = sphereCenter + lX*R + lY*U + lZ*F.
-    //    Sphere center == dome center == (halfW, 0, 0) in world.
+    //    Sphere center == dome center == (centerX, 0, 0) in world.
     //
     //    Signs verified:
     //      mouse at right-edge midpoint → (lX,lY,lZ) = (0, 0, +R) → light on
@@ -377,7 +387,7 @@
     //      mouse at left-edge midpoint  → clamp puts (lX,lY) on the rim at
     //        (-R, 0), lZ=0 → light sits in the dome-local XY plane, off to
     //        the screen-left side → grazing light from the left. ✓
-    var lx = halfW + lX * fz + lZ * fx;
+    var lx = centerX + lX * fz + lZ * fx;
     var ly =         lY;
     var lz =       - lX * fx + lZ * fz;
 

@@ -6,6 +6,7 @@
   <title>Toolbox</title>
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
+  <script src="../scripts/page-header.js"></script>
   <script src="../scripts/theme.js"></script>
   <style>
     /* Generation region: flex so the word cloud (wrapper + SVG) is centered */
@@ -38,16 +39,7 @@
 </head>
 <body id="top">
   <div class="wrap">
-    <header>
-      <div class="toolbar" style="justify-content: space-between;">
-        <div>
-          <h1 style="margin-bottom:.1rem;"><a href="../index.html"><img src="../images/wyc.png" alt="" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;" /></a>Toolbox</h1>
-        </div>
-        <div>
-          <button class="toggle" id="themeToggle" aria-label="Toggle theme">🌗 Theme</button>
-        </div>
-      </div>
-    </header>
+    <header class="page-head" data-page-header></header>
     <main>
       <section>
         <div class="tabs">

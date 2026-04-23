@@ -53,8 +53,7 @@ body {
 body, section, nav a, .toggle, .project-card, .project-media, .pill, .flip-card, .flip-card-front, .flip-card-back {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
-.wrap { max-width: 980px; margin: 0 auto; padding: 2rem 1rem 5rem; }
-header { margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 1rem; }
 h1 { font-size: 2rem; margin: 0 0 .25rem; color: var(--accent); }
 .tagline { color: var(--muted); margin: 0.25rem 0 0.75rem; }
 .contact a { color: var(--link); text-decoration: none; }
@@ -514,71 +513,44 @@ details > summary::-webkit-details-marker { display: none; }
   .p3-menu { transform: scale(0.52); }
 }
 
-/* Landing-page branding plate */
+/* Branding plate — shared between landing page (.p3-root) and sub-page headers
+   (.page-head). Base rules cover layout + typography; the landing-only rules
+   below add absolute positioning, white-on-dark coloring, and fade-in. */
 .p3-brand {
-  position: absolute;
-  top: 28px;
-  left: 40px;
-  z-index: 20;
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #fff;
-  opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 0.6s ease 0.1s, transform 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s;
-  pointer-events: none;
 }
-.p3-brand.mounted { opacity: 1; transform: translateY(0); }
 .p3-brand img {
   height: 36px;
   width: auto;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
-  pointer-events: auto;
 }
 .p3-brand-name {
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
   font-size: 22px;
   letter-spacing: 3px;
   line-height: 1;
-  color: #fff;
 }
 .p3-brand-sub {
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
   font-size: 12px;
   letter-spacing: 4px;
-  color: rgba(255,255,255,0.5);
   margin-top: 2px;
 }
 .p3-brand-links {
-  position: absolute;
-  top: 28px;
-  right: 40px;
-  z-index: 20;
   display: flex;
+  align-items: center;
   gap: 14px;
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
   font-size: 13px;
   letter-spacing: 3px;
-  opacity: 0;
-  transition: opacity 0.6s ease 0.2s;
 }
-.p3-brand-links.mounted { opacity: 1; }
 .p3-brand-links a {
-  color: rgba(255,255,255,0.55);
   text-decoration: none;
   padding: 4px 2px;
   border-bottom: 1px solid transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
-.p3-brand-links a:hover {
-  color: #fff;
-  border-bottom-color: #c4001a;
-}
-/* Theme toggle is styled to match the brand-links aesthetic — same font,
-   spacing, and underline-on-hover treatment — so it reads as part of that
-   row rather than a foreign UI control. Theme-aware text color overrides
-   below handle the white-on-white case under light theme. */
 .p3-theme-toggle {
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
   font-size: 13px;
@@ -586,44 +558,75 @@ details > summary::-webkit-details-marker { display: none; }
   background: transparent;
   border: 0;
   border-bottom: 1px solid transparent;
-  color: rgba(255,255,255,0.55);
   padding: 4px 2px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
-.p3-theme-toggle:hover,
-.p3-theme-toggle:focus-visible {
+.p3-theme-toggle:focus-visible { outline: none; }
+
+/* Landing-page context: absolute positioning overlays the sphere canvas, and
+   the p3-menu.js mount adds .mounted for the staggered fade-in. */
+.p3-root .p3-brand {
+  position: absolute;
+  top: 28px;
+  left: 40px;
+  z-index: 20;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.6s ease 0.1s, transform 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s;
+  pointer-events: none;
+}
+.p3-root .p3-brand.mounted { opacity: 1; transform: translateY(0); }
+.p3-root .p3-brand img {
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  pointer-events: auto;
+}
+.p3-root .p3-brand a,
+.p3-root .p3-brand button { pointer-events: auto; }
+.p3-root .p3-brand-name { color: #fff; }
+.p3-root .p3-brand-sub { color: rgba(255,255,255,0.5); }
+.p3-root .p3-brand-links {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.6s ease 0.2s;
+}
+.p3-root .p3-brand-links.mounted { opacity: 1; }
+.p3-root .p3-brand-links a,
+.p3-root .p3-theme-toggle {
+  color: rgba(255,255,255,0.55);
+}
+.p3-root .p3-brand-links a:hover,
+.p3-root .p3-theme-toggle:hover,
+.p3-root .p3-theme-toggle:focus-visible {
   color: #fff;
   border-bottom-color: #c4001a;
-  outline: none;
-}
-/* Light theme: the brand-links area sits over a white sphere/page, so the
-   default translucent-white treatment becomes invisible. Switch to a
-   readable dark ink, keep the red accent for the hover underline. */
-html[data-theme="light"] .p3-brand-links a,
-html[data-theme="light"] .p3-theme-toggle {
-  color: rgba(20,20,24,0.65);
-}
-html[data-theme="light"] .p3-brand-links a:hover,
-html[data-theme="light"] .p3-theme-toggle:hover,
-html[data-theme="light"] .p3-theme-toggle:focus-visible {
-  color: #14151a;
 }
 
-/* Light-theme overrides for the rest of the landing UI: brand plate, menu
-   labels, and the keyboard hint all default to white-on-dark. Switch to
-   dark inks so they read on the white page. The active/hover label state
-   also flips from white to a dark wine red (the active row's red SVG banner
-   keeps the white-text-over-red treatment, which still reads correctly). */
-html[data-theme="light"] .p3-brand,
-html[data-theme="light"] .p3-brand-name {
+/* Landing page, light theme: the sphere background goes white, so the
+   default translucent-white treatment becomes invisible. Switch to dark ink,
+   keep the red accent for the hover underline. */
+html[data-theme="light"] .p3-root .p3-brand,
+html[data-theme="light"] .p3-root .p3-brand-name {
   color: #14151a;
 }
-html[data-theme="light"] .p3-brand img {
+html[data-theme="light"] .p3-root .p3-brand img {
   filter: drop-shadow(0 2px 6px rgba(0,0,0,0.18));
 }
-html[data-theme="light"] .p3-brand-sub {
+html[data-theme="light"] .p3-root .p3-brand-sub {
   color: rgba(20,20,24,0.55);
+}
+html[data-theme="light"] .p3-root .p3-brand-links a,
+html[data-theme="light"] .p3-root .p3-theme-toggle {
+  color: rgba(20,20,24,0.65);
+}
+html[data-theme="light"] .p3-root .p3-brand-links a:hover,
+html[data-theme="light"] .p3-root .p3-theme-toggle:hover,
+html[data-theme="light"] .p3-root .p3-theme-toggle:focus-visible {
+  color: #14151a;
 }
 html[data-theme="light"] .p3-label {
   color: #5c1a23;
@@ -642,12 +645,61 @@ html[data-theme="light"] .p3-hint-key {
   border-color: rgba(20,20,24,0.25);
   background: rgba(255,255,255,0.6);
 }
+
+/* Sub-page header: same brand components, in-flow, theme-aware colors. */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 0;
+  margin: 0 0 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.page-head .p3-brand a {
+  display: inline-flex;
+  line-height: 0;
+}
+.page-head .p3-brand-name {
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+.page-head .p3-brand-sub {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.page-head .p3-brand-links,
+.page-head .p3-theme-toggle {
+  font-size: 11px;
+  font-weight: 700;
+}
+.page-head .p3-brand-links a,
+.page-head .p3-theme-toggle {
+  color: var(--fg);
+  opacity: 0.7;
+}
+.page-head .p3-brand-links a:hover,
+.page-head .p3-theme-toggle:hover,
+.page-head .p3-theme-toggle:focus-visible {
+  color: var(--link);
+  border-bottom-color: var(--link);
+  opacity: 1;
+}
+
 @media (max-width: 600px) {
-  .p3-brand { top: 16px; left: 20px; }
+  .p3-root .p3-brand { top: 16px; left: 20px; }
+  .p3-root .p3-brand-links { top: 16px; right: 20px; font-size: 11px; gap: 10px; }
   .p3-brand img { height: 28px; }
   .p3-brand-name { font-size: 16px; }
   .p3-brand-sub { font-size: 10px; }
-  .p3-brand-links { top: 16px; right: 20px; font-size: 11px; gap: 10px; }
+  .page-head { padding: 1rem 0; }
+  .page-head .p3-brand-name { font-size: 13px; }
+  .page-head .p3-brand-sub { font-size: 9px; }
+  .page-head .p3-brand-links,
+  .page-head .p3-theme-toggle { font-size: 10px; }
 }
 
 /* Persona-menu body. Theme-aware: pitch-black in dark, pure white in light.
