@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Prime Engine — Engine Systems Implementation — Yuanchen Wang</title>
-  <meta name="description" content="Prime Engine — Engine Systems Implementation (frustum culling, physics/collision, debug visualization)." />
+  <meta name="description" content="Prime Engine — Engine Systems Implementation (frustum culling, physics/collision, animation blending, debug visualization)." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
@@ -36,8 +36,10 @@
               <p class="meta">I implemented several engine-level systems, including:</p>
               <ul>
                 <li>View frustum culling for rendering optimization</li>
+                <li>Hierarchical BVH culling (static median-split and dynamic Morton-code trees)</li>
                 <li>Collision detection and physics movement (move-and-slide with gravity)</li>
-                <li>Debug visualization tools for bounding volumes</li>
+                <li>Skeletal animation blending (full-body, partial-body, and additive layers)</li>
+                <li>Debug visualization tools for bounding volumes and animation state</li>
               </ul>
               <p class="meta">Working inside the engine required understanding its <strong>component system</strong>, <strong>event system</strong>, and <strong>scene graph</strong> structure in order to integrate new features without breaking the existing architecture.</p>
             </div>
@@ -47,14 +49,20 @@
               <ul>
                 <li><strong>Learned and navigated a large C++ codebase</strong> for a minimal custom game engine.</li>
                 <li><strong>Implemented view frustum culling</strong> for rendering optimization.</li>
+                <li><strong>Built hierarchical BVH culling</strong> with static median-split and dynamic Morton-code trees.</li>
                 <li><strong>Implemented a basic physics system</strong> with collision and sliding response.</li>
+                <li><strong>Built a skeletal animation blending system</strong> supporting full-body, partial-body, and additive blends.</li>
               </ul>
 
               <h3 style="margin-top: 1rem;">Highlights</h3>
               <p style="margin: 0;">
                 <span class="pill">Frustum culling</span>
+                <span class="pill">BVH culling</span>
+                <span class="pill">Morton codes</span>
                 <span class="pill">Physics engine</span>
                 <span class="pill">Collision &amp; sliding</span>
+                <span class="pill">Animation blending</span>
+                <span class="pill">Additive layers</span>
                 <span class="pill">Debug visualization</span>
                 <span class="pill">C++</span>
               </p>
@@ -221,6 +229,149 @@
               style="border-radius: var(--radius);">
             </iframe>
           </article>
+
+          <h4>Animation Blending</h4>
+          <p class="meta">I extended the soldier's animation state machine with several <strong>blending modes</strong>, chosen at spawn via an <code>npcType</code> value from Lua. The skeleton is split into an <strong>upper body</strong> (joints 2–37) and a <strong>lower body</strong> (joints 38–47), so clips can drive different parts at once.</p>
+          <ul>
+            <li><strong>Full-body blend</strong> — two clips mixed by a factor (e.g. idle + run, weighted 0.5 each).</li>
+            <li><strong>Partial blend</strong> — a clip overrides only a joint range via <code>PARTIAL_BODY_ANIMATION</code> (e.g. upper-body shoot over a full-body idle).</li>
+            <li><strong>Additive blend</strong> — a clip layered <em>on top of</em> the existing pose instead of replacing it.</li>
+          </ul>
+          <p class="meta">For additive motion I added an <code>ADDITIVE</code> slot flag. The additive pass takes the clip's <strong>delta from its reference pose (frame 0)</strong> as a rotation-only quaternion and pre-multiplies it onto the joint's local transform — so a base motion stays intact while extra movement is layered on (e.g. lower-body run + upper-body shoot, running and aiming at once).</p>
+
+          <div class="diagram-card">
+            <h3>Animation Blending Modes</h3>
+            <svg viewBox="0 0 960 320" aria-label="Animation blending modes diagram" role="img" style="font-family: Arial, sans-serif;">
+              <defs>
+                <pattern id="additiveHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                  <rect width="8" height="8" fill="#eceef2"/>
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#c94b4b" stroke-width="3"/>
+                </pattern>
+              </defs>
+              <rect x="0" y="0" width="960" height="320" rx="16" fill="#ffffff"/>
+
+              <!-- Full-body blend -->
+              <text x="160" y="40" text-anchor="middle" font-size="16" font-weight="bold">Full-body blend</text>
+              <circle cx="160" cy="80" r="20" fill="#dbeae4" stroke="#3f9b57" stroke-width="2"/>
+              <rect x="128" y="105" width="64" height="70" rx="8" fill="#dbeae4" stroke="#3f9b57" stroke-width="2"/>
+              <rect x="128" y="180" width="64" height="75" rx="8" fill="#dbeae4" stroke="#3f9b57" stroke-width="2"/>
+              <text x="160" y="280" text-anchor="middle" font-size="13" fill="#444">STAND + RUN</text>
+              <text x="160" y="298" text-anchor="middle" font-size="12" fill="#777">0.5 / 0.5 across all joints</text>
+
+              <!-- Partial blend -->
+              <text x="480" y="40" text-anchor="middle" font-size="16" font-weight="bold">Partial blend</text>
+              <circle cx="480" cy="80" r="20" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
+              <rect x="448" y="105" width="64" height="70" rx="8" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
+              <rect x="448" y="180" width="64" height="75" rx="8" fill="#eceef2" stroke="#b9bcc3" stroke-width="2"/>
+              <text x="525" y="145" font-size="12" fill="#c94b4b">Shoot (2–37)</text>
+              <text x="525" y="222" font-size="12" fill="#777">STAND (lower)</text>
+              <text x="480" y="280" text-anchor="middle" font-size="13" fill="#444">upper-body override</text>
+              <text x="480" y="298" text-anchor="middle" font-size="12" fill="#777">replaces joints 2–37</text>
+
+              <!-- Additive blend -->
+              <text x="800" y="40" text-anchor="middle" font-size="16" font-weight="bold">Additive blend</text>
+              <circle cx="800" cy="80" r="20" fill="url(#additiveHatch)" stroke="#c94b4b" stroke-width="2"/>
+              <rect x="768" y="105" width="64" height="70" rx="8" fill="url(#additiveHatch)" stroke="#c94b4b" stroke-width="2"/>
+              <rect x="768" y="180" width="64" height="75" rx="8" fill="#d9f0e0" stroke="#3f9b57" stroke-width="2"/>
+              <text x="845" y="145" font-size="12" fill="#c94b4b">STAND + Shoot</text>
+              <text x="845" y="222" font-size="12" fill="#3f9b57">RUN (38–47)</text>
+              <text x="800" y="280" text-anchor="middle" font-size="13" fill="#444">layered on top</text>
+              <text x="800" y="298" text-anchor="middle" font-size="12" fill="#777">delta pose added to upper body</text>
+
+              <!-- Caption -->
+              <text x="480" y="315" text-anchor="middle" font-size="13" fill="#444"></text>
+            </svg>
+          </div>
+
+          <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+            <iframe
+              src="https://drive.google.com/file/d/1pDR-E51-nmlVNFSYHVQqY08jF-Ondc-i/preview"
+              class="embed-frame"
+              allowfullscreen
+              loading="lazy"
+              title="Animation blending demo"
+              style="border-radius: var(--radius);">
+            </iframe>
+          </article>
+
+          <h4>Hierarchical Culling — Static &amp; Dynamic BVH</h4>
+          <p class="meta">I extended frustum culling into a <strong>Bounding Volume Hierarchy</strong> managed by a central <code>CullingManager</code>, so large groups of objects can be rejected with a few AABB-vs-frustum tests instead of one test per mesh. Each instance is bucketed as <strong>static</strong> or <strong>dynamic</strong>.</p>
+          <ul>
+            <li><strong>Static BVH</strong> — built once, recursively <strong>median-split</strong> along the widest centroid axis, with leaves holding ≤ 8 instances. Traversal prunes whole subtrees whose bounds miss the frustum.</li>
+            <li><strong>Dynamic BVH</strong> — rebuilt every frame for moving objects (to stress-test it I spawned many small meshes given simple random movement). Centroids are normalized and encoded as 30-bit <strong>Morton codes</strong> (Z-order), sorted, then split at the midpoint — a linear, cache-friendly construction.</li>
+          </ul>
+          <p class="meta">The static tree gives better quality for buildings and terrain, while the Morton-code rebuild is cheap enough to run per frame for many moving units — Z-order keeps spatially close objects adjacent in memory, so the build and traversal access nodes nearly linearly, staying cache-friendly. Both are roughly <em>O(n log n)</em>, dominated by the sort.</p>
+
+          <div class="diagram-card">
+            <h3>Static vs. Dynamic BVH Construction</h3>
+            <svg viewBox="0 0 960 280" aria-label="Static versus dynamic BVH construction diagram" role="img" style="font-family: Arial, sans-serif;">
+              <rect x="0" y="0" width="960" height="280" rx="16" fill="#ffffff"/>
+
+              <!-- Static side -->
+              <text x="240" y="40" text-anchor="middle" font-size="16" font-weight="bold">Static BVH — median split</text>
+              <rect x="190" y="60" width="100" height="34" rx="8" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
+              <text x="240" y="82" text-anchor="middle" font-size="13">root AABB</text>
+              <rect x="110" y="120" width="90" height="32" rx="8" fill="#fff3d6" stroke="#c9a93f" stroke-width="2"/>
+              <rect x="280" y="120" width="90" height="32" rx="8" fill="#fff3d6" stroke="#c9a93f" stroke-width="2"/>
+              <rect x="70" y="178" width="70" height="30" rx="8" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
+              <rect x="160" y="178" width="70" height="30" rx="8" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
+              <rect x="260" y="178" width="70" height="30" rx="8" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
+              <rect x="350" y="178" width="70" height="30" rx="8" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
+              <line x1="225" y1="94" x2="155" y2="120" stroke="#888" stroke-width="2"/>
+              <line x1="255" y1="94" x2="325" y2="120" stroke="#888" stroke-width="2"/>
+              <line x1="140" y1="152" x2="105" y2="178" stroke="#888" stroke-width="2"/>
+              <line x1="170" y1="152" x2="195" y2="178" stroke="#888" stroke-width="2"/>
+              <line x1="310" y1="152" x2="295" y2="178" stroke="#888" stroke-width="2"/>
+              <line x1="340" y1="152" x2="385" y2="178" stroke="#888" stroke-width="2"/>
+              <text x="240" y="232" text-anchor="middle" font-size="13" fill="#444">split on widest axis · leaves ≤ 8 instances</text>
+              <text x="240" y="252" text-anchor="middle" font-size="12" fill="#777">built once for static geometry</text>
+
+              <!-- Divider -->
+              <line x1="480" y1="55" x2="480" y2="225" stroke="#e0e0e0" stroke-width="2"/>
+
+              <!-- Dynamic side: Z-order curve -->
+              <text x="720" y="40" text-anchor="middle" font-size="16" font-weight="bold">Dynamic BVH — Morton (Z-order)</text>
+              <polyline points="600,80 660,80 600,130 660,130 740,80 800,80 740,130 800,130 600,180 660,180 600,210 660,210 740,180 800,180 740,210 800,210"
+                        fill="none" stroke="#3f6fb9" stroke-width="2"/>
+              <g fill="#c94b4b">
+                <circle cx="600" cy="80" r="5"/><circle cx="660" cy="80" r="5"/>
+                <circle cx="600" cy="130" r="5"/><circle cx="660" cy="130" r="5"/>
+                <circle cx="740" cy="80" r="5"/><circle cx="800" cy="80" r="5"/>
+                <circle cx="740" cy="130" r="5"/><circle cx="800" cy="130" r="5"/>
+                <circle cx="600" cy="180" r="5"/><circle cx="660" cy="180" r="5"/>
+                <circle cx="600" cy="210" r="5"/><circle cx="660" cy="210" r="5"/>
+                <circle cx="740" cy="180" r="5"/><circle cx="800" cy="180" r="5"/>
+                <circle cx="740" cy="210" r="5"/><circle cx="800" cy="210" r="5"/>
+              </g>
+              <text x="720" y="240" text-anchor="middle" font-size="13" fill="#444">Morton code → sort → midpoint split</text>
+              <text x="720" y="260" text-anchor="middle" font-size="12" fill="#777">rebuilt every frame for moving objects</text>
+            </svg>
+          </div>
+
+          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+              <iframe
+                src="https://drive.google.com/file/d/1rbXzQFXgfYWXn0ZlS2JHHfOdQQ4NcLFt/preview"
+                class="embed-frame"
+                allowfullscreen
+                loading="lazy"
+                title="Static BVH debug demo"
+                style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
+              </iframe>
+              <p class="meta" style="margin: 0.5rem 0 0;">Static BVH — rainbow boxes from root (red) to leaf (purple).</p>
+            </article>
+            <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+              <iframe
+                src="https://drive.google.com/file/d/1TWLfY1hcDGbvflQvAJeAwzv6WJ20s_Te/preview"
+                class="embed-frame"
+                allowfullscreen
+                loading="lazy"
+                title="Dynamic BVH debug demo"
+                style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
+              </iframe>
+              <p class="meta" style="margin: 0.5rem 0 0;">Dynamic BVH — white boxes over randomly moving meshes, leaves shown as dots.</p>
+            </article>
+          </div>
         </section>
 
         <p style="margin-top: 1.5rem;"><a href="projects.html">← Back to Projects</a></p>
