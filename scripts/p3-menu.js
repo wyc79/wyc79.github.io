@@ -250,6 +250,11 @@
     }
 
     document.addEventListener('keydown', function (e) {
+      // Ignore keys typed into form fields (e.g. the chat widget's input) —
+      // Enter there means "send the message", not "open the hovered page".
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable ||
+                (t.closest && t.closest('.ycchat-panel')))) return;
       var heroRect = root.getBoundingClientRect();
       var visible  = heroRect.bottom > 120 && heroRect.top < window.innerHeight * 0.6;
       if (!visible) return;

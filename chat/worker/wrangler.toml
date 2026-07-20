@@ -1,0 +1,18 @@
+name = "portfolio-chat"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# Non-secret config. The API key is a secret — set it with:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+SITE_BASE = "https://wyc79.github.io"
+ALLOWED_ORIGINS = "https://wyc79.github.io,http://localhost:8000,http://127.0.0.1:8000"
+LLM_MODEL = "claude-3-5-haiku-latest"
+RATE_LIMIT_PER_HOUR = "30"
+
+# Optional but recommended: one KV namespace enables per-IP rate limiting and
+# persistent chat logs (30-day TTL). Create it, then uncomment:
+#   npx wrangler kv namespace create CHAT_KV
+# [[kv_namespaces]]
+# binding = "CHAT_KV"
+# id = "<paste the id printed by the command above>"
