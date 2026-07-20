@@ -7,18 +7,70 @@ rebuilds are stable diffs.
 """
 
 import json
+import logging
+import os
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
+
 from portfolio_rag.chunker import chunk_text
-from portfolio_rag.config import settings
-from portfolio_rag.embedder import get_embedder
-from portfolio_rag.loader import load_site
+from portfolio_rag.config import MODEL_PRESETS, settings
+from portfolio_rag.embedder import OnnxEmbedder, get_embedder
+from portfolio_rag.gate_calibration import OFF_TOPIC_ZH, ON_TOPIC_ZH, compute_gate
+from portfolio_rag.loader import load_knowledge, load_site
 from portfolio_rag.roles import roles_payload
 
-SCHEMA_VERSION = 1
+logger = logging.getLogger(__name__)
+
+SCHEMA_VERSION = 2
+
+
+def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
+    """Chinese first-pass gate: bge-zh over the hand-written knowledge_zh
+    corpus. Evidence-gated — only enabled if calibration on the zh query
+    sets actually separates (otherwise the backend keeps the CJK bypass).
+    Set RAG_ZH_GATE_FORCE=1 to write it despite overlap (testing only)."""
+    zh_model = preset.get("gate_model_zh")
+    if not zh_model:
+        return None
+    zh_preset = MODEL_PRESETS[zh_model]
+    model_dir = settings.resolve_path(zh_preset["dir"])
+    corpus_dir = settings.chat_root / "knowledge_zh"
+    if not model_dir.is_dir() or not corpus_dir.is_dir():
+        logger.info("zh gate: skipped (%s missing)", "model" if not model_dir.is_dir() else "knowledge_zh/")
+        return None
+
+    sections = load_knowledge(corpus_dir)
+    if not sections:
+        logger.info("zh gate: skipped (knowledge_zh has no sections yet)")
+        return None
+    embedder = OnnxEmbedder(
+        model_dir,
+        max_tokens=settings.embedding_max_tokens,
+        query_prefix=zh_preset["query_prefix"],
+        passage_prefix=zh_preset["passage_prefix"],
+        pooling=zh_preset.get("pooling", "mean"),
+    )
+    vecs = np.round(embedder.embed_documents([s.text for s in sections]).astype(float), ndigits)
+    gate = compute_gate(embedder, vecs.astype(np.float32), on=ON_TOPIC_ZH, off=OFF_TOPIC_ZH)
+    if gate["margin"] <= 0 and not os.environ.get("RAG_ZH_GATE_FORCE"):
+        logger.warning("zh gate: calibration does not separate (margin %.1f%%) — NOT enabled; "
+                       "CJK queries will bypass the gate", gate["margin"] * 100)
+        return None
+    logger.info("zh gate: enabled (%s >= %s, margin %.1f%%, %d sections)",
+                gate["stat"], gate["threshold"], gate["margin"] * 100, len(sections))
+    return {
+        "model": zh_preset["name"],
+        "model_preset": zh_model,
+        "query_prefix": zh_preset["query_prefix"],
+        "pooling": zh_preset.get("pooling", "mean"),
+        "gate_stat": gate["stat"],
+        "gate_threshold": gate["threshold"],
+        "vectors": vecs.tolist(),
+    }
 
 
 def build_index(site_root: Path | None = None) -> dict:
@@ -51,14 +103,74 @@ def build_index(site_root: Path | None = None) -> dict:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise ValueError(f"duplicate chunk ids: {dupes[:5]}")
 
-    vectors = get_embedder().embed_documents([c["text"] for c in chunks])
+    embedder = get_embedder()
+    preset = settings.preset
+    vectors = embedder.embed_documents([c["text"] for c in chunks])
     ndigits = settings.vector_round_decimals
     for chunk, vector in zip(chunks, vectors):
         chunk["vector"] = [round(float(v), ndigits) for v in vector]
 
+    # Off-topic gate. If the preset delegates gating to another model (e5
+    # can't separate on/off-topic), embed the chunks AGAIN with the gate
+    # model and write data/gate_vectors.json for the backend; otherwise
+    # calibrate the retrieval model itself for the widget's local gate.
+    gate_model = preset.get("gate_model")
+    if gate_model:
+        gate_preset = MODEL_PRESETS[gate_model]
+        gate_embedder = OnnxEmbedder(
+            settings.resolve_path(gate_preset["dir"]),
+            max_tokens=settings.embedding_max_tokens,
+            query_prefix=gate_preset["query_prefix"],
+            passage_prefix=gate_preset["passage_prefix"],
+            pooling=gate_preset.get("pooling", "mean"),
+        )
+        gate_vecs = gate_embedder.embed_documents([c["text"] for c in chunks])
+        gate_vecs = np.round(gate_vecs.astype(float), ndigits)
+        gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
+                            multilingual=gate_preset["multilingual"])
+        gate_payload = {
+            "en": {
+                "model": gate_preset["name"],
+                "model_preset": gate_model,
+                "query_prefix": gate_preset["query_prefix"],
+                "pooling": gate_preset.get("pooling", "mean"),
+                "gate_stat": gate["stat"],
+                "gate_threshold": gate["threshold"],
+                "chunk_ids": [c["id"] for c in chunks],
+                "vectors": gate_vecs.tolist(),
+            }
+        }
+        zh_gate = _build_zh_gate(preset, ndigits)
+        if zh_gate:
+            gate_payload["zh"] = zh_gate
+        gate_path = settings.resolve_path(settings.gate_vectors_path)
+        gate_path.write_text(json.dumps(gate_payload, ensure_ascii=False), encoding="utf-8")
+
+        # Published fallback for the widget's degraded mode (backend down):
+        # same MiniLM vectors, chunk-order aligned with index.json.
+        fallback = {
+            "model": gate_preset["name"],
+            "query_prefix": gate_preset["query_prefix"],
+            "gate_stat": gate["stat"],
+            "gate_threshold": gate["threshold"],
+            "vectors": gate_vecs.tolist(),
+        }
+        settings.resolve_path(settings.fallback_vectors_path).write_text(
+            json.dumps(fallback, ensure_ascii=False), encoding="utf-8"
+        )
+        index_gate = {"gate_remote": True, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"]}
+    else:
+        matrix = np.array([c["vector"] for c in chunks], dtype=np.float32)
+        gate = compute_gate(embedder, matrix, multilingual=preset["multilingual"])
+        index_gate = {"gate_remote": False, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"]}
+
     index = {
         "schema_version": SCHEMA_VERSION,
-        "model": "Xenova/all-MiniLM-L6-v2 (quantized ONNX, mean pooling, normalized)",
+        "model": preset["name"],
+        "model_preset": settings.model_preset,
+        "query_prefix": preset["query_prefix"],
+        "multilingual": preset["multilingual"],
+        **index_gate,
         "dim": int(vectors.shape[1]) if len(chunks) else 0,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "chunk_size": settings.chunk_size,
@@ -81,5 +193,7 @@ def build_index(site_root: Path | None = None) -> dict:
         "sections": len(sections),
         "chunks": len(chunks),
         "index_kb": round(index_path.stat().st_size / 1024, 1),
+        "gate_stat": gate["stat"],
+        "gate_threshold": gate["threshold"],
         "elapsed_seconds": round(time.time() - t0, 3),
     }

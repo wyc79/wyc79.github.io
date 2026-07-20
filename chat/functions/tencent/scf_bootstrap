@@ -1,0 +1,5 @@
+#!/bin/bash
+# Tencent SCF web-function bootstrap: start the HTTP server on :9000.
+# Must be executable (chmod 755) and sit next to index.py in the package root.
+PY=$(command -v python3.10 || command -v python3 || echo /var/lang/python310/bin/python3.10)
+exec "$PY" -u index.py

@@ -36,6 +36,12 @@ def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path) -> No
 
     assert index["schema_version"] == index_builder.SCHEMA_VERSION
     assert index["dim"] == 384
+    assert index["model_preset"] == "minilm"
+    assert index["query_prefix"] == ""
+    # Thresholds are stat-dependent (a zscore gate can be ~3), and this tiny
+    # one-topic fixture can't calibrate meaningfully — just check the fields.
+    assert index["gate_stat"] in {"top", "contrast", "zscore"}
+    assert isinstance(index["gate_threshold"], float)
     assert stats["chunks"] == len(index["chunks"]) > 1  # long section got split
 
     ids = [c["id"] for c in index["chunks"]]

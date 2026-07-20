@@ -49,10 +49,11 @@ field, checks the `Origin` header, caps `max_tokens`, and (with the optional KV
 binding) rate-limits per IP.
 
 **Off-topic use is refused three times over.** The chat is not a general assistant:
-(1) the widget gates on retrieval score — if the best chunk scores below 0.22
-(calibrated: on-topic questions measure ≥ ~0.30, jokes/homework/translation requests
-≤ ~0.25), it refuses locally and re-suggests role-specific questions without any LLM
-call. The gate is name-blind: mentioning "Yuanchen Wang" inflates similarity (a
+(1) the widget gates on retrieval score — if the best chunk scores below the
+threshold, it refuses locally and re-suggests role-specific questions without any
+LLM call. The threshold is not hardcoded: build_index calibrates it per embedding
+model from canonical on-/off-topic query sets (src/portfolio_rag/gate_calibration.py)
+and ships it in index.json (`gate_threshold`; ≈0.23 for MiniLM). The gate is name-blind: mentioning "Yuanchen Wang" inflates similarity (a
 name-dropped joke request scores 0.61), so name-bearing questions are gated on the
 question with the name stripped out, unless the remainder is a bio-intent stub
 ("who is", "tell me about", empty) — those are genuinely about YC and pass; (2) the Worker independently refuses empty-context requests, so bypassing the
@@ -113,10 +114,15 @@ erroring). Preview over HTTP from the repo root:
 python -m http.server 8000   # then open http://localhost:8000
 ```
 
-## Deploying the Worker (enables LLM answers)
+## Deploying a backend (enables LLM answers)
 
 The site works without this step — the widget stays in retrieval-only mode until
-`WORKER_URL` is set.
+`WORKER_URL` is set. Two interchangeable backends exist:
+
+- **Tencent SCF (chosen for China reachability + DeepSeek):** sources in
+  `functions/tencent/`; the step-by-step console guide is kept locally in
+  `.claude/DEPLOY.md` (gitignored, not published).
+- **Cloudflare Worker (Anthropic API):** below.
 
 ```bash
 cd chat/worker

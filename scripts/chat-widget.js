@@ -16,13 +16,32 @@
   'use strict';
 
   // ── Config ────────────────────────────────────────────────────────────
-  var WORKER_URL = ''; // e.g. 'https://portfolio-chat.<account>.workers.dev' after deploy
+  // Backend base URL (Tencent SCF 函数URL or Cloudflare Worker). Set it here
+  // after deploying — see chat/functions/tencent/DEPLOY.md. A page may also
+  // predefine window.YC_CHAT_WORKER_URL before this script loads.
+  var WORKER_URL = (window.YC_CHAT_WORKER_URL || 'https://1302480548-79ajhb3iyj.ap-guangzhou.tencentscf.com').replace(/\/+$/, '');
   var TOP_K = 4;
   var MIN_SCORE = 0.18;  // per-source display floor
-  // Off-topic gate: if even the BEST chunk scores below this, the question
-  // isn't about YC — refuse locally, never call the LLM. Calibrated against
-  // measured scores (on-topic ≥ ~0.30, jokes/weather/homework ≤ ~0.25).
+  // Off-topic gate: statistic + threshold are calibrated per embedding model
+  // at build time and shipped in index.json (gate_stat, gate_threshold) —
+  // see chat/src/portfolio_rag/gate_calibration.py, mirrored in
+  // chat/tests/test_gate.py. These constants are only the fallback for old
+  // indexes: raw top-score >= 0.22 (the MiniLM calibration).
   var OFFTOPIC_GATE = 0.22;
+
+  function gateThreshold() {
+    return (state.index && state.index.gate_threshold) || OFFTOPIC_GATE;
+  }
+
+  function statValue(stats, kind) {
+    if (kind === 'contrast') return stats.top - stats.mean;
+    if (kind === 'zscore') return (stats.top - stats.mean) / (stats.std + 1e-6);
+    return stats.top;
+  }
+
+  function gateValue(stats) {
+    return statValue(stats, (state.index && state.index.gate_stat) || 'top');
+  }
   // Name-dropping inflates similarity ("Yuanchen Wang tell me a joke" scores
   // 0.61), so when the question mentions the name, the gate is applied to the
   // question WITHOUT the name — unless what remains is a bio-intent stub
@@ -45,7 +64,9 @@
     roles: null,
     index: null,
     extractor: null,
-    loading: null, // Promise while assets load
+    loading: null, // Promise while core assets load
+    extractorLoading: null, // Promise while the local model loads
+    remoteEmbedDown: false, // /embed said 503 or errored -> stop trying
     busy: false,
     session: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
     history: [], // [{role:'user'|'assistant', content}]
@@ -77,8 +98,11 @@
     }
   }
 
-  // ── Lazy asset loading (model + index + roles) ────────────────────────
-  function loadAssets(onProgress) {
+  // ── Lazy asset loading ────────────────────────────────────────────────
+  // Core (roles + index) always loads on open — it's ~600KB. The 23MB local
+  // model loads only when actually needed: immediately when there's no
+  // backend, lazily as a fallback when the backend embeds server-side.
+  function loadCore() {
     if (state.loading) return state.loading;
     state.loading = (async function () {
       // no-cache = revalidate with the server (cheap 304 when unchanged), so
@@ -91,41 +115,96 @@
         if (!r.ok) throw new Error('index.json ' + r.status);
         return r.json();
       });
+      state.roles = await rolesRes;
+      state.index = await indexRes;
+    })();
+    return state.loading;
+  }
+
+  // The vendored in-browser model only matches indexes built with MiniLM —
+  // an e5-built index needs the backend's /embed and has no local fallback.
+  function localModelMatchesIndex() {
+    return !state.index || /all-MiniLM-L6-v2/.test(state.index.model || '');
+  }
+
+  function ensureExtractor(onProgress) {
+    if (state.extractor) return Promise.resolve();
+    if (state.extractorLoading) return state.extractorLoading;
+    state.extractorLoading = (async function () {
       var T = await import(new URL(PREFIX + 'scripts/vendor/transformers.min.js', window.location.href).href);
       T.env.allowRemoteModels = false;
       T.env.localModelPath = new URL(PREFIX + 'chat/models/', window.location.href).href;
       T.env.backends.onnx.wasm.wasmPaths = new URL(PREFIX + 'scripts/vendor/', window.location.href).href;
       T.env.backends.onnx.wasm.numThreads = 1;
-      var extractor = await T.pipeline('feature-extraction', MODEL_ID, {
+      state.extractor = await T.pipeline('feature-extraction', MODEL_ID, {
         quantized: true,
         progress_callback: function (p) {
-          if (p.status === 'progress' && /model_quantized/.test(p.file || '') && p.total) {
+          if (onProgress && p.status === 'progress' && /model_quantized/.test(p.file || '') && p.total) {
             onProgress(Math.round((p.loaded / p.total) * 100));
           }
         },
       });
-      state.roles = await rolesRes;
-      state.index = await indexRes;
-      state.extractor = extractor;
     })();
-    return state.loading;
+    return state.extractorLoading;
   }
 
-  async function embedQuery(text) {
-    var out = await state.extractor(text, { pooling: 'mean', normalize: true });
-    return out.data; // Float32Array(384), unit norm
+  // Returns {vector, gate}. gate is non-null only when the backend embeds
+  // AND has the gate model packaged — it judges gateText (the name-stripped
+  // question) with MiniLM, since e5 can't separate on/off-topic.
+  async function embedQuery(text, gateText) {
+    // Preferred: the backend embeds (multilingual model, no client download).
+    // One retry with a pause covers cold starts and transient hiccups before
+    // we give up on the backend for this session.
+    if (WORKER_URL && !state.remoteEmbedDown) {
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          var res = await fetch(WORKER_URL + '/embed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, gate_text: gateText || text }),
+          });
+          if (res.ok) {
+            var data = await res.json();
+            return { vector: new Float32Array(data.vector), gate: data.gate || null };
+          }
+          if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
+        } catch (e) {
+          if (String(e && e.message).indexOf('rate limited') === 0) throw e;
+        }
+        if (attempt === 0) await new Promise(function (r) { setTimeout(r, 1500); });
+      }
+      state.remoteEmbedDown = true;
+      logTurn({ event: 'remote_embed_fallback' });
+    }
+    if (!localModelMatchesIndex()) {
+      throw new Error('embedding service unavailable (the search index needs the server-side model)');
+    }
+    await ensureExtractor(null);
+    var out = await state.extractor((state.index.query_prefix || '') + text, { pooling: 'mean', normalize: true });
+    return { vector: out.data, gate: null }; // Float32Array(384), unit norm
   }
 
   function retrieve(queryVec) {
     var chunks = state.index.chunks;
-    var scored = [];
+    var scored = [], sum = 0, sumSq = 0;
     for (var i = 0; i < chunks.length; i++) {
       var v = chunks[i].vector, s = 0;
       for (var j = 0; j < v.length; j++) s += v[j] * queryVec[j];
       scored.push({ chunk: chunks[i], score: s });
+      sum += s;
+      sumSq += s * s;
     }
+    var n = scored.length || 1;
+    var mean = sum / n;
     scored.sort(function (a, b) { return b.score - a.score; });
-    return scored.slice(0, TOP_K).filter(function (r) { return r.score >= MIN_SCORE; });
+    return {
+      results: scored.slice(0, TOP_K).filter(function (r) { return r.score >= MIN_SCORE; }),
+      stats: {
+        top: scored.length ? scored[0].score : 0,
+        mean: mean,
+        std: Math.sqrt(Math.max(sumSq / n - mean * mean, 0)),
+      },
+    };
   }
 
   function dedupeForDisplay(results) {
@@ -135,6 +214,77 @@
       if (!seen[key]) { seen[key] = true; out.push(r); }
     });
     return out;
+  }
+
+  // ── Degraded mode: backend down + e5 index ────────────────────────────
+  // The published fallback_vectors.json holds MiniLM copies of the chunk
+  // vectors (chunk-order aligned with index.json), so the local MiniLM model
+  // can still recommend relevant pages even when server-side embedding and
+  // LLM answers are unreachable.
+  function loadFallbackVectors() {
+    if (state.fallback) return Promise.resolve(state.fallback);
+    return fetch(PREFIX + 'chat/data/fallback_vectors.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('fallback index unavailable');
+      return r.json();
+    }).then(function (fb) { state.fallback = fb; return fb; });
+  }
+
+  function retrieveFallback(fb, queryVec) {
+    var scored = [], sum = 0, sumSq = 0;
+    for (var i = 0; i < fb.vectors.length; i++) {
+      var v = fb.vectors[i], s = 0;
+      for (var j = 0; j < v.length; j++) s += v[j] * queryVec[j];
+      scored.push({ chunk: state.index.chunks[i], score: s });
+      sum += s; sumSq += s * s;
+    }
+    var n = scored.length || 1, mean = sum / n;
+    scored.sort(function (a, b) { return b.score - a.score; });
+    return {
+      results: scored.slice(0, TOP_K).filter(function (r) { return r.score >= MIN_SCORE; }),
+      stats: { top: scored.length ? scored[0].score : 0, mean: mean, std: Math.sqrt(Math.max(sumSq / n - mean * mean, 0)) },
+    };
+  }
+
+  async function degradedTurn(question, stripped, thinking, record) {
+    record.mode = 'degraded-local';
+    try {
+      if (/[぀-ヿ㐀-鿿豈-﫿]/.test(question)) {
+        // The local fallback model is English-only — be honest for CJK.
+        thinking.classList.remove('ycchat-dots');
+        thinking.textContent = 'The AI answer service is unreachable right now, and offline search only covers English. Please try again in a minute.';
+        record.answer = thinking.textContent;
+        logTurn(record);
+        return;
+      }
+      var fb = await loadFallbackVectors();
+      await ensureExtractor(function (pct) {
+        thinking.textContent = 'Backend unreachable — loading offline search (' + pct + '%)…';
+        thinking.classList.remove('ycchat-dots');
+      });
+      var embedFb = async function (t) {
+        var out = await state.extractor((fb.query_prefix || '') + t, { pooling: 'mean', normalize: true });
+        return out.data;
+      };
+      var retrieved = retrieveFallback(fb, await embedFb(question));
+      var gateScore = stripped
+        ? statValue(retrieveFallback(fb, await embedFb(stripped)).stats, fb.gate_stat || 'top')
+        : statValue(retrieved.stats, fb.gate_stat || 'top');
+      thinking.classList.remove('ycchat-dots');
+      if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
+        thinking.textContent = 'That doesn\'t look like a question about YC, and that\'s all I can help with here — his projects, skills, education, and publications. Try one of these:';
+        addStarters(state.roles.roles[state.role]);
+      } else {
+        thinking.textContent = 'The AI answer service is unreachable right now, but these pages look most relevant to your question:';
+        addSources(retrieved.results);
+      }
+      record.retrieved = retrieved.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
+      record.answer = thinking.textContent;
+      logTurn(record);
+    } catch (err2) {
+      thinking.classList.remove('ycchat-dots');
+      thinking.textContent = 'The chat backend is unreachable right now — please try again in a minute.';
+      logTurn({ event: 'error', role: state.role, question: question, error: String(err2) });
+    }
   }
 
   // ── LLM call via worker ───────────────────────────────────────────────
@@ -299,27 +449,47 @@
     thinking.classList.add('ycchat-dots');
 
     try {
-      var qVec = await embedQuery(question);
-      var results = retrieve(qVec);
-      var record = {
-        event: 'turn', role: state.role, question: question,
-        retrieved: results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; }),
-      };
-
-      // Off-topic gate: nothing on the site is a decent match, so this chat
-      // isn't the right tool for the question. Refuse locally — no LLM call.
-      var gateScore = results.length ? results[0].score : 0;
+      // Name-blind gate input: strip YC's name unless the remainder is a
+      // bio-intent stub (a genuine question about him).
+      var stripped = null;
       if (NAME_TEST_RE.test(question)) {
-        var stripped = question.replace(NAME_STRIP_RE, ' ')
+        var remainder = question.replace(NAME_STRIP_RE, ' ')
           .replace(/\s+/g, ' ').trim()
           .replace(/^[\s:;,.!?—-]+|[\s:;,.!?—-]+$/g, '');
-        if (!BIO_STUB_RE.test(stripped)) {
-          var sResults = retrieve(await embedQuery(stripped));
-          gateScore = sResults.length ? sResults[0].score : 0;
-          record.gate = { stripped: stripped, score: +gateScore.toFixed(3) };
-        }
+        if (!BIO_STUB_RE.test(remainder)) stripped = remainder;
       }
-      if (gateScore < OFFTOPIC_GATE) {
+
+      var record = { event: 'turn', role: state.role, question: question };
+      var emb;
+      try {
+        emb = await embedQuery(question, stripped || question);
+      } catch (embErr) {
+        if (String(embErr && embErr.message).indexOf('embedding service unavailable') !== 0) throw embErr;
+        await degradedTurn(question, stripped, thinking, record);
+        return;
+      }
+      var retrieved = retrieve(emb.vector);
+      var results = retrieved.results;
+      record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
+
+      // Off-topic gate: refuse before any LLM call. Three cases: the backend
+      // judged it (server-side MiniLM gate), the index expects a remote gate
+      // that wasn't available (fail open — the LLM prompt still refuses), or
+      // the classic local gate on this index's own scores.
+      var refused = false;
+      if (emb.gate) {
+        refused = !emb.gate.pass;
+        record.gate = { remote: true, value: emb.gate.value, reason: emb.gate.reason, stripped: stripped || undefined };
+      } else if (state.index.gate_remote) {
+        record.gate = { remote: true, unavailable: true };
+      } else {
+        var gateScore = stripped
+          ? gateValue(retrieve((await embedQuery(stripped, stripped)).vector).stats)
+          : gateValue(retrieved.stats);
+        if (stripped) record.gate = { stripped: stripped, score: +gateScore.toFixed(3) };
+        refused = gateScore < gateThreshold();
+      }
+      if (refused) {
         record.mode = 'off_topic_refused';
         thinking.classList.remove('ycchat-dots');
         thinking.textContent =
@@ -335,6 +505,9 @@
       if (WORKER_URL) {
         record.mode = 'llm';
         answer = await askWorker(question, results);
+        // The UI renders plain text; strip stray markdown emphasis the LLM
+        // may emit despite the prompt (e.g. **Prime Engine**).
+        answer = answer.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#+\s+/gm, '');
         thinking.classList.remove('ycchat-dots');
         thinking.textContent = answer;
       } else {
@@ -416,7 +589,7 @@
     els.btn.setAttribute('aria-expanded', String(state.open));
     if (!state.open) return;
 
-    if (!state.extractor) {
+    if (!state.roles) {
       els.body.textContent = '';
       // file:// blocks module imports and fetch — the widget needs a web
       // server. Explain instead of failing with a cryptic import error.
@@ -427,11 +600,20 @@
           'then open http://localhost:8000 — or just use the live site.');
         return;
       }
-      var status = addMsg('note', 'Loading the on-device search model (~23 MB, cached after the first visit)…');
-      loadAssets(function (pct) {
-        status.textContent = 'Loading the on-device search model… ' + pct + '%';
-      }).then(function () {
-        logTurn({ event: 'assets_loaded' });
+      var needLocalModel = !WORKER_URL; // backend embeds server-side when configured
+      var status = addMsg('note', needLocalModel
+        ? 'Loading the on-device search model (~23 MB, cached after the first visit)…'
+        : 'Loading…');
+      var ready = loadCore();
+      if (needLocalModel) {
+        ready = ready.then(function () {
+          return ensureExtractor(function (pct) {
+            status.textContent = 'Loading the on-device search model… ' + pct + '%';
+          });
+        });
+      }
+      ready.then(function () {
+        logTurn({ event: 'assets_loaded', remote_embed: !!WORKER_URL });
         showRolePicker();
       }).catch(function (err) {
         status.textContent = 'Could not load the chat assets (' + (err && err.message || err) + ').';

@@ -20,8 +20,21 @@ _embedder = None
 
 
 class OnnxEmbedder:
-    def __init__(self, model_dir: Path, max_tokens: int = 256) -> None:
-        logger.info("Loading ONNX embedding model from %s", model_dir)
+    def __init__(
+        self,
+        model_dir: Path,
+        max_tokens: int = 256,
+        query_prefix: str = "",
+        passage_prefix: str = "",
+        pooling: str = "mean",  # "mean" (MiniLM/e5) or "cls" (bge family)
+    ) -> None:
+        logger.info("Loading ONNX embedding model from %s (pooling=%s)", model_dir, pooling)
+        # e5-style models are trained with asymmetric prefixes; MiniLM uses none.
+        self.query_prefix = query_prefix
+        self.passage_prefix = passage_prefix
+        if pooling not in ("mean", "cls"):
+            raise ValueError(f"unknown pooling {pooling!r}")
+        self.pooling = pooling
         self.tokenizer = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
         self.tokenizer.enable_truncation(max_length=max_tokens)
         self.session = ort.InferenceSession(
@@ -43,20 +56,23 @@ class OnnxEmbedder:
             feed["token_type_ids"] = np.zeros_like(input_ids)
         (last_hidden,) = self.session.run(["last_hidden_state"], feed)
 
-        mask = attention_mask[:, :, None].astype(np.float32)
-        summed = (last_hidden * mask).sum(axis=1)
-        counts = np.clip(mask.sum(axis=1), 1e-9, None)
-        mean_pooled = summed / counts
-        norms = np.clip(np.linalg.norm(mean_pooled, axis=1, keepdims=True), 1e-12, None)
-        return (mean_pooled / norms).astype(np.float32)[0]
+        if self.pooling == "cls":
+            pooled = last_hidden[:, 0]
+        else:
+            mask = attention_mask[:, :, None].astype(np.float32)
+            summed = (last_hidden * mask).sum(axis=1)
+            counts = np.clip(mask.sum(axis=1), 1e-9, None)
+            pooled = summed / counts
+        norms = np.clip(np.linalg.norm(pooled, axis=1, keepdims=True), 1e-12, None)
+        return (pooled / norms).astype(np.float32)[0]
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.empty((0, 384), dtype=np.float32)
-        return np.vstack([self._run_one(t) for t in texts])
+        return np.vstack([self._run_one(self.passage_prefix + t) for t in texts])
 
     def embed_query(self, text: str) -> np.ndarray:
-        return self._run_one(text)
+        return self._run_one(self.query_prefix + text)
 
 
 def get_embedder() -> OnnxEmbedder:
@@ -64,8 +80,12 @@ def get_embedder() -> OnnxEmbedder:
     if _embedder is None:
         from portfolio_rag.config import settings
 
+        preset = settings.preset
         _embedder = OnnxEmbedder(
-            settings.resolve_path(settings.embedding_model_dir),
+            settings.resolve_path(preset["dir"]),
             max_tokens=settings.embedding_max_tokens,
+            query_prefix=preset["query_prefix"],
+            passage_prefix=preset["passage_prefix"],
+            pooling=preset.get("pooling", "mean"),
         )
     return _embedder

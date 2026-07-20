@@ -9,3 +9,13 @@ __pycache__/
 *.egg-info/
 node_modules/
 .wrangler/
+
+# large multilingual model fetched by functions/tencent/build_package.py — never commit
+models/Xenova/multilingual-e5-small/
+functions/tencent/_wheels/
+functions/tencent/tencent-function-*.zip
+models/Xenova/bge-small-zh-v1.5/
+data/gate_vectors.json
+
+# scratch area for files Claude cannot delete remotely - safe to delete manually
+_to_delete/
