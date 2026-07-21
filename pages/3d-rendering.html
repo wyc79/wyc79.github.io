@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>3D Rendering Project — Yuanchen Wang</title>
+  <title data-en="3D Rendering Project — Yuanchen Wang" data-zh="3D 渲染项目 — Yuanchen Wang">3D Rendering Project — Yuanchen Wang</title>
   <meta name="description" content="3D Rendering Project" />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
 </head>
@@ -20,67 +22,74 @@
       <section class="project-hero" style="background-image: url('../images/3Drendering.png');">
         <span class="sr-only" role="img" aria-label="3D Rendering Project"></span>
         <div class="project-hero__content">
-          <h2 class="project-hero__title">3D Rendering Project</h2>
+          <h2 class="project-hero__title"><span data-lang="en">3D Rendering Project</span><span data-lang="zh">3D 渲染项目</span></h2>
           <div class="project-hero__meta">
-            <div class="project-hero__meta-item"><strong>Role:</strong> Engineer</div>
-            <div class="project-hero__meta-item"><strong>Tool:</strong> Unity URP, HLSL, C#, GitHub</div>
-            <div class="project-hero__meta-item"><strong>Duration:</strong> Fall 2025 · 1 semester</div>
+            <div class="project-hero__meta-item"><span data-lang="en">Role: Engineer</span><span data-lang="zh">职责： 工程师</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tool: Unity URP, HLSL, C#, GitHub</span><span data-lang="zh">工具： Unity URP、HLSL、C#、GitHub</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Duration: Fall 2025 · 1 semester</span><span data-lang="zh">时长： 2025 秋季 · 1 学期</span></div>
           </div>
         </div>
       </section>
 
       <section class="project-body">
         <p class="meta">
-          <strong>Unity URP</strong> —
-          <a href="https://github.com/wyc79/580Project" target="_blank" rel="noopener">View on GitHub</a>
+          Unity URP —
+          <a href="https://github.com/wyc79/580Project" target="_blank" rel="noopener"><span data-lang="en">View on GitHub</span><span data-lang="zh">在 GitHub 上查看</span></a>
         </p>
 
         <section style="margin-top: 1.5rem;">
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
-              <h3 style="margin-top: 0;">Why</h3>
-              <p class="meta">I wanted to get hands-on with real-time rendering beyond "using shaders" — specifically: how procedural textures, custom shading, and world-space masks can be composed into a readable VFX sequence.</p>
-              <p class="meta">This was my final project for <strong>CSCI 580: 3D Graphics and Rendering (USC, Fall 2025)</strong>, where we explored both offline and realtime rendering techniques (rasterization, shading, noise/procedural generation, and pipeline concepts).</p>
+              <h3 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
+              <p class="meta"><span data-lang="en">I wanted to get hands-on with real-time rendering beyond "using shaders" — specifically: how procedural textures, custom shading, and world-space masks can be composed into a readable VFX sequence.</span><span data-lang="zh">我想真正上手实时渲染，而不只是停留在“会用着色器”的层面：具体来说，就是如何把程序化纹理、自定义着色与世界空间遮罩组合成一段清晰可读的视觉特效序列。</span></p>
+              <p class="meta"><span data-lang="en">This was my final project for CSCI 580: 3D Graphics and Rendering (USC, Fall 2025), where we explored both offline and realtime rendering techniques (rasterization, shading, noise/procedural generation, and pipeline concepts).</span><span data-lang="zh">这是我在 CSCI 580：3D 图形与渲染课程（南加州大学，2025 秋季）的期末项目，课程中我们探索了离线与实时的渲染技术（光栅化、着色、噪声/程序化生成，以及管线相关概念）。</span></p>
             </div>
 
             <div>
-              <h3 style="margin-top: 0;">What</h3>
-              <p class="meta">A real-time <strong>asteroid impact</strong> sequence in Unity URP: a procedural asteroid falls onto a terrain, an "impact frame" post-process sells the moment of collision, and an expanding shockwave reveals molten cracks across the ground.</p>
+              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <p class="meta"><span data-lang="en">A real-time asteroid impact sequence in Unity URP: a procedural asteroid falls onto a terrain, an "impact frame" post-process sells the moment of collision, and an expanding shockwave reveals molten cracks across the ground.</span><span data-lang="zh">一段在 Unity URP 中实现的实时小行星撞击序列：一颗程序化生成的小行星坠向地形，一个“撞击帧”后处理强化了碰撞瞬间的冲击感，随后不断扩张的冲击波在地面上揭示出熔融的裂缝。</span></p>
               <p style="margin: 0;"><span class="pill">Unity URP</span><span class="pill">HLSL</span><span class="pill">C#</span><span class="pill">Procedural Noise</span><span class="pill">World-space Masks</span></p>
             </div>
           </div>
         </section>
 
         <section style="margin-top: 1.5rem;">
-          <h3>How</h3>
-          <h4 style="margin-top: 0;">My contributions (Terrain Transformation)</h4>
-          <p class="meta">I owned the <strong>terrain transformation system</strong> — the lava/crack look and the reveal/fade logic that makes the shockwave "paint" the ground as it expands.</p>
+          <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
+          <h4 style="margin-top: 0;"><span data-lang="en">My contributions (Terrain Transformation)</span><span data-lang="zh">我的贡献（地形变换）</span></h4>
+          <p class="meta"><span data-lang="en">I owned the terrain transformation system — the lava/crack look and the reveal/fade logic that makes the shockwave "paint" the ground as it expands.</span><span data-lang="zh">我负责整个地形变换系统：熔岩/裂缝的外观，以及让冲击波在扩张时“绘制”地面的显现/淡出逻辑。</span></p>
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
               <ul>
-                <li><strong>Procedural lava &amp; cracks shader (HLSL):</strong> Built a terrain material that blends from normal ground to molten lava using <strong>3D Worley noise</strong> for organic crack boundaries.</li>
-                <li><strong>Corner rounding for Worley junctions:</strong> Standard Worley borders can create sharp, unnatural corners at cell junctions. I used the <strong>third-nearest distance (F3)</strong> to compute a corner metric and widen cracks near junctions, producing rounded lava "veins."</li>
-                <li><strong>Surface micro-detail:</strong> Added controllable normal perturbation (Worley + Perlin-style noise) to avoid a flat/plastic feel and improve lighting response.</li>
+                <li data-lang="en">Procedural lava &amp; cracks shader (HLSL): Built a terrain material that blends from normal ground to molten lava using 3D Worley noise for organic crack boundaries.</li>
+                <li data-lang="zh">程序化熔岩与裂缝着色器（HLSL）：构建了一种地形材质，利用 3D Worley 噪声生成自然的裂缝边界，从普通地面平滑过渡到熔融熔岩。</li>
+                <li data-lang="en">Corner rounding for Worley junctions: Standard Worley borders can create sharp, unnatural corners at cell junctions. I used the third-nearest distance (F3) to compute a corner metric and widen cracks near junctions, producing rounded lava "veins."</li>
+                <li data-lang="zh">Worley 交界处的圆角处理：标准的 Worley 边界会在单元交界处产生尖锐、不自然的拐角。我使用第三近距离（F3）计算拐角度量，并在交界附近加宽裂缝，从而形成圆润的熔岩“脉络”。</li>
+                <li data-lang="en">Surface micro-detail: Added controllable normal perturbation (Worley + Perlin-style noise) to avoid a flat/plastic feel and improve lighting response.</li>
+                <li data-lang="zh">表面微观细节：加入可控的法线扰动（Worley + Perlin 风格噪声），避免出现扁平/塑料感，并改善光照响应。</li>
               </ul>
               <div style="margin-top: 1rem;">
                 <img src="../images/3Drendering_lava.png" alt="Lava rendering" style="width: 100%; border-radius: var(--radius-lg);" />
                 <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-                  <p style="margin: 0;" class="meta">Demonstration of the rounding corner effect and normal shading on the lava shader. 
-                  <br>(left: not rounded; middle: rounded corners; right: added normal details)</p>
+                  <p style="margin: 0;" class="meta"><span data-lang="en">Demonstration of the rounding corner effect and normal shading on the lava shader.
+                  <br>(left: not rounded; middle: rounded corners; right: added normal details)</span><span data-lang="zh">熔岩着色器上圆角效果与法线着色的演示。
+                  <br>（左：未圆角；中：圆角；右：加入法线细节）</span></p>
                 </div>
               </div>
             </div>
-            
+
             <div>
               <ul>
-                <li><strong>World-space spherical reveal mask:</strong> Implemented a <code>smoothstep</code>-based mask using distance-to-impact-center with radius + feather controls, then used that mask to lerp between the original terrain and lava shader outputs.</li>
-                <li><strong>C# runtime control:</strong> Drove shader parameters every frame (center, radius, feather) using <strong>MaterialPropertyBlock</strong> so multiple objects can share a material while still receiving per-instance reveal behavior.</li>
-                <li><strong>Fade-out variant:</strong> Implemented a complementary transparent fade shader using the same world-space mask logic (useful for "clearing" geometry inside the shockwave region).</li>
+                <li data-lang="en">World-space spherical reveal mask: Implemented a <code>smoothstep</code>-based mask using distance-to-impact-center with radius + feather controls, then used that mask to lerp between the original terrain and lava shader outputs.</li>
+                <li data-lang="zh">世界空间球形显现遮罩：基于 <code>smoothstep</code> 实现了一个遮罩，使用到撞击中心的距离并配以半径 + 羽化控制，再用该遮罩在原始地形与熔岩着色器输出之间进行插值。</li>
+                <li data-lang="en">C# runtime control: Drove shader parameters every frame (center, radius, feather) using MaterialPropertyBlock so multiple objects can share a material while still receiving per-instance reveal behavior.</li>
+                <li data-lang="zh">C# 运行时控制：使用 MaterialPropertyBlock 每帧驱动着色器参数（中心、半径、羽化），使多个对象可以共享同一材质，同时仍获得逐实例的显现表现。</li>
+                <li data-lang="en">Fade-out variant: Implemented a complementary transparent fade shader using the same world-space mask logic (useful for "clearing" geometry inside the shockwave region).</li>
+                <li data-lang="zh">淡出变体：使用相同的世界空间遮罩逻辑实现了一个互补的透明淡出着色器（可用于“清除”冲击波范围内的几何体）。</li>
               </ul>
               <div style="margin-top: 1rem;">
                 <img src="../images/3Drendering_controlMask.gif" alt="Control mask progression" style="width: 100%; border-radius: var(--radius-lg);" />
                 <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-                  <p style="margin: 0;" class="meta">Controlled revealation of lava and fade-out shaders. </p>
+                  <p style="margin: 0;" class="meta"><span data-lang="en">Controlled revealation of lava and fade-out shaders. </span><span data-lang="zh">熔岩显现与淡出着色器的受控演示。</span></p>
                 </div>
               </div>
             </div>
@@ -88,20 +97,24 @@
         </section>
 
         <section style="margin-top: 1.5rem;">
-          <h3>Outcomes</h3>
-          
+          <h3><span data-lang="en">Outcomes</span><span data-lang="zh">成果</span></h3>
+
           <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-bottom: 1.5rem;">
-            <h4 style="margin-top: 0;">Team system context</h4>
-            <p class="meta">This was a 4-person project. While I focused on terrain transformation, the full sequence also includes:</p>
+            <h4 style="margin-top: 0;"><span data-lang="en">Team system context</span><span data-lang="zh">团队系统背景</span></h4>
+            <p class="meta"><span data-lang="en">This was a 4-person project. While I focused on terrain transformation, the full sequence also includes:</span><span data-lang="zh">这是一个 4 人项目。在我专注于地形变换的同时，整个序列还包括：</span></p>
             <ul>
-              <li><strong>Procedural asteroid generation</strong> (vertex displacement + heightfield-driven normals)</li>
-              <li><strong>Velocity-reactive asteroid lighting</strong> (emission + Fresnel rim "burn")</li>
-              <li><strong>Impact frame post-processing</strong> (edge detection + radial blur + polar noise "speed lines")</li>
-              <li><strong>Shockwave bubble shader</strong> (depth intersection + Fresnel + heat distortion)</li>
+              <li data-lang="en">Procedural asteroid generation (vertex displacement + heightfield-driven normals)</li>
+              <li data-lang="zh">程序化小行星生成（顶点位移 + 高度场驱动的法线）</li>
+              <li data-lang="en">Velocity-reactive asteroid lighting (emission + Fresnel rim "burn")</li>
+              <li data-lang="zh">随速度响应的小行星光照（自发光 + 菲涅尔边缘“灼烧”）</li>
+              <li data-lang="en">Impact frame post-processing (edge detection + radial blur + polar noise "speed lines")</li>
+              <li data-lang="zh">撞击帧后处理（边缘检测 + 径向模糊 + 极坐标噪声“速度线”）</li>
+              <li data-lang="en">Shockwave bubble shader (depth intersection + Fresnel + heat distortion)</li>
+              <li data-lang="zh">冲击波气泡着色器（深度相交 + 菲涅尔 + 热浪扭曲）</li>
             </ul>
 
           </div>
-          
+
           <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
             <iframe
               src="https://drive.google.com/file/d/1E8jcsfaWMn5RO8kw6s2tnNYQdFKJUnFa/preview"
@@ -117,30 +130,35 @@
 
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-              <h4 style="margin-top: 0;">What worked well</h4>
+              <h4 style="margin-top: 0;"><span data-lang="en">What worked well</span><span data-lang="zh">做得好的地方</span></h4>
               <ul style="margin-bottom: 0;">
-                <li><strong>Readable, stylized “lava reveal”:</strong> The world-space mask + Worley cracks made the shockwave feel like it physically alters the terrain.</li>
-                <li><strong>More natural crack topology:</strong> Corner rounding reduced sharp triangular junctions common in basic Worley borders.</li>
-                <li><strong>Reusable control pattern:</strong> MaterialPropertyBlock-based driving is engine-friendly and scales to multiple affected surfaces.</li>
+                <li data-lang="en">Readable, stylized “lava reveal”: The world-space mask + Worley cracks made the shockwave feel like it physically alters the terrain.</li>
+                <li data-lang="zh">清晰而风格化的“熔岩显现”：世界空间遮罩 + Worley 裂缝让冲击波仿佛真的在物理改变地形。</li>
+                <li data-lang="en">More natural crack topology: Corner rounding reduced sharp triangular junctions common in basic Worley borders.</li>
+                <li data-lang="zh">更自然的裂缝拓扑：圆角处理减少了基础 Worley 边界中常见的尖锐三角形交界。</li>
+                <li data-lang="en">Reusable control pattern: MaterialPropertyBlock-based driving is engine-friendly and scales to multiple affected surfaces.</li>
+                <li data-lang="zh">可复用的控制模式：基于 MaterialPropertyBlock 的驱动方式对引擎友好，并能扩展到多个受影响的表面。</li>
               </ul>
             </div>
 
             <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-              <h4 style="margin-top: 0;">Limitations &amp; next steps</h4>
+              <h4 style="margin-top: 0;"><span data-lang="en">Limitations &amp; next steps</span><span data-lang="zh">局限与后续计划</span></h4>
               <ul style="margin-bottom: 0;">
-                <li>The micro-normal detail was tricky to balance; in the final render we reduced the detail scale to avoid noisy lighting. Next, I’d tune a sharper normal pattern that still reads cleanly in motion.</li>
-                <li>I’d also like to expose a small “art direction” panel (crack width, junction rounding strength, lava pulse speed) for faster iteration.</li>
+                <li data-lang="en">The micro-normal detail was tricky to balance; in the final render we reduced the detail scale to avoid noisy lighting. Next, I’d tune a sharper normal pattern that still reads cleanly in motion.</li>
+                <li data-lang="zh">微观法线细节的平衡比较棘手；在最终渲染中，我们降低了细节强度以避免光照出现噪点。接下来，我会调出一种更锐利、在运动中仍然清晰可读的法线图案。</li>
+                <li data-lang="en">I’d also like to expose a small “art direction” panel (crack width, junction rounding strength, lava pulse speed) for faster iteration.</li>
+                <li data-lang="zh">我还希望开放一个小巧的“美术调控”面板（裂缝宽度、交界圆角强度、熔岩脉动速度），以加快迭代。</li>
               </ul>
             </div>
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;"><a href="projects.html">← Back to Projects</a></p>
+        <p style="margin-top: 1.5rem;"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
       </section>
     </main>
 
     <footer>
-      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
+      <p><span data-lang="en">© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。最后更新于 2025-09-16。</span></p>
     </footer>
   </div>
 </body>

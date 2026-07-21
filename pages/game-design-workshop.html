@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Game Design Workshop — Yuanchen Wang</title>
+  <title data-en="Game Design Workshop — Yuanchen Wang" data-zh="游戏设计工作坊 — Yuanchen Wang">Game Design Workshop — Yuanchen Wang</title>
   <meta name="description" content="Game Design Workshop — " />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
   <style>
@@ -110,7 +112,7 @@
       from {opacity: .4}
       to {opacity: 1}
     }
-  
+
     /* Tabs (lightweight W3CSS-style) */
     .tabs {
       display: flex;
@@ -166,26 +168,26 @@
       <section class="project-hero" style="background-image: url('../images/ctin488.png');">
         <span class="sr-only" role="img" aria-label="Game Design Workshop"></span>
         <div class="project-hero__content">
-          <h2 class="project-hero__title">Game Design Workshop</h2>
+          <h2 class="project-hero__title"><span data-lang="en">Game Design Workshop</span><span data-lang="zh">游戏设计工作坊</span></h2>
           <div class="project-hero__meta">
           </div>
         </div>
       </section>
 
-      
+
       <section class="project-body">
 
         <article class="card" style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <h3 style="margin-top:0;">CTIN 488 — Game Design Workshop (Fall 2025)</h3>
+          <h3 style="margin-top:0;"><span data-lang="en">CTIN 488 — Game Design Workshop (Fall 2025)</span><span data-lang="zh">CTIN 488：游戏设计工作坊（2025 秋季）</span></h3>
           <p>
-            This page documents my work across three studio projects in CTIN 488, a playcentric design course focused on
+            <span data-lang="en">This page documents my work across three studio projects in CTIN 488, a playcentric design course focused on
             rapid prototyping, playtesting, and iteration toward a clear player experience goal.
             The semester included an <em>Up the River</em> game mod/variation, a focused <em>Mechanics</em> project, and a
-            team <em>Final Project</em>.
+            team <em>Final Project</em>.</span><span data-lang="zh">本页记录了我在 CTIN 488 中完成的三个工作室项目。这是一门以玩法为核心的设计课程，聚焦于快速原型、玩法测试，以及朝着清晰的玩家体验目标不断迭代。本学期包含一个 <em>Up the River</em> 游戏 mod／变体、一个专注的 <em>Mechanics</em> 项目，以及一个团队 <em>Final Project</em>。</span>
           </p>
           <p style="margin:0;">
-            Use the tabs below to see <strong>why</strong> we made each project, <strong>what</strong> we decided to build,
-            and <strong>how</strong> it evolved through design photo journals.
+            <span data-lang="en">Use the tabs below to see why we made each project, what we decided to build,
+            and how it evolved through design photo journals.</span><span data-lang="zh">点击下方标签页，即可了解我们为什么要做每个项目、决定构建什么，以及它如何通过设计照片日志逐步演进。</span>
           </p>
         </article>
 
@@ -199,45 +201,49 @@
         <!-- Up the River Tab -->
         <section id="tab-upriver" class="tabcontent" role="tabpanel" aria-labelledby="btn-upriver" style="display:block;">
           <div class="tabcard">
-            <h3 style="margin-top:0;">Up the River: Variation / Game Mod</h3>
+            <h3 style="margin-top:0;"><span data-lang="en">Up the River: Variation / Game Mod</span><span data-lang="zh">Up the River：变体／游戏 Mod</span></h3>
 
             <!-- Why + What (same row, 2 columns) -->
             <div class="two-col" style="gap: 1.25rem; align-items: start;">
               <div>
-                <h4 style="margin-top: 0;">Why</h4>
+                <h4 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
                 <p class="meta">
-                  Build a <strong>variation</strong> on a shared base game (Up the River) by changing constraints and mechanics,
-                  then iterate through structured playtests while keeping a specific experience goal in focus.
+                  <span data-lang="en">Build a variation on a shared base game (Up the River) by changing constraints and mechanics,
+                  then iterate through structured playtests while keeping a specific experience goal in focus.</span><span data-lang="zh">在一个共享的基础游戏（Up the River）之上，通过改变约束与机制来打造一个变体，然后在始终聚焦于特定体验目标的前提下，通过结构化的玩法测试不断迭代。</span>
                 </p>
               </div>
 
               <div>
-                <h4 style="margin-top: 0;">What</h4>
+                <h4 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
                 <p class="meta">
-                  Our variation reworked the original linear track into a <strong>circular race-to-treasure</strong> loop with
-                  environmental tiles (Wave/Reef), <strong>Pirate</strong> hazards, and a card system that lets players speed up
-                  their ship or hinder others. The intended experience was <strong>pressure + strategy</strong> as players chase points
-                  while avoiding danger.
+                  <span data-lang="en">Our variation reworked the original linear track into a circular race-to-treasure loop with
+                  environmental tiles (Wave/Reef), Pirate hazards, and a card system that lets players speed up
+                  their ship or hinder others. The intended experience was pressure + strategy as players chase points
+                  while avoiding danger.</span><span data-lang="zh">我们的变体把原本的线性轨道改造成一个环形的夺宝竞赛回路，加入了环境地块（Wave／Reef）、海盗危险，以及一套可以让玩家加速自己船只或阻碍他人的卡牌系统。预期的体验是压力与策略并存：玩家在追逐分数的同时，还要不断躲避危险。</span>
                 </p>
               </div>
             </div>
 
             <!-- How (separate section) -->
             <div style="margin-top: 1.25rem;">
-              <h4 style="margin-top: 0;">How (weekly iteration)</h4>
+              <h4 style="margin-top: 0;"><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
               <div class="weekblocks">
                 <div class="weekblock">
-                  <h5>Week 1 — Core loop + first pass balancing (9/21–9/23)</h5>
+                  <h5><span data-lang="en">Week 1 — Core loop + first pass balancing (9/21–9/23)</span><span data-lang="zh">第 1 周：核心循环 + 首轮平衡调整（9/21–9/23）</span></h5>
                   <ul>
-                    <li>Defined the core loop: travel between <em>Port</em> and <em>Treasure Island</em> on a circular track, using dice + event cards to create risk/reward decisions.</li>
-                    <li>Iterated quickly on pacing and probability: expanded the board, switched from D4 to D6, increased pirate pressure, and tightened card/rule wording so turns stayed snappy (we focused on pacing/balance tuning + clarity).</li>
+                    <li data-lang="en">Defined the core loop: travel between <em>Port</em> and <em>Treasure Island</em> on a circular track, using dice + event cards to create risk/reward decisions.</li>
+                    <li data-lang="zh">确定了核心循环：在环形轨道上于 <em>Port</em> 和 <em>Treasure Island</em> 之间移动，用骰子 + 事件卡制造风险／收益的抉择。</li>
+                    <li data-lang="en">Iterated quickly on pacing and probability: expanded the board, switched from D4 to D6, increased pirate pressure, and tightened card/rule wording so turns stayed snappy (we focused on pacing/balance tuning + clarity).</li>
+                    <li data-lang="zh">在节奏与概率上快速迭代：扩大了棋盘，把 D4 换成 D6，加大海盗压力，并收紧卡牌／规则的措辞，让每个回合都保持利落（我们专注于节奏／平衡的调校与清晰度）。</li>
                   </ul>
                 </div>
                 <div class="weekblock">
-                  <h5>Week 2 — Playtest-driven clarity + V2 polish (9/24–9/30)</h5>
+                  <h5><span data-lang="en">Week 2 — Playtest-driven clarity + V2 polish (9/24–9/30)</span><span data-lang="zh">第 2 周：以玩法测试驱动清晰度 + V2 打磨（9/24–9/30）</span></h5>
                   <ul>
-                    <li>Ran a lab playtest and rewrote setup/turn order text for clarity; tuned incentives (e.g., when card draws trigger) to reduce “dead” rolls.</li>
-                    <li>Conducted internal playtests to reduce downtime and edge-case confusion (reshuffle rules, clearer card effects, max hand size), then consolidated everything into a cleaner V2 with a faster, smoother flow (we led setup/turn-order + edge-case clarity fixes and helped consolidate the final V2 rules).</li>
+                    <li data-lang="en">Ran a lab playtest and rewrote setup/turn order text for clarity; tuned incentives (e.g., when card draws trigger) to reduce “dead” rolls.</li>
+                    <li data-lang="zh">进行了一次实验室玩法测试，并为清晰起见重写了布置／回合顺序的说明；调整了激励机制（例如抽牌的触发时机），以减少“无效”的掷骰。</li>
+                    <li data-lang="en">Conducted internal playtests to reduce downtime and edge-case confusion (reshuffle rules, clearer card effects, max hand size), then consolidated everything into a cleaner V2 with a faster, smoother flow (we led setup/turn-order + edge-case clarity fixes and helped consolidate the final V2 rules).</li>
+                    <li data-lang="zh">开展了内部玩法测试，以减少等待时间与边缘情况带来的困惑（重洗规则、更清晰的卡牌效果、最大手牌数），随后把一切整合成更简洁的 V2，流程更快也更顺畅（我们主导了布置／回合顺序与边缘情况的清晰化修正，并协助整合了最终的 V2 规则）。</li>
                   </ul>
                 </div>
               </div>
@@ -250,7 +256,7 @@
 
           <!-- Keep existing slideshow -->
           <section class="slideshow-section">
-            <h3>This project was selected for in-class presentation.</h3>
+            <h3><span data-lang="en">This project was selected for in-class presentation.</span><span data-lang="zh">该项目入选了课堂展示。</span></h3>
             <div class="slideshow-container" id="slideshow-upriver">
               <!-- Slides will be inserted here by JavaScript -->
             </div>
@@ -261,56 +267,62 @@
         <!-- Mechanics Tab -->
         <section id="tab-mechanics" class="tabcontent" role="tabpanel" aria-labelledby="btn-mechanics" style="display:none;">
           <div class="tabcard">
-            <h3 style="margin-top:0;">Mechanics Project: Focused Mechanic Exploration</h3>
+            <h3 style="margin-top:0;"><span data-lang="en">Mechanics Project: Focused Mechanic Exploration</span><span data-lang="zh">Mechanics 项目：聚焦机制的探索</span></h3>
 
             <!-- Why + What (same row, 2 columns) -->
             <div class="two-col" style="gap: 1.25rem; align-items: start;">
               <div>
-                <h4 style="margin-top: 0;">Why</h4>
+                <h4 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
                 <p class="meta">
-                  Practice <strong>mechanics-first</strong> design: choose a core interaction, prototype fast, and use formal feedback to
-                  refine clarity, pacing, and player interpretation.
+                  <span data-lang="en">Practice mechanics-first design: choose a core interaction, prototype fast, and use formal feedback to
+                  refine clarity, pacing, and player interpretation.</span><span data-lang="zh">练习机制优先的设计：选定一个核心交互，快速制作原型，并借助正式反馈来打磨清晰度、节奏和玩家的理解。</span>
                 </p>
                 <p class="meta">
-                  This project started from <strong>randomly drawn topics</strong>. Our team selected four key words —
-                  <strong>auction</strong>, <strong>versus</strong>, <strong>romance</strong>, and <strong>solution-finding</strong> — and our goal was to turn them into a playable game.
+                  <span data-lang="en">This project started from randomly drawn topics. Our team selected four key words —
+                  auction, versus, romance, and solution-finding — and our goal was to turn them into a playable game.</span><span data-lang="zh">这个项目从随机抽取的主题开始。我们团队选定了四个关键词：拍卖、对抗、浪漫与寻找解法，目标是把它们变成一款可玩的游戏。</span>
                 </p>
                 <p class="meta" style="margin-bottom: 0;">
-                  We specifically wanted to explore how <strong>auctions</strong> can function as both a competitive system and a narrative device, letting emotional stakes emerge from mechanical choices
-                  (instead of scripted story beats).
+                  <span data-lang="en">We specifically wanted to explore how auctions can function as both a competitive system and a narrative device, letting emotional stakes emerge from mechanical choices
+                  (instead of scripted story beats).</span><span data-lang="zh">我们尤其想探索拍卖如何既能作为一套竞争系统，又能作为一种叙事手段，让情感张力从机制选择中自然浮现，而不是依赖预设的剧情节点。</span>
                 </p>
               </div>
 
               <div>
-                <h4 style="margin-top: 0;">What</h4>
+                <h4 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
                 <p class="meta">
-                  <strong>Too Bird To Handle</strong> is a silent-coordination bidding game themed around birds courting.
-                  Players coordinate without speaking, trying to read intention and manage risk through a “give or take” style action loop.
+                  <span data-lang="en">Too Bird To Handle is a silent-coordination bidding game themed around birds courting.
+                  Players coordinate without speaking, trying to read intention and manage risk through a “give or take” style action loop.</span><span data-lang="zh">Too Bird To Handle 是一款以鸟类求偶为主题的无声协作竞价游戏。玩家在不开口的情况下相互配合，通过“取或舍”式的行动循环来揣摩意图、管理风险。</span>
                 </p>
                 <p class="meta" style="margin-bottom: 0;">
-                  Built around an <strong>auction-style</strong> interaction, the experience emphasizes <strong>reading intent</strong>, managing risk, and negotiating value under social pressure.
+                  <span data-lang="en">Built around an auction-style interaction, the experience emphasizes reading intent, managing risk, and negotiating value under social pressure.</span><span data-lang="zh">整个体验围绕拍卖式的交互构建，强调在社交压力下解读意图、管理风险并权衡价值。</span>
                 </p>
               </div>
             </div>
 
             <!-- How (separate section) -->
             <div style="margin-top: 1.25rem;">
-              <h4 style="margin-top: 0;">How (weekly iteration)</h4>
+              <h4 style="margin-top: 0;"><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
               <div class="weekblocks">
                 <div class="weekblock">
-                  <h5>Week 1 — Prompt → playable prototype + first external tests (Week 9)</h5>
+                  <h5><span data-lang="en">Week 1 — Prompt → playable prototype + first external tests (Week 9)</span><span data-lang="zh">第 1 周：从命题到可玩原型 + 首次外部测试（第 9 周）</span></h5>
                   <ul>
-                    <li>Used a “yes-and” brainstorm to interpret the prompt, then committed to an <strong>auction-inspired</strong>, <strong>four-player cooperative</strong> direction about birds searching for mates.</li>
-                    <li>Built a minimum playable prototype: sketched resource and bird cards, established clear win/loss conditions, and iterated internally to smooth the difficulty curve (less swingy, more teamwork).</li>
-                    <li>Ran early external playtests and captured the biggest issues: players misread the game as competitive, terminology (“bid/bird”) was confusing, and setup/visibility needed cleaner structure.</li>
-                    <li>Turned playtest feedback into concrete fixes (terminology, setup clarity, table layout), and tightened win/loss wording for faster onboarding.</li>
+                    <li data-lang="en">Used a “yes-and” brainstorm to interpret the prompt, then committed to an auction-inspired, four-player cooperative direction about birds searching for mates.</li>
+                    <li data-lang="zh">用“yes-and”式的头脑风暴来解读命题，随后确定了一个受拍卖启发、以鸟类寻偶为主题的四人合作方向。</li>
+                    <li data-lang="en">Built a minimum playable prototype: sketched resource and bird cards, established clear win/loss conditions, and iterated internally to smooth the difficulty curve (less swingy, more teamwork).</li>
+                    <li data-lang="zh">制作了一个最小可玩原型：勾勒了资源卡与鸟类卡，确立了清晰的胜负条件，并在内部迭代以平滑难度曲线（波动更小、更讲究团队协作）。</li>
+                    <li data-lang="en">Ran early external playtests and captured the biggest issues: players misread the game as competitive, terminology (“bid/bird”) was confusing, and setup/visibility needed cleaner structure.</li>
+                    <li data-lang="zh">进行了早期的外部玩法测试，并记录下最主要的问题：玩家误以为这是竞争型游戏，术语（“bid/bird”）容易混淆，布置与可见性也需要更清晰的结构。</li>
+                    <li data-lang="en">Turned playtest feedback into concrete fixes (terminology, setup clarity, table layout), and tightened win/loss wording for faster onboarding.</li>
+                    <li data-lang="zh">把玩法测试的反馈转化为具体修改（术语、布置的清晰度、桌面布局），并收紧了胜负条件的措辞，让上手更快。</li>
                   </ul>
                 </div>
                 <div class="weekblock">
-                  <h5>Week 2 — Clarity pass + visual polish + finalization (Week 10)</h5>
+                  <h5><span data-lang="en">Week 2 — Clarity pass + visual polish + finalization (Week 10)</span><span data-lang="zh">第 2 周：清晰度梳理 + 视觉打磨 + 定稿（第 10 周）</span></h5>
                   <ul>
-                    <li>Ran additional external playtests that confirmed stronger engagement and pacing, while still highlighting edge-case questions and moments where the rules needed explicit guidance.</li>
-                    <li>Validated changes through internal playtests, then did a final consistency/clarity pass across the rulebook, cards, and board to remove edge cases and improve readability (so the experience matched the intended “silent teamwork” tension).</li>
+                    <li data-lang="en">Ran additional external playtests that confirmed stronger engagement and pacing, while still highlighting edge-case questions and moments where the rules needed explicit guidance.</li>
+                    <li data-lang="zh">又进行了几次外部玩法测试，确认了更强的投入感与更好的节奏，同时也暴露出一些边缘情况的疑问，以及规则需要明确指引的地方。</li>
+                    <li data-lang="en">Validated changes through internal playtests, then did a final consistency/clarity pass across the rulebook, cards, and board to remove edge cases and improve readability (so the experience matched the intended “silent teamwork” tension).</li>
+                    <li data-lang="zh">通过内部玩法测试验证了这些改动，然后对规则书、卡牌与棋盘做了最后一轮一致性／清晰度梳理，以消除边缘情况、提升可读性（让体验契合预期中“无声协作”的张力）。</li>
                   </ul>
                 </div>
               </div>
@@ -326,7 +338,7 @@
 
           <!-- Keep existing slideshow -->
           <section class="slideshow-section">
-            <h3>This project was selected for in-class presentation.</h3>
+            <h3><span data-lang="en">This project was selected for in-class presentation.</span><span data-lang="zh">该项目入选了课堂展示。</span></h3>
             <div class="slideshow-container" id="slideshow-mechanics">
               <!-- Slides will be inserted here by JavaScript -->
             </div>
@@ -337,55 +349,79 @@
         <!-- Final Project Tab -->
         <section id="tab-final" class="tabcontent" role="tabpanel" aria-labelledby="btn-final" style="display:none;">
           <div class="tabcard">
-            <h3 style="margin-top:0;">Final Project: Original Team Game; Role: Producer</h3>
+            <h3 style="margin-top:0;"><span data-lang="en">Final Project: Original Team Game; Role: Producer</span><span data-lang="zh">Final Project：原创团队游戏；职责：制作人</span></h3>
 
             <!-- Why + What (same row, 2 columns) -->
             <div class="two-col" style="gap: 1.25rem; align-items: start;">
               <div>
-                <h4 style="margin-top: 0;">Why</h4>
+                <h4 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
                 <p class="meta">
-                  The final project is a <strong>free project</strong>: define an original experience goal, build an end-to-end prototype,
-                  and demonstrate <strong>playcentric iteration</strong> across multiple weeks (rules, components, balance, and presentation).
+                  <span data-lang="en">The final project is a free project: define an original experience goal, build an end-to-end prototype,
+                  and demonstrate playcentric iteration across multiple weeks (rules, components, balance, and presentation).</span><span data-lang="zh">期末项目是一个自由命题：确定一个原创的体验目标，构建一个端到端的原型，并在数周时间里展现以玩法为核心的迭代（规则、组件、平衡与展示）。</span>
                 </p>
               </div>
 
               <div>
-                <h4 style="margin-top: 0;">What</h4>
+                <h4 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
                 <p class="meta">
-                  Our team built a competitive survival game centered on <strong>social hierarchy</strong>. Players take on different roles
+                  <span data-lang="en">Our team built a competitive survival game centered on social hierarchy. Players take on different roles
                   (upper- to lower-class) and must meet role-specific needs inspired by Maslow’s hierarchy while dealing with threats,
-                  deception, and negotiation as resources flow from top to bottom each round.
+                  deception, and negotiation as resources flow from top to bottom each round.</span><span data-lang="zh">我们团队打造了一款以社会阶层为核心的竞争型生存游戏。玩家扮演不同的角色（从上层到下层），必须满足受马斯洛需求层次启发、因角色而异的需求，同时应对威胁、欺骗与谈判，而资源在每一回合都自上而下流动。</span>
                 </p>
               </div>
             </div>
 
             <!-- How (separate section) -->
             <div style="margin-top: 1.25rem;">
-              <h4 style="margin-top: 0;">How (weekly iteration)</h4>
+              <h4 style="margin-top: 0;"><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
               <ul class="bullets">
-                <li>
-                  <strong>Week 1 — Core loop + first playable:</strong>
+                <li data-lang="en">
+                  Week 1 — Core loop + first playable:
                   We defined the concept, scope, and primary mechanics (roles + descending resources), aligned on the intended player experience,
                   and built an early prototype for quick internal/external playtests.
                   We helped lock the core loop and tightened the threat / gun rules based on early feedback.
                 </li>
-                <li>
-                  <strong>Week 2 — Clarity + agency pass:</strong>
+                <li data-lang="zh">
+                  第 1 周：核心循环 + 首个可玩版本：
+                  我们确定了概念、范围与主要机制（角色 + 逐级下降的资源），就预期的玩家体验达成一致，
+                  并搭建了早期原型以进行快速的内部／外部玩法测试。
+                  我们帮助锁定了核心循环，并根据早期反馈收紧了威胁／枪支规则。
+                </li>
+                <li data-lang="en">
+                  Week 2 — Clarity + agency pass:
                   We expanded and stabilized systems through playtesting, then improved readability and decision-making:
-                  “pet” → <strong>love</strong>, shifted to a <strong>single-winner</strong> victory condition, increased lower-class agency (starting hand),
+                  “pet” → love, shifted to a single-winner victory condition, increased lower-class agency (starting hand),
                   and refined the rulebook for fewer edge-case questions.
                   We drove rule/wording cleanup and helped implement the agency + win-condition revisions.
                 </li>
-                <li>
-                  <strong>Week 3 — Balance with simulation support:</strong>
-                  We ran a focused balance pass supported by <strong>200k-trial simulations</strong>, adjusted deck composition,
+                <li data-lang="zh">
+                  第 2 周：清晰度 + 能动性梳理：
+                  我们通过玩法测试扩展并稳定了各个系统，随后提升了可读性与决策感：
+                  “pet” → love，改为单一胜者的胜利条件，增强了下层阶级的能动性（初始手牌），
+                  并精修规则书以减少边缘情况的疑问。
+                  我们推动了规则／措辞的清理，并协助实现了能动性与胜利条件的修订。
+                </li>
+                <li data-lang="en">
+                  Week 3 — Balance with simulation support:
+                  We ran a focused balance pass supported by 200k-trial simulations, adjusted deck composition,
                   and updated win conditions to reduce “accidental” wins, then validated changes via final playtests.
                   We ran the simulation-backed balance checks and translated results into concrete deck/win-condition updates.
                 </li>
-                <li>
-                  <strong>Week 4 — Presentation polish:</strong>
+                <li data-lang="zh">
+                  第 3 周：借助模拟的平衡调整：
+                  我们在 20 万次试验的模拟支持下进行了一轮专注的平衡调整，调整了牌库构成，
+                  并更新了胜利条件以减少“意外”取胜，随后通过最终玩法测试验证了这些改动。
+                  我们运行了以模拟为依据的平衡检查，并把结果转化为具体的牌库／胜利条件更新。
+                </li>
+                <li data-lang="en">
+                  Week 4 — Presentation polish:
                   Finalized the slide deck and recorded the final presentation video.
                   We supported deck polish and final deliverable prep.
+                </li>
+                <li data-lang="zh">
+                  第 4 周：展示打磨：
+                  完成了幻灯片定稿并录制了最终的展示视频。
+                  我们协助了幻灯片打磨与最终交付物的准备。
                 </li>
               </ul>
 
@@ -396,13 +432,13 @@
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;"><a href="projects.html">← Back to Projects</a></p>
+        <p style="margin-top: 1.5rem;"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
       </section>
 
     </main>
 
     <footer>
-      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-11-24.</p>
+      <p><span data-lang="en">© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-11-24.</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。最后更新于 2025-11-24。</span></p>
     </footer>
   </div>
 
@@ -431,4 +467,3 @@
   <script src="../scripts/ctin488-slideshow.js"></script>
 </body>
 </html>
-

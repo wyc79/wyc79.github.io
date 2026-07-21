@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Codebreaker — Gameplay Systems — Yuanchen Wang</title>
+  <title data-en="Codebreaker — Gameplay Systems — Yuanchen Wang" data-zh="Codebreaker — 玩法系统 — Yuanchen Wang">Codebreaker — Gameplay Systems — Yuanchen Wang</title>
   <meta name="description" content="Codebreaker — gameplay system architecture and combat mechanics." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
 </head>
@@ -22,15 +24,15 @@
 <section class="project-hero" style="background-image: url('../images/codebreaker.png');">
   <div class="project-hero__content">
 
-    <h2 class="project-hero__title">Codebreaker — Gameplay Systems</h2>
+    <h2 class="project-hero__title"><span data-lang="en">Codebreaker — Gameplay Systems</span><span data-lang="zh">Codebreaker — 玩法系统</span></h2>
 
     <div class="project-hero__meta">
       <div class="project-hero__meta-item">
-        <strong>Role:</strong> Gameplay Engineer · Systems Designer
+        <span data-lang="en">Role: Gameplay Engineer · Systems Designer</span><span data-lang="zh">职责： 玩法工程师 · 系统设计师</span>
       </div>
 
       <div class="project-hero__meta-item">
-        <strong>Tools:</strong> Unity 6, C#
+        <span data-lang="en">Tools: Unity 6, C#</span><span data-lang="zh">工具： Unity 6、C#</span>
       </div>
     </div>
 
@@ -54,22 +56,22 @@
 
 <div>
 
-<h3 style="margin-top:0;">What</h3>
+<h3 style="margin-top:0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
 
 <p class="meta">
-<strong>Codebreaker</strong> is a systems-driven action game developed in Unity,
-focused on combat interactions and player decision-making in structured environments.
+<span data-lang="en">Codebreaker is a systems-driven action game developed in Unity,
+focused on combat interactions and player decision-making in structured environments.</span><span data-lang="zh">Codebreaker 是一款基于系统设计、使用 Unity 开发的动作游戏，聚焦于战斗互动，以及玩家在结构化场景中的决策。</span>
 </p>
 
 <p class="meta">
-I served as the <strong>primary gameplay engineer</strong> for the project,
+<span data-lang="en">I served as the primary gameplay engineer for the project,
 implementing the core gameplay architecture and combat systems while working
-with production and audio teams to integrate game features into milestone builds.
+with production and audio teams to integrate game features into milestone builds.</span><span data-lang="zh">我是该项目的主要玩法工程师，负责实现核心玩法架构与战斗系统，并与制作和音频团队协作，将各项功能整合进里程碑版本。</span>
 </p>
 
 <p class="meta">
-The goal of the project was to design gameplay systems that support
-clear player feedback, responsive controls, and consistent combat pacing.
+<span data-lang="en">The goal of the project was to design gameplay systems that support
+clear player feedback, responsive controls, and consistent combat pacing.</span><span data-lang="zh">项目的目标是设计一套玩法系统，以支持清晰的玩家反馈、灵敏的操作手感，以及稳定的战斗节奏。</span>
 </p>
 
 </div>
@@ -77,17 +79,21 @@ clear player feedback, responsive controls, and consistent combat pacing.
 
 <div>
 
-<h3 style="margin-top:0;">Main Achievements</h3>
+<h3 style="margin-top:0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
 
 <ul>
-<li>Implemented core gameplay systems including <strong>combat mechanics, player interactions, and environmental logic</strong>.</li>
-<li>Designed gameplay architecture supporting modular systems and clear event-driven interactions.</li>
-<li>Integrated animation, audio triggers, and player feedback into cohesive gameplay loops.</li>
-<li>Coordinated with production and audio teams to deliver playable milestone builds.</li>
+<li data-lang="en">Implemented core gameplay systems including combat mechanics, player interactions, and environmental logic.</li>
+<li data-lang="zh">实现了核心玩法系统，包括战斗机制、玩家互动与场景逻辑。</li>
+<li data-lang="en">Designed gameplay architecture supporting modular systems and clear event-driven interactions.</li>
+<li data-lang="zh">设计了玩法架构，支持模块化系统与清晰的事件驱动互动。</li>
+<li data-lang="en">Integrated animation, audio triggers, and player feedback into cohesive gameplay loops.</li>
+<li data-lang="zh">将动画、音频触发与玩家反馈整合为连贯的玩法循环。</li>
+<li data-lang="en">Coordinated with production and audio teams to deliver playable milestone builds.</li>
+<li data-lang="zh">与制作和音频团队协作，交付可试玩的里程碑版本。</li>
 </ul>
 
 
-<h3 style="margin-top:1rem;">Highlights</h3>
+<h3 style="margin-top:1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
 
 <p style="margin:0;">
 <span class="pill">Unity Gameplay Programming</span>
@@ -106,59 +112,69 @@ clear player feedback, responsive controls, and consistent combat pacing.
 
 <section style="margin-top:1.5rem;">
 
-<h3>How</h3>
+<h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-<h4 style="margin-top:0;">Gameplay Systems Architecture</h4>
+<h4 style="margin-top:0;"><span data-lang="en">Gameplay Systems Architecture</span><span data-lang="zh">玩法系统架构</span></h4>
 
 <p class="meta">
-I designed the core gameplay systems that drive player interactions and combat behavior.
-These systems manage player actions, environmental responses, and gameplay feedback.
+<span data-lang="en">I designed the core gameplay systems that drive player interactions and combat behavior.
+These systems manage player actions, environmental responses, and gameplay feedback.</span><span data-lang="zh">我设计了驱动玩家互动与战斗行为的核心玩法系统。这些系统负责管理玩家动作、场景响应与玩法反馈。</span>
 </p>
 
 <ul>
 
-<li>Implemented gameplay logic for <strong>player combat actions and interaction mechanics</strong>.</li>
+<li data-lang="en">Implemented gameplay logic for player combat actions and interaction mechanics.</li>
+<li data-lang="zh">实现了玩家战斗动作与互动机制的玩法逻辑。</li>
 
-<li>Designed modular gameplay scripts to support flexible feature development and iteration.</li>
+<li data-lang="en">Designed modular gameplay scripts to support flexible feature development and iteration.</li>
+<li data-lang="zh">设计了模块化的玩法脚本，以支持灵活的功能开发与迭代。</li>
 
-<li>Integrated player input, animations, and gameplay feedback to ensure responsive controls.</li>
+<li data-lang="en">Integrated player input, animations, and gameplay feedback to ensure responsive controls.</li>
+<li data-lang="zh">整合了玩家输入、动画与玩法反馈，以确保操作灵敏。</li>
 
-<li>Structured gameplay systems so mechanics could be extended without breaking existing systems.</li>
+<li data-lang="en">Structured gameplay systems so mechanics could be extended without breaking existing systems.</li>
+<li data-lang="zh">对玩法系统做了结构化设计，使机制可以在不破坏现有系统的前提下扩展。</li>
 
 </ul>
 
 
 
-<h4>Game Feel and Player Feedback</h4>
+<h4><span data-lang="en">Game Feel and Player Feedback</span><span data-lang="zh">游戏手感与玩家反馈</span></h4>
 
 <p class="meta">
-A major focus of the project was ensuring that player actions produce clear and immediate feedback.
+<span data-lang="en">A major focus of the project was ensuring that player actions produce clear and immediate feedback.</span><span data-lang="zh">本项目的一大重点，是确保玩家的每个动作都能获得清晰而即时的反馈。</span>
 </p>
 
 <ul>
 
-<li>Integrated <strong>animation events and audio triggers</strong> to reinforce gameplay actions.</li>
+<li data-lang="en">Integrated animation events and audio triggers to reinforce gameplay actions.</li>
+<li data-lang="zh">整合了动画事件与音频触发，以强化玩法动作的表现力。</li>
 
-<li>Implemented feedback systems that communicate combat outcomes and player interactions.</li>
+<li data-lang="en">Implemented feedback systems that communicate combat outcomes and player interactions.</li>
+<li data-lang="zh">实现了反馈系统，用于传达战斗结果与玩家互动。</li>
 
-<li>Worked with audio and production teams to ensure gameplay events triggered correct audiovisual responses.</li>
+<li data-lang="en">Worked with audio and production teams to ensure gameplay events triggered correct audiovisual responses.</li>
+<li data-lang="zh">与音频和制作团队协作，确保玩法事件触发正确的视听反馈。</li>
 
 </ul>
 
 
-<h4>Level Interaction Design</h4>
+<h4><span data-lang="en">Level Interaction Design</span><span data-lang="zh">关卡互动设计</span></h4>
 
 <p class="meta">
-Gameplay spaces were designed to support combat pacing and interaction opportunities.
+<span data-lang="en">Gameplay spaces were designed to support combat pacing and interaction opportunities.</span><span data-lang="zh">玩法空间的设计旨在支撑战斗节奏，并创造互动机会。</span>
 </p>
 
 <ul>
 
-<li>Designed level interactions that encourage player movement and tactical decisions.</li>
+<li data-lang="en">Designed level interactions that encourage player movement and tactical decisions.</li>
+<li data-lang="zh">设计了鼓励玩家移动与战术决策的关卡互动。</li>
 
-<li>Implemented environmental interaction systems connected to gameplay events.</li>
+<li data-lang="en">Implemented environmental interaction systems connected to gameplay events.</li>
+<li data-lang="zh">实现了与玩法事件相连的场景互动系统。</li>
 
-<li>Ensured gameplay systems supported designers iterating on level flow and player challenges.</li>
+<li data-lang="en">Ensured gameplay systems supported designers iterating on level flow and player challenges.</li>
+<li data-lang="zh">确保玩法系统能够支持设计师对关卡流程与玩家挑战进行迭代。</li>
 
 </ul>
 
@@ -167,7 +183,7 @@ Gameplay spaces were designed to support combat pacing and interaction opportuni
 
 
 <p style="margin-top:1.5rem;">
-<a href="projects.html">← Back to Projects</a>
+<a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
 </p>
 
 </section>
@@ -176,7 +192,7 @@ Gameplay spaces were designed to support combat pacing and interaction opportuni
 
 
 <footer>
-<p>© 2025 Yuanchen Wang — Portfolio</p>
+<p><span data-lang="en">© 2025 Yuanchen Wang — Portfolio</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。</span></p>
 </footer>
 
 </div>

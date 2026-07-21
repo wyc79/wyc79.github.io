@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Automatic Differentiation Toolbox — Yuanchen Wang</title>
+  <title data-en="Automatic Differentiation Toolbox — Yuanchen Wang" data-zh="Automatic Differentiation Toolbox — Yuanchen Wang">Automatic Differentiation Toolbox — Yuanchen Wang</title>
   <meta name="description" content="Automatic Differentiation Toolbox — a Python package for forward-mode automatic differentiation" />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
 </head>
@@ -25,9 +27,9 @@
           <h2 class="project-hero__title">Automatic Differentiation (AD) Toolbox</h2>
 
           <div class="project-hero__meta">
-            <div class="project-hero__meta-item"><strong>Role:</strong> Python Developer & QA Lead</div>
-            <div class="project-hero__meta-item"><strong>Tool:</strong> Python, PyPI, GitHub</div>
-            <div class="project-hero__meta-item"><strong>Duration:</strong> Fall 2022 · 1 semester</div>
+            <div class="project-hero__meta-item"><span data-lang="en">Role: Python Developer &amp; QA Lead</span><span data-lang="zh">职责： Python 开发者 &amp; QA 负责人</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tool: Python, PyPI, GitHub</span><span data-lang="zh">工具： Python、PyPI、GitHub</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Duration: Fall 2022 · 1 semester</span><span data-lang="zh">周期： 2022 年秋 · 一学期</span></div>
           </div>
         </div>
       </section>
@@ -35,57 +37,63 @@
       <section class="project-body">
 
         <p class="meta">
-          <strong>Python</strong> —
-          <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener">View on test.pypi.org</a>
+          Python —
+          <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener"><span data-lang="en">View on test.pypi.org</span><span data-lang="zh">在 test.pypi.org 查看</span></a>
         </p>
 
         <section style="margin-top: 1.5rem;">
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
-              <h3 style="margin-top: 0;">Why</h3>
-              <p class="meta">Derivatives show up everywhere in optimization, ML, and scientific computing, but the common alternatives are frustrating in practice: <strong>numerical differentiation</strong> can be unstable (step-size tradeoffs), and <strong>symbolic differentiation</strong> can blow up in expression size.</p>
-              <p class="meta">We wanted a small, readable tool that computes <strong>exact derivatives</strong> at runtime, so users can differentiate “normal Python code” without manually applying the chain rule.</p>
+              <h3 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
+              <p class="meta"><span data-lang="en">Derivatives show up everywhere in optimization, ML, and scientific computing, but the common alternatives are frustrating in practice: numerical differentiation can be unstable (step-size tradeoffs), and symbolic differentiation can blow up in expression size.</span><span data-lang="zh">导数在优化、机器学习和科学计算中无处不在，但常见的几种做法在实践中都很别扭：数值微分不够稳定（受步长权衡的影响），符号微分则可能让表达式规模急剧膨胀。</span></p>
+              <p class="meta"><span data-lang="en">We wanted a small, readable tool that computes exact derivatives at runtime, so users can differentiate “normal Python code” without manually applying the chain rule.</span><span data-lang="zh">我们想要一个小巧、易读的工具，能在运行时计算精确的导数，让用户可以对“普通的 Python 代码”求导，而无需手动套用链式法则。</span></p>
             </div>
 
             <div>
-              <h3 style="margin-top: 0;">What</h3>
-              <p class="meta">A forward-mode automatic differentiation (AD) Python package built by a <strong>5-person team</strong>. It evaluates user-defined functions and returns derivatives by propagating dual numbers through operator overloads and elementary functions.</p>
-              <p class="meta">The focus was a <strong>clean API</strong>, strong correctness guarantees, and maintainability through a test-first workflow.</p>
+              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <p class="meta"><span data-lang="en">A forward-mode automatic differentiation (AD) Python package built by a 5-person team. It evaluates user-defined functions and returns derivatives by propagating dual numbers through operator overloads and elementary functions.</span><span data-lang="zh">一个由 5 人团队开发的前向模式自动微分（AD）Python 包。它对用户自定义的函数求值，并通过在运算符重载和基本函数中传播对偶数来返回导数。</span></p>
+              <p class="meta"><span data-lang="en">The focus was a clean API, strong correctness guarantees, and maintainability through a test-first workflow.</span><span data-lang="zh">开发重点在于简洁的 API、可靠的正确性保证，以及通过测试先行的工作流带来的可维护性。</span></p>
               <p style="margin: 0;"><span class="pill">Python</span><span class="pill">Forward-mode AD</span><span class="pill">Dual Numbers</span><span class="pill">Operator Overloading</span><span class="pill">Unit Testing</span><span class="pill">PyPI</span></p>
             </div>
           </div>
         </section>
 
         <section style="margin-top: 1.5rem;">
-          <h3>How</h3>
-          <h4 style="margin-top: 0;">My contributions (Core AD + QA)</h4>
-          <p class="meta">I implemented key pieces of the forward-mode engine and led QA to keep the package correct as features expanded.</p>
+          <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
+          <h4 style="margin-top: 0;"><span data-lang="en">My contributions (Core AD + QA)</span><span data-lang="zh">我的贡献（核心 AD + QA）</span></h4>
+          <p class="meta"><span data-lang="en">I implemented key pieces of the forward-mode engine and led QA to keep the package correct as features expanded.</span><span data-lang="zh">我实现了前向模式引擎的关键部分，并主导 QA 工作，在功能不断扩展的同时确保包的正确性。</span></p>
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
               <ul>
-                <li><strong>Forward-mode engine:</strong> Implemented dual number arithmetic and operator overloading to propagate derivatives through composed expressions.</li>
-                <li><strong>Function composition:</strong> Ensured derivatives flow correctly through chained operations (add/mul/div/pow, etc.) by applying the chain rule consistently across overloaded operators.</li>
-                <li><strong>Refactoring for clarity:</strong> Reduced redundancy and improved readability so teammates could extend the system without breaking core invariants.</li>
+                <li data-lang="en">Forward-mode engine: Implemented dual number arithmetic and operator overloading to propagate derivatives through composed expressions.</li>
+                <li data-lang="zh">前向模式引擎：实现了对偶数运算和运算符重载，以在复合表达式中传播导数。</li>
+                <li data-lang="en">Function composition: Ensured derivatives flow correctly through chained operations (add/mul/div/pow, etc.) by applying the chain rule consistently across overloaded operators.</li>
+                <li data-lang="zh">函数复合：通过在各重载运算符中一致地应用链式法则，确保导数在链式运算（加/乘/除/幂等）中正确传递。</li>
+                <li data-lang="en">Refactoring for clarity: Reduced redundancy and improved readability so teammates could extend the system without breaking core invariants.</li>
+                <li data-lang="zh">重构以提升清晰度：减少冗余、改善可读性，让队友能在不破坏核心不变量的前提下扩展系统。</li>
               </ul>
             </div>
             <div>
               <ul>
-                <li><strong>QA leadership:</strong> Designed and executed comprehensive unit tests (core ops + edge cases) to verify numerical correctness and prevent regressions.</li>
-                <li><strong>Debugging &amp; integration:</strong> Coordinated module integration, triaged bugs, and documented design decisions to streamline collaboration.</li>
-                <li><strong>Release readiness:</strong> Helped ensure stable packaging/behavior for publishing on TestPyPI.</li>
+                <li data-lang="en">QA leadership: Designed and executed comprehensive unit tests (core ops + edge cases) to verify numerical correctness and prevent regressions.</li>
+                <li data-lang="zh">QA 主导：设计并执行了全面的单元测试（核心运算 + 边界情况），以验证数值正确性并防止回归。</li>
+                <li data-lang="en">Debugging &amp; integration: Coordinated module integration, triaged bugs, and documented design decisions to streamline collaboration.</li>
+                <li data-lang="zh">调试与集成：协调模块集成、分类处理缺陷，并记录设计决策，以让协作更顺畅。</li>
+                <li data-lang="en">Release readiness: Helped ensure stable packaging/behavior for publishing on TestPyPI.</li>
+                <li data-lang="zh">发布准备：协助确保打包与行为的稳定，以便在 TestPyPI 上发布。</li>
               </ul>
             </div>
           </div>
         </section>
 
         <p style="margin-top: 1.5rem;">
-          <a href="projects.html">← Back to Projects</a>
+          <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
         </p>
       </section>
     </main>
 
     <footer>
-      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
+      <p><span data-lang="en">© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。最后更新于 2025-09-16。</span></p>
     </footer>
   </div>
 </body>

@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nothing Can Go Wrong — Game Jam Project — Yuanchen Wang</title>
+  <title data-en="Nothing Can Go Wrong — Game Jam Project — Yuanchen Wang" data-zh="Nothing Can Go Wrong — 游戏 jam 项目 — Yuanchen Wang">Nothing Can Go Wrong — Game Jam Project — Yuanchen Wang</title>
   <meta name="description" content="Nothing Can Go Wrong — fast-paced game jam project built in Godot." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
 </head>
@@ -27,11 +29,11 @@
 
     <div class="project-hero__meta">
       <div class="project-hero__meta-item">
-        <strong>Role:</strong> Primary Programmer
+        <span data-lang="en">Role: Primary Programmer</span><span data-lang="zh">职责：主程序</span>
       </div>
 
       <div class="project-hero__meta-item">
-        <strong>Tools:</strong> Godot 4, GDScript
+        <span data-lang="en">Tools: Godot 4, GDScript</span><span data-lang="zh">工具：Godot 4、GDScript</span>
       </div>
     </div>
 
@@ -42,7 +44,7 @@
 <section class="project-body">
 
 <p class="meta">
-  <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener">Play on itch.io</a>
+  <a href="https://strikeoo.itch.io/nothing-can-go-wrong" target="_blank" rel="noopener"><span data-lang="en">Play on itch.io</span><span data-lang="zh">在 itch.io 上试玩</span></a>
 </p>
 
 <section style="margin-top:1.5rem;">
@@ -51,21 +53,33 @@
 
 <div>
 
-<h3 style="margin-top:0;">What</h3>
+<h3 style="margin-top:0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
 
 <p class="meta">
-<strong>Nothing Can Go Wrong</strong> is a fast-paced game created during a game jam,
+<span data-lang="en">
+Nothing Can Go Wrong is a fast-paced game created during a game jam,
 where the goal was to design and ship a complete playable experience within a very short development cycle.
+</span><span data-lang="zh">
+Nothing Can Go Wrong 是一款在游戏 jam 期间制作的快节奏游戏，目标是在极短的开发周期内设计并交付一个完整可玩的体验。
+</span>
 </p>
 
 <p class="meta">
-I served as the <strong>primary programmer</strong>, responsible for implementing the core gameplay systems,
+<span data-lang="en">
+I served as the primary programmer, responsible for implementing the core gameplay systems,
 player controls, and game logic while integrating assets created by teammates.
+</span><span data-lang="zh">
+我担任主程序，负责实现核心玩法系统、玩家操控与游戏逻辑，并整合队友制作的素材。
+</span>
 </p>
 
 <p class="meta">
+<span data-lang="en">
 The project focused on rapid iteration and experimentation while maintaining a stable,
 playable build throughout the jam.
+</span><span data-lang="zh">
+项目专注于快速迭代与实验，同时在整个 jam 期间始终保持稳定、可玩的构建版本。
+</span>
 </p>
 
 </div>
@@ -73,22 +87,26 @@ playable build throughout the jam.
 
 <div>
 
-<h3 style="margin-top:0;">Main Achievements</h3>
+<h3 style="margin-top:0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
 
 <ul>
 
-<li>Implemented the core gameplay systems and player control logic.</li>
+<li data-lang="en">Implemented the core gameplay systems and player control logic.</li>
+<li data-lang="zh">实现了核心玩法系统与玩家操控逻辑。</li>
 
-<li>Integrated game mechanics, UI feedback, and input systems using Godot.</li>
+<li data-lang="en">Integrated game mechanics, UI feedback, and input systems using Godot.</li>
+<li data-lang="zh">使用 Godot 整合了游戏机制、UI 反馈与输入系统。</li>
 
-<li>Rapidly iterated on gameplay mechanics under strict time constraints.</li>
+<li data-lang="en">Rapidly iterated on gameplay mechanics under strict time constraints.</li>
+<li data-lang="zh">在严格的时间限制下快速迭代玩法机制。</li>
 
-<li>Delivered a polished playable build within the game jam deadline.</li>
+<li data-lang="en">Delivered a polished playable build within the game jam deadline.</li>
+<li data-lang="zh">在游戏 jam 截止前交付了打磨完善的可玩版本。</li>
 
 </ul>
 
 
-<h3 style="margin-top:1rem;">Highlights</h3>
+<h3 style="margin-top:1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
 
 <p style="margin:0;">
 <span class="pill">Godot</span>
@@ -107,42 +125,56 @@ playable build throughout the jam.
 
 <section style="margin-top:1.5rem;">
 
-<h3>How</h3>
+<h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-<h4 style="margin-top:0;">Rapid Gameplay Implementation</h4>
+<h4 style="margin-top:0;"><span data-lang="en">Rapid Gameplay Implementation</span><span data-lang="zh">快速玩法实现</span></h4>
 
 <p class="meta">
+<span data-lang="en">
 Because of the short jam timeline, the main engineering goal was to build
 gameplay systems that were simple, modular, and easy to iterate on.
+</span><span data-lang="zh">
+由于 jam 时间紧张，主要的工程目标是构建简单、模块化且易于迭代的玩法系统。
+</span>
 </p>
 
 <ul>
 
-<li>Implemented core gameplay mechanics and player control logic using <strong>Godot and GDScript</strong>.</li>
+<li data-lang="en">Implemented core gameplay mechanics and player control logic using Godot and GDScript.</li>
+<li data-lang="zh">使用 Godot 与 GDScript 实现了核心玩法机制与玩家操控逻辑。</li>
 
-<li>Built systems that connected input handling, game state, and player feedback.</li>
+<li data-lang="en">Built systems that connected input handling, game state, and player feedback.</li>
+<li data-lang="zh">构建了将输入处理、游戏状态与玩家反馈串联起来的系统。</li>
 
-<li>Structured scripts so new mechanics could be quickly added or adjusted during playtesting.</li>
+<li data-lang="en">Structured scripts so new mechanics could be quickly added or adjusted during playtesting.</li>
+<li data-lang="zh">合理组织脚本结构，使新机制能在玩法测试中被快速添加或调整。</li>
 
 </ul>
 
 
 
-<h4>Rapid Iteration and Debugging</h4>
+<h4><span data-lang="en">Rapid Iteration and Debugging</span><span data-lang="zh">快速迭代与调试</span></h4>
 
 <p class="meta">
+<span data-lang="en">
 Game jams require constant iteration and quick problem solving.
 The development process involved frequent playtesting and adjustment
 to ensure the game remained fun and stable.
+</span><span data-lang="zh">
+游戏 jam 需要不断迭代与快速解决问题。开发过程中包含频繁的玩法测试与调整，以确保游戏始终有趣且稳定。
+</span>
 </p>
 
 <ul>
 
-<li>Iterated on gameplay mechanics based on quick playtest feedback.</li>
+<li data-lang="en">Iterated on gameplay mechanics based on quick playtest feedback.</li>
+<li data-lang="zh">根据快速玩法测试的反馈迭代玩法机制。</li>
 
-<li>Debugged gameplay issues and optimized scripts to maintain smooth performance.</li>
+<li data-lang="en">Debugged gameplay issues and optimized scripts to maintain smooth performance.</li>
+<li data-lang="zh">调试玩法问题并优化脚本，以保持流畅的性能。</li>
 
-<li>Ensured the game remained stable while new features were added rapidly.</li>
+<li data-lang="en">Ensured the game remained stable while new features were added rapidly.</li>
+<li data-lang="zh">在快速添加新功能的同时确保游戏保持稳定。</li>
 
 </ul>
 
@@ -152,7 +184,7 @@ to ensure the game remained fun and stable.
 
 
 <p style="margin-top:1.5rem;">
-<a href="projects.html">← Back to Projects</a>
+<a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
 </p>
 
 
@@ -161,7 +193,7 @@ to ensure the game remained fun and stable.
 
 
 <footer>
-<p>© 2025 Yuanchen Wang — Portfolio</p>
+<p><span data-lang="en">© 2025 Yuanchen Wang — Portfolio</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。</span></p>
 </footer>
 
 </div>

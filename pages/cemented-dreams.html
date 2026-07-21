@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cemented Dreams — Gameplay Systems — Yuanchen Wang</title>
+  <title data-en="Cemented Dreams — Gameplay Systems — Yuanchen Wang" data-zh="Cemented Dreams — 玩法系统 — Yuanchen Wang">Cemented Dreams — Gameplay Systems — Yuanchen Wang</title>
   <meta name="description" content="Cemented Dreams — Gameplay systems, combat mechanics, and level design." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
 </head>
@@ -20,15 +22,15 @@
 
 <section class="project-hero" style="background-image: url('../images/CD.png');">
   <div class="project-hero__content">
-    <h2 class="project-hero__title">Cemented Dreams — Gameplay Systems</h2>
+    <h2 class="project-hero__title"><span data-lang="en">Cemented Dreams — Gameplay Systems</span><span data-lang="zh">Cemented Dreams — 玩法系统</span></h2>
 
     <div class="project-hero__meta">
       <div class="project-hero__meta-item">
-        <strong>Role:</strong> Combat Designer · Gameplay Engineer · Level Designer
+        <span data-lang="en">Role: Combat Designer · Gameplay Engineer · Level Designer</span><span data-lang="zh">职责： 战斗设计师 · 玩法工程师 · 关卡设计师</span>
       </div>
 
       <div class="project-hero__meta-item">
-        <strong>Tools:</strong> Unreal Engine 5, C++, Blueprint
+        <span data-lang="en">Tools: Unreal Engine 5, C++, Blueprint</span><span data-lang="zh">工具： Unreal Engine 5、C++、Blueprint</span>
       </div>
     </div>
   </div>
@@ -41,23 +43,23 @@
 <div class="two-col" style="gap:1.25rem; align-items:start;">
 
 <div>
-<h3 style="margin-top:0;">What</h3>
+<h3 style="margin-top:0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
 
 <p class="meta">
-<strong>Cemented Dreams</strong> is a third-person action game set inside a parasite-infested building.
+<span data-lang="en">Cemented Dreams is a third-person action game set inside a parasite-infested building.
 Players navigate an infected structure where a mechanical Hive grows through the architecture,
-creating traversal paths and combat spaces.
+creating traversal paths and combat spaces.</span><span data-lang="zh">Cemented Dreams 是一款第三人称动作游戏，故事发生在一座被寄生体侵蚀的建筑内部。玩家在受感染的结构中穿行，一座机械 Hive 在建筑中不断生长，形成位移路径与战斗空间。</span>
 </p>
 
 <p class="meta">
-I worked primarily on <strong>combat design, gameplay programming, and level design</strong>,
-building core movement and combat mechanics while coordinating closely with artists and producers.
+<span data-lang="en">I worked primarily on combat design, gameplay programming, and level design,
+building core movement and combat mechanics while coordinating closely with artists and producers.</span><span data-lang="zh">我主要负责战斗设计、玩法编程与关卡设计，构建核心的移动与战斗机制，同时与美术和制作人密切协作。</span>
 </p>
 
 <p class="meta">
-Gameplay systems were implemented using a combination of
-<strong>Unreal Engine C++ gameplay code</strong> and
-<strong>Blueprint-driven iteration</strong>.
+<span data-lang="en">Gameplay systems were implemented using a combination of
+Unreal Engine C++ gameplay code and
+Blueprint-driven iteration.</span><span data-lang="zh">玩法系统通过 Unreal Engine 的 C++ 玩法代码与 Blueprint 驱动的迭代相结合来实现。</span>
 </p>
 
 </div>
@@ -65,17 +67,21 @@ Gameplay systems were implemented using a combination of
 
 <div>
 
-<h3 style="margin-top:0;">Main Achievements</h3>
+<h3 style="margin-top:0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
 
 <ul>
-<li>Designed and implemented core combat movement mechanics including <strong>grapple traversal and sliding combat</strong>.</li>
-<li>Built gameplay behaviors using <strong>C++ systems exposed to Blueprint</strong> for rapid iteration.</li>
-<li>Designed a level centered around a <strong>growing parasite Hive simulation</strong> integrated into the building structure.</li>
-<li>Collaborated with artists and producers to align gameplay mechanics with visual direction and milestone goals.</li>
+<li data-lang="en">Designed and implemented core combat movement mechanics including grapple traversal and sliding combat.</li>
+<li data-lang="zh">设计并实现了核心的战斗移动机制，包括钩爪位移与滑行战斗。</li>
+<li data-lang="en">Built gameplay behaviors using C++ systems exposed to Blueprint for rapid iteration.</li>
+<li data-lang="zh">使用暴露给 Blueprint 的 C++ 系统构建玩法行为，以便快速迭代。</li>
+<li data-lang="en">Designed a level centered around a growing parasite Hive simulation integrated into the building structure.</li>
+<li data-lang="zh">设计了一个以不断生长的寄生 Hive 模拟为核心、并融入建筑结构的关卡。</li>
+<li data-lang="en">Collaborated with artists and producers to align gameplay mechanics with visual direction and milestone goals.</li>
+<li data-lang="zh">与美术和制作人协作，使玩法机制与视觉方向及里程碑目标保持一致。</li>
 </ul>
 
 
-<h3 style="margin-top:1rem;">Highlights</h3>
+<h3 style="margin-top:1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
 
 <p style="margin:0;">
 <span class="pill">UE5 Gameplay Programming</span>
@@ -95,30 +101,34 @@ Gameplay systems were implemented using a combination of
 
 <section style="margin-top:1.5rem;">
 
-<h3>How</h3>
+<h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-<h4 style="margin-top:0;">Combat Design + Gameplay Engineering</h4>
+<h4 style="margin-top:0;"><span data-lang="en">Combat Design + Gameplay Engineering</span><span data-lang="zh">战斗设计 + 玩法工程</span></h4>
 
 <p class="meta">
-I designed and implemented the player's core movement and combat systems,
-focusing on mobility and responsiveness in tight indoor environments.
+<span data-lang="en">I designed and implemented the player's core movement and combat systems,
+focusing on mobility and responsiveness in tight indoor environments.</span><span data-lang="zh">我设计并实现了玩家的核心移动与战斗系统，专注于狭窄室内环境中的机动性与操作响应。</span>
 </p>
 
 <ul>
-<li>Implemented gameplay behaviors such as <strong>grapple traversal, sliding movement, and aim-assist targeting</strong>.</li>
+<li data-lang="en">Implemented gameplay behaviors such as grapple traversal, sliding movement, and aim-assist targeting.</li>
+<li data-lang="zh">实现了钩爪位移、滑行移动与瞄准辅助等玩法行为。</li>
 
-<li>Integrated player input, animation states, and physics interactions through
-<strong>C++ gameplay components and Blueprint interfaces</strong>.</li>
+<li data-lang="en">Integrated player input, animation states, and physics interactions through
+C++ gameplay components and Blueprint interfaces.</li>
+<li data-lang="zh">通过 C++ 玩法组件与 Blueprint 接口整合了玩家输入、动画状态与物理交互。</li>
 
-<li>Exposed key combat parameters to designers through Blueprint to enable
-<strong>rapid tuning of movement feel and combat pacing</strong>.</li>
+<li data-lang="en">Exposed key combat parameters to designers through Blueprint to enable
+rapid tuning of movement feel and combat pacing.</li>
+<li data-lang="zh">通过 Blueprint 将关键战斗参数开放给设计师，以便快速调校移动手感与战斗节奏。</li>
 
-<li>Worked closely with artists and producers to ensure mechanics supported
+<li data-lang="en">Worked closely with artists and producers to ensure mechanics supported
 the intended combat rhythm and player flow.</li>
+<li data-lang="zh">与美术和制作人密切协作，确保机制契合预期的战斗节奏与玩家流程。</li>
 </ul>
 
 <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-top:1rem;">
-  <p style="margin:0 0 0.75rem;"><strong>Grapple traversal</strong></p>
+  <p style="margin:0 0 0.75rem;"><span data-lang="en">Grapple traversal</span><span data-lang="zh">钩爪位移</span></p>
   <iframe
     src="https://drive.google.com/file/d/18MloGueUhsugaT3NTPr-ZMTGBdJwklMX/preview"
     class="embed-frame"
@@ -131,7 +141,7 @@ the intended combat rhythm and player flow.</li>
 </article>
 
 <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-top:1rem;">
-  <p style="margin:0 0 0.75rem;"><strong>Aim-assist targeting</strong></p>
+  <p style="margin:0 0 0.75rem;"><span data-lang="en">Aim-assist targeting</span><span data-lang="zh">瞄准辅助</span></p>
   <iframe
     src="https://drive.google.com/file/d/1PBuQ87tH9YwVS1G207XPQ7vYSPKdGGkL/preview"
     class="embed-frame"
@@ -144,39 +154,43 @@ the intended combat rhythm and player flow.</li>
 </article>
 
 
-<h4>Level Design — Hive Simulation</h4>
+<h4><span data-lang="en">Level Design — Hive Simulation</span><span data-lang="zh">关卡设计：Hive 模拟</span></h4>
 
 <p class="meta">
-I designed a level centered around a parasitic Hive structure growing inside a building,
-creating traversal paths and combat arenas through environmental transformation.
+<span data-lang="en">I designed a level centered around a parasitic Hive structure growing inside a building,
+creating traversal paths and combat arenas through environmental transformation.</span><span data-lang="zh">我设计了一个以寄生 Hive 结构在建筑内部生长为核心的关卡，通过环境的变形创造出位移路径与战斗场地。</span>
 </p>
 
 <ul>
 
-<li>The central <strong>Hive structure</strong> grows into the building while cables from the structure attempt to strangle it.</li>
+<li data-lang="en">The central Hive structure grows into the building while cables from the structure attempt to strangle it.</li>
+<li data-lang="zh">中央的 Hive 结构向建筑内部生长，而建筑的缆索则试图将其绞杀。</li>
 
-<li>At cable contact points, the Hive generates <strong>hexagonal platforms</strong> that players can traverse.</li>
+<li data-lang="en">At cable contact points, the Hive generates hexagonal platforms that players can traverse.</li>
+<li data-lang="zh">在缆索的接触点，Hive 会生成供玩家穿行的六边形平台。</li>
 
-<li>Entrances into the Hive are <strong>torn open by structural cables</strong>, creating layered vertical gameplay spaces.</li>
+<li data-lang="en">Entrances into the Hive are torn open by structural cables, creating layered vertical gameplay spaces.</li>
+<li data-lang="zh">进入 Hive 的入口被结构缆索撕开，形成层叠的垂直玩法空间。</li>
 
-<li>A critical <strong>injection point</strong> forms around a cable that pierces the Hive wall, granting players the <strong>grapple ability</strong>.</li>
+<li data-lang="en">A critical injection point forms around a cable that pierces the Hive wall, granting players the grapple ability.</li>
+<li data-lang="zh">在一条穿透 Hive 墙体的缆索周围形成了关键的注入点，赋予玩家钩爪能力。</li>
 
 </ul>
 
 <p class="meta">
-This level structure links narrative worldbuilding with traversal mechanics,
-turning the parasite's growth into both a visual motif and a gameplay system.
+<span data-lang="en">This level structure links narrative worldbuilding with traversal mechanics,
+turning the parasite's growth into both a visual motif and a gameplay system.</span><span data-lang="zh">这一关卡结构将叙事世界观与位移机制相连接，把寄生体的生长同时转化为视觉母题与玩法系统。</span>
 </p>
 
 </section>
 
 
 <p style="margin-top:1.5rem;">
-<a href="https://www.cemented-dreams.com/" target="_blank" rel="noopener">Visit the official game site →</a>
+<a href="https://www.cemented-dreams.com/" target="_blank" rel="noopener"><span data-lang="en">Visit the official game site →</span><span data-lang="zh">访问游戏官网 →</span></a>
 </p>
 
 <p style="margin-top:1rem;">
-<a href="projects.html">← Back to Projects</a>
+<a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
 </p>
 
 </section>
@@ -185,7 +199,7 @@ turning the parasite's growth into both a visual motif and a gameplay system.
 
 
 <footer>
-<p>© 2025 Yuanchen Wang — Portfolio</p>
+<p><span data-lang="en">© 2025 Yuanchen Wang — Portfolio</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。</span></p>
 </footer>
 
 </div>

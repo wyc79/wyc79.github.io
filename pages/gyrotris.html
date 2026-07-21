@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gyrotris — Solo Puzzle Game — Yuanchen Wang</title>
+  <title data-en="Gyrotris — Solo Puzzle Game — Yuanchen Wang" data-zh="Gyrotris — 独立解谜游戏 — Yuanchen Wang">Gyrotris — Solo Puzzle Game — Yuanchen Wang</title>
   <meta name="description" content="Gyrotris — a sci-fi puzzle game reimagining Tetris with rotating boards, dynamic gravity, and environmental hazards." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
 </head>
@@ -22,8 +24,8 @@
         <div class="project-hero__content">
           <h2 class="project-hero__title">Gyrotris</h2>
           <div class="project-hero__meta">
-            <div class="project-hero__meta-item"><strong>Role:</strong> Solo Developer</div>
-            <div class="project-hero__meta-item"><strong>Tools:</strong> Godot 4.3, GDScript, Piskel</div>
+            <div class="project-hero__meta-item"><span data-lang="en">Role: Solo Developer</span><span data-lang="zh">职责： 独立开发者</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tools: Godot 4.3, GDScript, Piskel</span><span data-lang="zh">工具： Godot 4.3、GDScript、Piskel</span></div>
           </div>
         </div>
       </section>
@@ -31,38 +33,42 @@
       <section class="project-body">
 
         <p class="meta">
-          <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener">Play on itch.io</a>
+          <a href="https://strikeoo.itch.io/gyrotris" target="_blank" rel="noopener"><span data-lang="en">Play on itch.io</span><span data-lang="zh">在 itch.io 上试玩</span></a>
         </p>
 
         <section style="margin-top:1.5rem;">
           <div class="two-col" style="gap:1.25rem; align-items:start;">
 
             <div>
-              <h3 style="margin-top:0;">What</h3>
+              <h3 style="margin-top:0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
 
               <p class="meta">
-                <strong>Gyrotris</strong> is a sci-fi puzzle game that reimagines classic Tetris through
-                <strong>rotating boards, dynamic gravity, and environmental hazards</strong>.
+                <span data-lang="en">Gyrotris is a sci-fi puzzle game that reimagines classic Tetris through
+                rotating boards, dynamic gravity, and environmental hazards.
                 The game is set on a spaceship trapped by a black hole, where the player clears unstable cargo
-                while adapting to shifting conditions.
+                while adapting to shifting conditions.</span><span data-lang="zh">Gyrotris 是一款科幻解谜游戏，借助棋盘旋转、动态重力和环境危险，重新演绎了经典的 Tetris。游戏设定在一艘被黑洞困住的飞船上，玩家一边清理不稳定的货物，一边适应不断变化的环境。</span>
               </p>
 
               <p class="meta">
-                Developed entirely by me for <strong>Untitled Game Jam #100</strong>, this was my
-                <strong>first complete shipped game</strong>. I handled the design, programming, and pixel art.
+                <span data-lang="en">Developed entirely by me for Untitled Game Jam #100, this was my
+                first complete shipped game. I handled the design, programming, and pixel art.</span><span data-lang="zh">这款游戏由我独自为 Untitled Game Jam #100 开发，是我第一款完整发布的作品。设计、编程和像素美术均由我一人完成。</span>
               </p>
             </div>
 
             <div>
-              <h3 style="margin-top:0;">Main Achievements</h3>
+              <h3 style="margin-top:0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
               <ul>
-                <li>Designed a twist on Tetris centered around <strong>board rotation and changing gravity</strong>.</li>
-                <li>Built the full game solo, including <strong>game design, programming, and art</strong>.</li>
-                <li>Implemented hazards such as <strong>board holes, falling debris, and limited repair tools</strong>.</li>
-                <li>Shipped a complete playable prototype within game jam constraints.</li>
+                <li data-lang="en">Designed a twist on Tetris centered around board rotation and changing gravity.</li>
+                <li data-lang="zh">设计了对 Tetris 的创新玩法，核心围绕棋盘旋转与重力变化。</li>
+                <li data-lang="en">Built the full game solo, including game design, programming, and art.</li>
+                <li data-lang="zh">独自完成了整款游戏，涵盖游戏设计、编程与美术。</li>
+                <li data-lang="en">Implemented hazards such as board holes, falling debris, and limited repair tools.</li>
+                <li data-lang="zh">实现了多种危险机制，例如棋盘空洞、坠落的碎片以及数量有限的维修工具。</li>
+                <li data-lang="en">Shipped a complete playable prototype within game jam constraints.</li>
+                <li data-lang="zh">在 game jam 的限制条件下，发布了一个完整可玩的原型。</li>
               </ul>
 
-              <h3 style="margin-top:1rem;">Highlights</h3>
+              <h3 style="margin-top:1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
               <p style="margin:0;">
                 <span class="pill">Godot</span>
                 <span class="pill">GDScript</span>
@@ -78,59 +84,69 @@
 
         <section style="margin-top:1.5rem;">
 
-          <h3>How</h3>
+          <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-          <h4 style="margin-top:0;">Puzzle Design</h4>
+          <h4 style="margin-top:0;"><span data-lang="en">Puzzle Design</span><span data-lang="zh">解谜设计</span></h4>
           <p class="meta">
-            The core design goal was to keep the readability of Tetris while adding new systems that force the
-            player to rethink space, timing, and recovery.
+            <span data-lang="en">The core design goal was to keep the readability of Tetris while adding new systems that force the
+            player to rethink space, timing, and recovery.</span><span data-lang="zh">核心设计目标是保留 Tetris 的易读性，同时加入新的系统，迫使玩家重新思考空间、时机与补救。</span>
           </p>
 
           <ul>
-            <li>Built classic falling-block movement and rotation as the foundation.</li>
-            <li>Added <strong>periodic board rotation</strong>, which changes how players read and plan the grid.</li>
-            <li>Used <strong>dynamic hazards</strong> such as holes and debris to disrupt standard settling behavior.</li>
-            <li>Included a <strong>time-stop ability</strong> and limited <strong>repair robots</strong> to add strategic recovery options.</li>
+            <li data-lang="en">Built classic falling-block movement and rotation as the foundation.</li>
+            <li data-lang="zh">以经典的方块下落移动与旋转作为基础。</li>
+            <li data-lang="en">Added periodic board rotation, which changes how players read and plan the grid.</li>
+            <li data-lang="zh">加入了周期性的棋盘旋转，改变了玩家阅读和规划网格的方式。</li>
+            <li data-lang="en">Used dynamic hazards such as holes and debris to disrupt standard settling behavior.</li>
+            <li data-lang="zh">利用空洞、碎片等动态危险，打破常规的方块堆叠方式。</li>
+            <li data-lang="en">Included a time-stop ability and limited repair robots to add strategic recovery options.</li>
+            <li data-lang="zh">加入了时间停止能力和数量有限的维修机器人，增加了战略性的补救选择。</li>
           </ul>
 
-          <h4>Solo Development</h4>
+          <h4><span data-lang="en">Solo Development</span><span data-lang="zh">独立开发</span></h4>
           <p class="meta">
-            Because this was a fully solo jam project, I focused on building a clear gameplay loop quickly and
-            iterating on the mechanic that made the game distinctive.
+            <span data-lang="en">Because this was a fully solo jam project, I focused on building a clear gameplay loop quickly and
+            iterating on the mechanic that made the game distinctive.</span><span data-lang="zh">由于这是一个完全独立的 jam 项目，我专注于快速搭建清晰的玩法循环，并不断打磨让游戏与众不同的机制。</span>
           </p>
 
           <ul>
-            <li>Implemented the full game in <strong>Godot 4.3 using GDScript</strong>.</li>
-            <li>Created the game's pixel art assets in <strong>Piskel</strong>.</li>
-            <li>Balanced scope to ship a complete prototype rather than overbuild presentation features.</li>
-            <li>Used the project to explore how established game formulas can be transformed into new experiences.</li>
+            <li data-lang="en">Implemented the full game in Godot 4.3 using GDScript.</li>
+            <li data-lang="zh">使用 GDScript 在 Godot 4.3 中实现了整款游戏。</li>
+            <li data-lang="en">Created the game's pixel art assets in Piskel.</li>
+            <li data-lang="zh">在 Piskel 中制作了游戏的像素美术资源。</li>
+            <li data-lang="en">Balanced scope to ship a complete prototype rather than overbuild presentation features.</li>
+            <li data-lang="zh">权衡了开发范围，选择发布一个完整的原型，而非过度堆砌表现层的功能。</li>
+            <li data-lang="en">Used the project to explore how established game formulas can be transformed into new experiences.</li>
+            <li data-lang="zh">借这个项目探索如何将成熟的游戏套路转化为全新的体验。</li>
           </ul>
 
-          <h4>Iteration</h4>
+          <h4><span data-lang="en">Iteration</span><span data-lang="zh">迭代</span></h4>
           <p class="meta">
-            Gyrotris also gave me an early foundation in iterative design: identifying which mechanic was novel,
-            what players found confusing, and what should be improved in future versions.
+            <span data-lang="en">Gyrotris also gave me an early foundation in iterative design: identifying which mechanic was novel,
+            what players found confusing, and what should be improved in future versions.</span><span data-lang="zh">Gyrotris 也让我打下了迭代设计的早期基础：判断哪种机制真正新颖、玩家在哪里感到困惑，以及未来版本应改进之处。</span>
           </p>
 
           <ul>
-            <li>Evaluated clarity around <strong>board rotation feedback</strong> and readability.</li>
-            <li>Considered future improvements such as stronger rotation animation and clearer hole behavior.</li>
-            <li>Used playtesting feedback to think about how much chaos helps the game versus hurts readability.</li>
+            <li data-lang="en">Evaluated clarity around board rotation feedback and readability.</li>
+            <li data-lang="zh">评估了棋盘旋转反馈的清晰度与易读性。</li>
+            <li data-lang="en">Considered future improvements such as stronger rotation animation and clearer hole behavior.</li>
+            <li data-lang="zh">考虑了未来的改进，例如更强的旋转动画和更清晰的空洞表现。</li>
+            <li data-lang="en">Used playtesting feedback to think about how much chaos helps the game versus hurts readability.</li>
+            <li data-lang="zh">借助玩法测试的反馈，思考多少混乱程度有助于游戏，又在多大程度上损害易读性。</li>
           </ul>
 
         </section>
 
         <p style="margin-top:1.5rem;">
-          <a href="projects.html">← Back to Projects</a>
+          <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
         </p>
 
       </section>
     </main>
 
     <footer>
-      <p>© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</p>
+      <p><span data-lang="en">© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。最后更新于 2025-09-16。</span></p>
     </footer>
   </div>
 </body>
 </html>
-
