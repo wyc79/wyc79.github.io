@@ -102,12 +102,16 @@
       greeting: 'Hi! I answer questions about YC, grounded in the pages of this site. Who\'s visiting?',
       viewingAs: function (label) { return 'Viewing as: ' + label + '. Ask me anything about YC — answers link back to the relevant pages.'; },
       refused: 'That doesn\'t look like a question about YC, and that\'s all I can help with here — his projects, skills, education, and publications. Try one of these:',
-      degradedCJK: 'The AI answer service is unreachable right now, and offline search only covers English. Please try again in a minute.',
+      degradedCJK: 'The AI answer service is unreachable right now, and offline search only covers English. Here are some pages you can browse in the meantime:',
       degradedLoading: function (pct) { return 'Backend unreachable — loading offline search (' + pct + '%)…'; },
       degradedSources: 'The AI answer service is unreachable right now, but these pages look most relevant to your question:',
       backendDown: 'The chat backend is unreachable right now — please try again in a minute.',
       retrievalOnly: 'Demo is in retrieval-only mode (no LLM connected yet), but here\'s what the semantic index surfaces for that — sources below:',
       somethingWrong: function (msg) { return 'Something went wrong (' + msg + '). Please try again.'; },
+      offlineConsent: 'The AI answer service is unreachable. I can download a small on-device search model (~23 MB, cached after this) to still find relevant pages — or you can just browse the site.',
+      offlineUse: 'Use offline search (~23 MB)',
+      offlineBrowse: 'Just browse the site',
+      offlineDeclined: 'No problem — here are some pages to explore. Ask again anytime to turn on offline search.',
     },
     zh: {
       askBtn: '✦ 问 AI',
@@ -127,12 +131,16 @@
       greeting: '你好！我可以回答关于王元辰的问题，内容都来自本站页面。请问你是？',
       viewingAs: function (label) { return '当前身份：' + label + '。有关王元辰的问题都可以问我 —— 回答下方会附上相关页面链接。'; },
       refused: '这看起来不像是关于王元辰的问题，而我只能回答这方面的内容 —— 他的项目、技能、教育和论文。可以试试这些：',
-      degradedCJK: 'AI 回答服务暂时无法连接，而离线检索目前只支持英文。请稍后再试。',
+      degradedCJK: 'AI 回答服务暂时无法连接，而离线检索目前只支持英文。你可以先浏览这些页面：',
       degradedLoading: function (pct) { return '后端暂时无法连接 —— 正在加载离线检索（' + pct + '%）…'; },
       degradedSources: 'AI 回答服务暂时无法连接，不过这些页面看起来和你的问题最相关：',
       backendDown: '聊天后端暂时无法连接 —— 请过一会儿再试。',
       retrievalOnly: '演示目前处于「仅检索」模式（还没接入 LLM），不过这是语义索引为该问题找到的内容 —— 来源见下方：',
       somethingWrong: function (msg) { return '出错了（' + msg + '）。请再试一次。'; },
+      offlineConsent: 'AI 回答服务暂时无法连接。我可以下载一个很小的本地检索模型（约 23 MB，之后会缓存）来帮你找到相关页面 —— 你也可以直接浏览站点。',
+      offlineUse: '使用离线检索（约 23 MB）',
+      offlineBrowse: '直接浏览站点',
+      offlineDeclined: '没问题 —— 这里有一些页面可以看看。你随时可以再问一次来启用离线检索。',
     },
   };
   function t(key) {
@@ -163,7 +171,16 @@
     busy: false,
     session: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
     history: [], // [{role:'user'|'assistant', content}]
+    offlineConsent: null, // null = undecided; true/false = this session's choice (TODO#5)
   };
+
+  // Static page suggestions for the "just browse" path — no model, no embedding.
+  var SUGGESTED_PAGES = [
+    { url: 'pages/projects.html', en: 'Projects', zh: '项目' },
+    { url: 'pages/skills.html', en: 'Skills', zh: '技能' },
+    { url: 'pages/education.html', en: 'Education', zh: '教育' },
+    { url: 'pages/publications.html', en: 'Publications', zh: '论文' },
+  ];
 
   // ── Logging (everything in, everything out) ───────────────────────────
   function logTurn(record) {
@@ -258,7 +275,7 @@
           });
           if (res.ok) {
             var data = await res.json();
-            return { vector: new Float32Array(data.vector), gate: data.gate || null };
+            return { vector: new Float32Array(data.vector), gate: data.gate || null, rid: data.rid || null };
           }
           if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
         } catch (e) {
@@ -274,7 +291,7 @@
     }
     await ensureExtractor(null);
     var out = await state.extractor((state.index.query_prefix || '') + text, { pooling: 'mean', normalize: true });
-    return { vector: out.data, gate: null }; // Float32Array(384), unit norm
+    return { vector: out.data, gate: null, rid: null }; // Float32Array(384), unit norm
   }
 
   function retrieve(queryVec) {
@@ -340,22 +357,69 @@
 
   async function degradedTurn(question, stripped, thinking, record) {
     record.mode = 'degraded-local';
+    if (/[぀-ヿ㐀-鿿豈-﫿]/.test(question)) {
+      // The local fallback model is English-only — be honest for CJK, never
+      // download it for a question it can't serve, but still offer static page
+      // links (localized) so a Chinese visitor isn't left at a dead end.
+      thinking.classList.remove('ycchat-dots');
+      thinking.textContent = t('degradedCJK');
+      addPageLinks();
+      record.mode = 'degraded-cjk';
+      record.answer = thinking.textContent;
+      logTurn(record);
+      return;
+    }
+    // TODO#5: never auto-download the ~23MB in-browser model. Ask once per
+    // session; remember the choice; declining shows static page links only.
+    if (state.offlineConsent === false) return offlineDeclined(thinking, record);
+    if (state.offlineConsent === true) return runOfflineSearch(question, stripped, thinking, record);
+
+    thinking.classList.remove('ycchat-dots');
+    thinking.textContent = t('offlineConsent');
+    var choices = h('div', 'ycchat-starters');
+    var yes = h('button', 'ycchat-starter', t('offlineUse'));
+    var no = h('button', 'ycchat-starter', t('offlineBrowse'));
+    yes.type = 'button';
+    no.type = 'button';
+    yes.addEventListener('click', function () {
+      state.offlineConsent = true;
+      choices.remove();
+      logTurn({ event: 'offline_consent', consent: true });
+      runOfflineSearch(question, stripped, thinking, record);
+    });
+    no.addEventListener('click', function () {
+      state.offlineConsent = false;
+      choices.remove();
+      logTurn({ event: 'offline_consent', consent: false });
+      offlineDeclined(thinking, record);
+    });
+    choices.appendChild(yes);
+    choices.appendChild(no);
+    els.body.appendChild(choices);
+    els.body.scrollTop = els.body.scrollHeight;
+  }
+
+  // Declined offline search: static page links, no model, no embedding.
+  function offlineDeclined(thinking, record) {
+    thinking.classList.remove('ycchat-dots');
+    thinking.textContent = t('offlineDeclined');
+    addPageLinks();
+    record.mode = 'degraded-declined';
+    record.answer = thinking.textContent;
+    logTurn(record);
+  }
+
+  // Consent granted: pull the MiniLM model and do local fallback retrieval.
+  async function runOfflineSearch(question, stripped, thinking, record) {
     try {
-      if (/[぀-ヿ㐀-鿿豈-﫿]/.test(question)) {
-        // The local fallback model is English-only — be honest for CJK.
-        thinking.classList.remove('ycchat-dots');
-        thinking.textContent = t('degradedCJK');
-        record.answer = thinking.textContent;
-        logTurn(record);
-        return;
-      }
       var fb = await loadFallbackVectors();
+      thinking.classList.add('ycchat-dots');
       await ensureExtractor(function (pct) {
         thinking.textContent = t('degradedLoading', pct);
         thinking.classList.remove('ycchat-dots');
       });
-      var embedFb = async function (t) {
-        var out = await state.extractor((fb.query_prefix || '') + t, { pooling: 'mean', normalize: true });
+      var embedFb = async function (q) {
+        var out = await state.extractor((fb.query_prefix || '') + q, { pooling: 'mean', normalize: true });
         return out.data;
       };
       var retrieved = retrieveFallback(fb, await embedFb(question));
@@ -397,12 +461,14 @@
             title: r.chunk.page_title + ' — ' + r.chunk.section_title,
             url: r.chunk.url,
             text: r.chunk.text,
+            score: +r.score.toFixed(4), // client-side retrieval similarity — the
+            // server logs it so 日志查询 shows retrieval quality per chunk.
           };
         }),
       }),
     });
     if (!res.ok) throw new Error('worker ' + res.status);
-    return (await res.json()).answer;
+    return await res.json(); // {answer, model, rid}
   }
 
   // ── UI ────────────────────────────────────────────────────────────────
@@ -492,6 +558,18 @@
     els.body.scrollTop = els.body.scrollHeight;
   }
 
+  function addPageLinks() {
+    var wrap = h('div', 'ycchat-srcs');
+    SUGGESTED_PAGES.forEach(function (p) {
+      var a = h('a', 'ycchat-src');
+      a.href = PREFIX + p.url;
+      a.appendChild(h('b', null, lang() === 'zh' ? p.zh : p.en));
+      wrap.appendChild(a);
+    });
+    els.body.appendChild(wrap);
+    els.body.scrollTop = els.body.scrollHeight;
+  }
+
   function showRolePicker() {
     els.body.textContent = '';
     addMsg('note', t('greeting'));
@@ -562,6 +640,7 @@
         await degradedTurn(question, stripped, thinking, record);
         return;
       }
+      record.embed_rid = emb.rid || undefined; // correlate with the server /embed log
       var retrieved = retrieve(emb.vector);
       var results = retrieved.results;
       record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
@@ -596,7 +675,9 @@
       var answer;
       if (WORKER_URL) {
         record.mode = 'llm';
-        answer = await askWorker(question, results);
+        var resp = await askWorker(question, results);
+        answer = resp.answer;
+        record.rid = resp.rid || undefined; // server /chat log id, for correlation
         // The UI renders plain text; strip stray markdown emphasis the LLM
         // may emit despite the prompt (e.g. **Prime Engine**).
         answer = answer.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#+\s+/gm, '');
