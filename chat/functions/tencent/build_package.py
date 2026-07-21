@@ -166,6 +166,14 @@ def main() -> None:
             zh_dir = CHAT / "models" / "Xenova" / "bge-small-zh-v1.5"
             download_model("Xenova/bge-small-zh-v1.5", zh_dir)
             gate_models["gate_model_zh"] = zh_dir
+        # Echo each gate the index build wrote (en is always present; zh only
+        # when its calibration separated) so the package log is self-describing.
+        for lang in ("en", "zh"):
+            spec = payload.get(lang)
+            print(
+                f"  gate[{lang}]: {spec['gate_stat']} >= {spec['gate_threshold']}"
+                if spec else f"  gate[{lang}]: not built (dormant)"
+            )
 
     print(f"[3/4] linux wheels for cp{args.python_version}")
     wheels = download_wheels(args.python_version, HERE / "_wheels")

@@ -91,7 +91,11 @@ def build_index(site_root: Path | None = None) -> dict:
             (s, "zh") for s in load_site(site_root, "zh")
         ]
     else:
-        tagged = [(s, None) for s in load_site(site_root)]
+        # A monolingual model (minilm) is English-only — take the English view
+        # of the (now bilingual) pages so its chunks aren't en+zh mush that the
+        # model can't embed. Tag None so ids keep the original scheme (no lang
+        # segment): a single-language index has no en/zh collision to break.
+        tagged = [(s, None) for s in load_site(site_root, "en")]
 
     chunks: list[dict] = []
     section_ordinal: dict[tuple, int] = defaultdict(int)  # per (page, lang) counter
@@ -158,6 +162,11 @@ def build_index(site_root: Path | None = None) -> dict:
         gate_vecs = np.round(gate_vecs.astype(float), ndigits)
         gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
                             multilingual=gate_preset["multilingual"])
+        # Symmetric with the zh line below. The en gate is unconditional (e5
+        # can't self-gate), so this always prints; a negative margin only warns
+        # (compute_gate still picks a threshold just above the off-topic max).
+        logger.info("en gate: enabled (%s >= %s, margin %.1f%%, %d chunks)",
+                    gate["stat"], gate["threshold"], gate["margin"] * 100, len(en_chunks))
         gate_payload = {
             "en": {
                 "model": gate_preset["name"],

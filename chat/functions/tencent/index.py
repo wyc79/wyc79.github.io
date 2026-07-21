@@ -6,7 +6,8 @@ provider that exposes /v1/chat/completions). Listens on :9000 as SCF web
 functions require; scf_bootstrap starts it.
 
 Same contract and guarantees as the Cloudflare worker:
-  POST /chat  {session, role, question, history?, contexts[]} -> {answer, model}
+  POST /chat  {session, role, question, history?, contexts[]} -> {answer, model, rid}
+  POST /embed {session?, text, gate_text?} -> {vector, gate?, rid}
   POST /log   client-side event record -> 204
   GET  /      health
 - Origin allowlist, size caps on every field.
@@ -14,11 +15,17 @@ Same contract and guarantees as the Cloudflare worker:
 - Role prompts come from the site's roles.json (client sends a role id only);
   a bundled roles.json copy is the fallback if github.io is unreachable from
   the function's region.
-- Every request/response printed as JSON -> visible in SCF 日志查询.
+- Every turn logged as JSON (SCF 日志查询), keyed by a short human-scannable
+  request id (rid) + hashed session (sid). /chat logs the exact LLM input
+  (system_head + clipped chunks with ids/scores + messages) and output
+  (answer, finish_reason, usage); /embed logs the gate decision only, never
+  the query vector. contexts may carry a client-side retrieval score, and the
+  widget can POST its top-k {id, score} to /log — all correlate by rid/sid.
 Config via environment variables: LLM_API_KEY (required), LLM_BASE_URL,
 LLM_MODEL, SITE_BASE, ALLOWED_ORIGINS, RATE_LIMIT_PER_HOUR.
 """
 
+import hashlib
 import json
 import os
 import threading
@@ -35,7 +42,19 @@ LIMITS = {
     "history_turns": 8,
     "history_text": 1200,
     "log_bytes": 4096,
+    # Log-only clip lengths. CLS (日志服务) truncates very long lines, so logs
+    # keep the exact LLM input/output but clip free text — ids/scores/usage
+    # stay full so retrieval quality and token accounting are never lost.
+    "log_ctx_text": 200,
+    "log_msg_text": 240,
+    "log_answer": 800,
 }
+
+# Human-scannable request id: MMDD-HHMMSS-NNNN. The 4-digit per-instance counter
+# makes it collision-free within a process (SCF may run several instances, so
+# ids are unique per instance — pair with sid to disambiguate across them).
+_req_counter = [0]
+_req_lock = threading.Lock()
 
 _roles_cache: dict = {"data": None, "ts": 0.0}
 _rate: dict = {"hour": None, "counts": {}}
@@ -175,6 +194,50 @@ def log(record: dict) -> None:
     print(json.dumps(record, ensure_ascii=False), flush=True)
 
 
+def new_request_id() -> str:
+    """Short, time-ordered, human-scannable id for one request (vs the opaque
+    uuid session). Scannable in 日志查询; sortable by time within an instance."""
+    with _req_lock:
+        _req_counter[0] = (_req_counter[0] + 1) % 10000
+        n = _req_counter[0]
+    return time.strftime("%m%d-%H%M%S", time.gmtime()) + f"-{n:04d}"
+
+
+def session_hash(session) -> str:
+    """8-char stable hash of the session uuid: same session → same sid across
+    turns (correlates a conversation in the logs) without dumping the raw id."""
+    if not isinstance(session, str) or not session:
+        return "anon"
+    return hashlib.sha1(session.encode("utf-8")).hexdigest()[:8]
+
+
+def clip(text, limit: int) -> str:
+    """Trim free text for logs, marking how much was dropped so truncation is
+    never mistaken for the whole value."""
+    text = text if isinstance(text, str) else ("" if text is None else str(text))
+    return text if len(text) <= limit else text[:limit] + f"…(+{len(text) - limit})"
+
+
+def log_contexts(contexts: list) -> list:
+    """Compact per-chunk log rows: ids/urls/scores kept FULL (that's the
+    retrieval-quality signal), chunk text clipped to fit CLS line limits. score
+    is the widget's client-side top-k similarity when it piggybacks it."""
+    rows = []
+    for i, c in enumerate(contexts):
+        row = {
+            "i": i + 1,
+            "id": c.get("id"),
+            "title": c.get("title"),
+            "url": c.get("url"),
+            "text": clip(c.get("text", ""), LIMITS["log_ctx_text"]),
+        }
+        score = c.get("score")
+        if isinstance(score, (int, float)) and not isinstance(score, bool):
+            row["score"] = round(float(score), 4)
+        rows.append(row)
+    return rows
+
+
 def allowed_origin(origin: str) -> bool:
     allowed = env("ALLOWED_ORIGINS", "https://wyc79.github.io")
     return origin in [s.strip() for s in allowed.split(",") if s.strip()]
@@ -230,7 +293,7 @@ def validate_chat_body(body) -> str | None:
     return None
 
 
-def call_llm(system: str, messages: list) -> tuple[str, str, dict | None]:
+def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | None]:
     url = env("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/v1/chat/completions"
     payload = {
         "model": env("LLM_MODEL", "deepseek-chat"),
@@ -247,8 +310,8 @@ def call_llm(system: str, messages: list) -> tuple[str, str, dict | None]:
     )
     with urllib.request.urlopen(req, timeout=60) as res:
         data = json.load(res)
-    answer = data["choices"][0]["message"]["content"]
-    return answer, data.get("model", ""), data.get("usage")
+    choice = data["choices"][0]
+    return choice["message"]["content"], data.get("model", ""), data.get("usage"), choice.get("finish_reason")
 
 
 REFUSAL = (
@@ -346,9 +409,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "text too long"})
         gate_text = body.get("gate_text") if isinstance(body.get("gate_text"), str) else body["text"]
         gate = gate_decision(gate_text[: LIMITS["question"]])
-        response = {"vector": embed_text(body["text"]), "model": env("MODEL_NAME", "server-embedder")}
+        rid, sid = new_request_id(), session_hash(body.get("session"))
+        response = {"vector": embed_text(body["text"]), "model": env("MODEL_NAME", "server-embedder"), "rid": rid}
         if gate is not None:
             response["gate"] = gate
+        # Log the gate decision only — NEVER the query vector. gate carries
+        # pass/value/lang(/reason); the clipped gate_text shows what was judged.
+        log({"type": "embed", "rid": rid, "sid": sid, "gate": gate, "q": clip(gate_text, 120)})
         self._json(200, response)
 
     def _chat(self):
@@ -365,14 +432,17 @@ class Handler(BaseHTTPRequestHandler):
         if invalid:
             return self._json(400, {"error": invalid})
 
+        rid, sid = new_request_id(), session_hash(body.get("session"))
+
         if len(body["contexts"]) == 0:
             log({
                 "type": "chat_refused",
-                "session": str(body.get("session", ""))[:64],
+                "rid": rid,
+                "sid": sid,
                 "role": body.get("role"),
-                "question": body["question"],
+                "question": clip(body["question"], LIMITS["log_msg_text"]),
             })
-            return self._json(200, {"answer": REFUSAL, "refused": True})
+            return self._json(200, {"answer": REFUSAL, "refused": True, "rid": rid})
 
         roles_data = load_roles()
         role = roles_data["roles"].get(body.get("role")) or roles_data["roles"][roles_data["default_role"]]
@@ -381,30 +451,47 @@ class Handler(BaseHTTPRequestHandler):
             f'<chunk index="{i + 1}" page="{c.get("title", "")}" url="{c.get("url", "")}">\n{c["text"]}\n</chunk>'
             for i, c in enumerate(body["contexts"])
         )
-        system = (
+        # system_head = the role/persona prompt WITHOUT the injected chunks; the
+        # chunks are logged separately (clipped) via log_contexts, so the whole
+        # LLM input is reconstructable without a giant log line.
+        system_head = (
             f"{roles_data['base_system_prompt']}\n\n"
-            f"Visitor role: {role['label']}. {role['system_prompt']}\n\n"
-            f"Context retrieved from the site for this question:\n{context_block}"
+            f"Visitor role: {role['label']}. {role['system_prompt']}"
         )
+        system = f"{system_head}\n\nContext retrieved from the site for this question:\n{context_block}"
         messages = list(body.get("history") or []) + [{"role": "user", "content": body["question"]}]
 
         try:
-            answer, model, usage = call_llm(system, messages)
+            answer, model, usage, finish = call_llm(system, messages)
         except urllib.error.HTTPError as err:
-            log({"type": "llm_error", "status": err.code, "detail": err.read().decode("utf-8", "replace")[:500]})
+            log({"type": "llm_error", "rid": rid, "sid": sid, "status": err.code,
+                 "detail": err.read().decode("utf-8", "replace")[:500]})
             return self._json(502, {"error": "llm call failed"})
 
+        # Full LLM I/O for every turn: system_head + clipped contexts (ids &
+        # widget-supplied scores kept full) + clipped messages in; answer +
+        # finish_reason + usage out. Enough to reproduce and audit any answer.
         log({
             "type": "chat",
-            "session": str(body.get("session", ""))[:64],
+            "rid": rid,
+            "sid": sid,
             "role": body.get("role"),
-            "question": body["question"],
-            "retrieved": [{"id": c.get("id"), "title": c.get("title"), "url": c.get("url")} for c in body["contexts"]],
-            "answer": answer,
-            "model": model,
-            "usage": usage,
+            "in": {
+                "system_head": system_head,
+                "contexts": log_contexts(body["contexts"]),
+                "messages": [
+                    {"role": m.get("role"), "content": clip(m.get("content"), LIMITS["log_msg_text"])}
+                    for m in messages
+                ],
+            },
+            "out": {
+                "answer": clip(answer, LIMITS["log_answer"]),
+                "finish_reason": finish,
+                "model": model,
+                "usage": usage,
+            },
         })
-        self._json(200, {"answer": answer, "model": model})
+        self._json(200, {"answer": answer, "model": model, "rid": rid})
 
     def _log(self):
         raw = self._read_body(LIMITS["log_bytes"] + 1)
@@ -414,7 +501,14 @@ class Handler(BaseHTTPRequestHandler):
             record = json.loads(raw)
         except json.JSONDecodeError:
             return self._json(400, {"error": "bad json"})
-        log({"type": "client_log", **(record if isinstance(record, dict) else {"data": record})})
+        if not isinstance(record, dict):
+            record = {"data": record}
+        # Correlate with server turns: hash the session to sid (drop the raw
+        # uuid), and keep any rid the widget echoes back from /chat or /embed.
+        # This is where the widget's client-side top-k {id, score} land.
+        if "session" in record:
+            record["sid"] = session_hash(record.pop("session"))
+        log({"type": "client_log", **record})
         self._send(204)
 
 
