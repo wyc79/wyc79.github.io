@@ -35,6 +35,22 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+
+# Build identity: build_package.py stamps build_info.json into the package at
+# build time; index.py reads it here so every log line carries build_id and the
+# health check reports the full stamp. Answers "which build is running?" (the
+# stale-zip ambiguity that made the zh-answer bug hard to see) at a glance.
+def _load_build_info() -> dict:
+    try:
+        return json.loads(Path(__file__).with_name("build_info.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {"build_id": "unknown", "built_at": None}
+
+
+BUILD_INFO = _load_build_info()
+BUILD_ID = BUILD_INFO.get("build_id", "unknown")
+
+
 LIMITS = {
     "question": 1000,
     "contexts": 6,
@@ -200,6 +216,7 @@ def env(key: str, default: str = "") -> str:
 
 def log(record: dict) -> None:
     record.setdefault("ts", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    record.setdefault("build", BUILD_ID)
     print(json.dumps(record, ensure_ascii=False), flush=True)
 
 
@@ -384,6 +401,7 @@ class Handler(BaseHTTPRequestHandler):
                 "service": "portfolio-chat",
                 "ok": True,
                 "embed": _embed["session"] is not None,
+                "build": BUILD_INFO,
             })
         self._json(404, {"error": "not found"})
 
@@ -530,7 +548,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     port = int(env("PORT", "9000"))  # SCF web functions must listen on 9000
-    log({"type": "startup", "port": port, "llm_base": env("LLM_BASE_URL", "https://api.deepseek.com")})
+    log({"type": "startup", "port": port, "llm_base": env("LLM_BASE_URL", "https://api.deepseek.com"),
+         "build_info": BUILD_INFO})
     # Load models BEFORE binding the port: SCF considers a web function ready
     # only once it listens, so cold-start requests queue until the models are
     # in memory instead of racing a background load and seeing 503s (the init

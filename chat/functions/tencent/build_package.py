@@ -19,6 +19,8 @@ Does four things:
 """
 
 import argparse
+import datetime
+import hashlib
 import json
 import shutil
 import subprocess
@@ -41,6 +43,35 @@ PRESETS = {
     "e5": {"repo": "Xenova/multilingual-e5-small", "query_prefix": "query: "},
     "minilm": {"repo": "Xenova/all-MiniLM-L6-v2", "query_prefix": ""},
 }
+
+
+def git_short_sha() -> str:
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             cwd=HERE, capture_output=True, text=True)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return "nogit"
+
+
+def make_build_info(preset: str, version: str | None) -> dict:
+    """A dated, versioned stamp bundled into the package as build_info.json.
+    code_sha is a hash of the exact index.py shipped, so a running function can
+    be compared against local source without trusting the zip's filename."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    date = now.strftime("%Y%m%d")
+    sha = git_short_sha()
+    code_sha = hashlib.sha256((HERE / "index.py").read_bytes()).hexdigest()[:12]
+    return {
+        "version": version or date,
+        "preset": preset,
+        "build_id": f"{preset}-{date}-{sha}",
+        "built_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "git_sha": sha,
+        "code_sha": code_sha,
+    }
 
 
 def download_model(repo: str, dest: Path) -> None:
@@ -92,10 +123,14 @@ def download_wheels(py_version: str, wheel_dir: Path) -> list[Path]:
 
 
 def build_zip(preset: dict, model_src: Path, wheels: list[Path], out_zip: Path,
-              gate_models: dict[str, Path] | None = None) -> None:
+              gate_models: dict[str, Path] | None = None, build_info: dict | None = None) -> None:
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         # code + fresh roles fallback
         zf.write(HERE / "index.py", "index.py")
+        # build stamp: index.py reads this at startup and logs build_id on
+        # every line, so SCF logs say which build produced them.
+        if build_info is not None:
+            zf.writestr("build_info.json", json.dumps(build_info, ensure_ascii=False, indent=2))
         roles = (CHAT / "data" / "roles.json").read_text(encoding="utf-8")
         zf.writestr("roles.json", roles)
         # scf_bootstrap with the executable bit, portable across build OSes
@@ -129,8 +164,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", choices=list(PRESETS), default="e5")
     ap.add_argument("--python-version", default="310", help="SCF runtime ABI (310 for Python 3.10)")
+    ap.add_argument("--version", default=None,
+                    help="build version label (default: UTC build date, e.g. 20260721)")
     args = ap.parse_args()
     preset = PRESETS[args.preset]
+
+    build_info = make_build_info(args.preset, args.version)
+    print(f"[build] {build_info['build_id']}  built_at={build_info['built_at']}  "
+          f"code_sha={build_info['code_sha']}")
 
     model_dir = CHAT / "models" / preset["repo"]
     print(f"[1/4] model {preset['repo']} -> {model_dir}")
@@ -181,9 +222,10 @@ def main() -> None:
 
     out = HERE / f"tencent-function-{args.preset}.zip"
     print(f"[4/4] packaging -> {out.name} (gates: {sorted(gate_models) or 'none'})")
-    build_zip(preset, model_dir, wheels, out, gate_models)
+    build_zip(preset, model_dir, wheels, out, gate_models, build_info)
 
     print(json.dumps({
+        "build": build_info["build_id"],
         "next": [
             f"rebuild index: cd chat && python scripts/build_index.py --model {args.preset}"
             + (" (note the new gate threshold it prints)" if args.preset == "e5" else ""),
