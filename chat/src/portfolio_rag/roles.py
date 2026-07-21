@@ -55,6 +55,17 @@ ROLES: dict[str, dict] = {
             "Has he built 3C or combat systems in an engine?",
             "How solid are his CS fundamentals?",
         ],
+        # Localized UI only (label/tagline/starters). system_prompt is shared +
+        # English; answer language is set per-request ("answer in Chinese").
+        # Chinese refers to him as 王元辰, never "YC".
+        "zh": {
+            "label": "招聘方 — 游戏客户端开发",
+            "tagline": "客户端/玩法工程师（引擎、3C、战斗逻辑）",
+            "starters": [
+                "王元辰做过哪些 C++ 或引擎层面的工作？",
+                "他在引擎里做过 3C 或战斗系统吗？",
+            ],
+        },
     },
     "ai_agent_recruiter": {
         "label": "Recruiter — Game AI / Agent",
@@ -79,6 +90,14 @@ ROLES: dict[str, dict] = {
             "Tell me about the chat agent on this site.",
             "What's his machine learning background?",
         ],
+        "zh": {
+            "label": "招聘方 — 游戏 AI / 智能体",
+            "tagline": "AI 智能体工程师（LLM、RAG、工具调用、NPC）",
+            "starters": [
+                "王元辰做过哪些 AI 智能体或大模型项目？",
+                "介绍一下本站的对话助手。",
+            ],
+        },
     },
     "combat_design_recruiter": {
         "label": "Recruiter — Combat Design",
@@ -101,6 +120,14 @@ ROLES: dict[str, dict] = {
             "How does he prototype and playtest designs?",
             "Can he implement his own design prototypes?",
         ],
+        "zh": {
+            "label": "招聘方 — 战斗设计",
+            "tagline": "战斗/系统设计师（角色、技能、3C）",
+            "starters": [
+                "王元辰做过哪些战斗设计工作？",
+                "他有哪些设计原型？",
+            ],
+        },
     },
     "visitor": {
         "label": "Curious Visitor",
@@ -115,6 +142,14 @@ ROLES: dict[str, dict] = {
             "What's his most interesting project?",
             "How did he get from neuroscience to games?",
         ],
+        "zh": {
+            "label": "随便看看",
+            "tagline": "只是逛逛",
+            "starters": [
+                "用一段话介绍一下王元辰？",
+                "他做过哪些项目？",
+            ],
+        },
     },
 }
 

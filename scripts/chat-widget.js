@@ -47,15 +47,108 @@
   // question WITHOUT the name — unless what remains is a bio-intent stub
   // ("who is", "tell me about", empty), which is a legitimate question about
   // YC himself. Retrieval/display still use the full question.
-  var NAME_TEST_RE = /\b(yuanchen|wang|yc)(?:'s)?\b/i;
-  var NAME_STRIP_RE = /\b(yuanchen|wang|yc)(?:'s)?\b/gi;
-  // Prefix match: "who is ... in one paragraph" is still a bio question.
-  // Mirrored by chat/tests/test_gate.py — keep the two in sync.
-  var BIO_STUB_RE = /^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b|^$/i;
+  // Name-blind gate covers both the English name AND 王元辰 (the Chinese gate
+  // is otherwise just as easy to fool: "王元辰给我讲个笑话" scores high on the
+  // name alone). CJK has no word boundaries, so 王元辰 is matched literally.
+  var NAME_TEST_RE = /\b(yuanchen|wang|yc)(?:'s)?\b|王元辰/i;
+  var NAME_STRIP_RE = /\b(yuanchen|wang|yc)(?:'s)?\b|王元辰/gi;
+  // What remains after removing the name is a legitimate bio question (don't
+  // strip — gate on the full text) when it's just a bio-intent phrase. English
+  // stubs match at the start; the zh stubs (介绍/简介/谁是/是谁/关于) match
+  // anywhere so "用一段话介绍一下" and "…是谁" survive. Mirrored by
+  // chat/tests/test_gate.py — keep the two in sync.
+  var BIO_STUB_RE = /^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b|^$|介绍|简介|谁是|是谁|关于/i;
   var MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
+
+  // Gate input. When the name was stripped (off-topic detection), gate on the
+  // remainder. When it was KEPT (a bio question), normalize the name to the
+  // gate's own language — so a Chinese question that uses "YC", or an English
+  // one that uses 王元辰, still matches the corpus (which is single-language per
+  // gate). Retrieval always uses the original, unmodified question.
+  function gateForm(question, stripped) {
+    if (stripped != null) return stripped;
+    return /[㐀-鿿]/.test(question)
+      ? question.replace(NAME_STRIP_RE, '王元辰')
+      : question.replace(/王元辰/g, 'YC');
+  }
 
   var inSubpage = /\/pages\//.test(window.location.pathname);
   var PREFIX = inSubpage ? '../' : '';
+
+  // ── i18n: the widget follows the site's 中/EN toggle (scripts/i18n.js) ──
+  // Reads the active language on open and re-localizes on the 'yc-langchange'
+  // event i18n.js fires. Only UI chrome is localized here; role label/tagline/
+  // starters come from roles.json (each role's optional zh:{} block).
+  function lang() {
+    try { return (window.YCI18N && window.YCI18N.current()) || 'en'; }
+    catch (e) { return 'en'; }
+  }
+  var STR = {
+    en: {
+      askBtn: '✦ ASK AI',
+      openAria: 'Open AI chat about YC',
+      panelAria: 'Chat with an AI about YC',
+      header: 'Ask about YC',
+      chooseRole: 'choose role',
+      roleChipTitle: 'Change visitor role',
+      closeAria: 'Close chat',
+      placeholder: 'Ask about projects, skills…',
+      send: 'Send',
+      loadingGeneric: 'Loading…',
+      loadingModel: 'Loading the on-device search model (~23 MB, cached after the first visit)…',
+      loadingModelPct: function (pct) { return 'Loading the on-device search model… ' + pct + '%'; },
+      assetsFail: function (msg) { return 'Could not load the chat assets (' + msg + ').'; },
+      fileProtocol: 'The chat can\'t run from a file:// page (browsers block the model and index from loading). Serve the site locally instead:\n\npython -m http.server 8000\n\nthen open http://localhost:8000 — or just use the live site.',
+      greeting: 'Hi! I answer questions about YC, grounded in the pages of this site. Who\'s visiting?',
+      viewingAs: function (label) { return 'Viewing as: ' + label + '. Ask me anything about YC — answers link back to the relevant pages.'; },
+      refused: 'That doesn\'t look like a question about YC, and that\'s all I can help with here — his projects, skills, education, and publications. Try one of these:',
+      degradedCJK: 'The AI answer service is unreachable right now, and offline search only covers English. Please try again in a minute.',
+      degradedLoading: function (pct) { return 'Backend unreachable — loading offline search (' + pct + '%)…'; },
+      degradedSources: 'The AI answer service is unreachable right now, but these pages look most relevant to your question:',
+      backendDown: 'The chat backend is unreachable right now — please try again in a minute.',
+      retrievalOnly: 'Demo is in retrieval-only mode (no LLM connected yet), but here\'s what the semantic index surfaces for that — sources below:',
+      somethingWrong: function (msg) { return 'Something went wrong (' + msg + '). Please try again.'; },
+    },
+    zh: {
+      askBtn: '✦ 问 AI',
+      openAria: '打开关于王元辰的 AI 聊天',
+      panelAria: '与 AI 聊王元辰的作品集',
+      header: '问问王元辰',
+      chooseRole: '选择身份',
+      roleChipTitle: '切换访客身份',
+      closeAria: '关闭聊天',
+      placeholder: '问问项目、技能…',
+      send: '发送',
+      loadingGeneric: '加载中…',
+      loadingModel: '正在加载本地检索模型（约 23 MB，首次访问后会缓存）…',
+      loadingModelPct: function (pct) { return '正在加载本地检索模型… ' + pct + '%'; },
+      assetsFail: function (msg) { return '无法加载聊天所需资源（' + msg + '）。'; },
+      fileProtocol: '聊天无法在 file:// 页面运行（浏览器会阻止模型和索引加载）。请在本地起一个服务器：\n\npython -m http.server 8000\n\n然后打开 http://localhost:8000 —— 或直接访问线上站点。',
+      greeting: '你好！我可以回答关于王元辰的问题，内容都来自本站页面。请问你是？',
+      viewingAs: function (label) { return '当前身份：' + label + '。有关王元辰的问题都可以问我 —— 回答下方会附上相关页面链接。'; },
+      refused: '这看起来不像是关于王元辰的问题，而我只能回答这方面的内容 —— 他的项目、技能、教育和论文。可以试试这些：',
+      degradedCJK: 'AI 回答服务暂时无法连接，而离线检索目前只支持英文。请稍后再试。',
+      degradedLoading: function (pct) { return '后端暂时无法连接 —— 正在加载离线检索（' + pct + '%）…'; },
+      degradedSources: 'AI 回答服务暂时无法连接，不过这些页面看起来和你的问题最相关：',
+      backendDown: '聊天后端暂时无法连接 —— 请过一会儿再试。',
+      retrievalOnly: '演示目前处于「仅检索」模式（还没接入 LLM），不过这是语义索引为该问题找到的内容 —— 来源见下方：',
+      somethingWrong: function (msg) { return '出错了（' + msg + '）。请再试一次。'; },
+    },
+  };
+  function t(key) {
+    var v = (STR[lang()] || STR.en)[key];
+    if (v === undefined) v = STR.en[key];
+    if (typeof v === 'function') return v.apply(null, Array.prototype.slice.call(arguments, 1));
+    return v;
+  }
+  // Localized role field: role[lang][field] (e.g. role.zh.label) when present,
+  // else the top-level English value. English stays top-level for the function.
+  function L(obj, field) {
+    if (!obj) return undefined;
+    var lz = lang();
+    if (lz !== 'en' && obj[lz] && obj[lz][field] != null) return obj[lz][field];
+    return obj[field];
+  }
 
   // ── State ─────────────────────────────────────────────────────────────
   var state = {
@@ -251,14 +344,14 @@
       if (/[぀-ヿ㐀-鿿豈-﫿]/.test(question)) {
         // The local fallback model is English-only — be honest for CJK.
         thinking.classList.remove('ycchat-dots');
-        thinking.textContent = 'The AI answer service is unreachable right now, and offline search only covers English. Please try again in a minute.';
+        thinking.textContent = t('degradedCJK');
         record.answer = thinking.textContent;
         logTurn(record);
         return;
       }
       var fb = await loadFallbackVectors();
       await ensureExtractor(function (pct) {
-        thinking.textContent = 'Backend unreachable — loading offline search (' + pct + '%)…';
+        thinking.textContent = t('degradedLoading', pct);
         thinking.classList.remove('ycchat-dots');
       });
       var embedFb = async function (t) {
@@ -271,10 +364,10 @@
         : statValue(retrieved.stats, fb.gate_stat || 'top');
       thinking.classList.remove('ycchat-dots');
       if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
-        thinking.textContent = 'That doesn\'t look like a question about YC, and that\'s all I can help with here — his projects, skills, education, and publications. Try one of these:';
+        thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
       } else {
-        thinking.textContent = 'The AI answer service is unreachable right now, but these pages look most relevant to your question:';
+        thinking.textContent = t('degradedSources');
         addSources(retrieved.results);
       }
       record.retrieved = retrieved.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
@@ -282,7 +375,7 @@
       logTurn(record);
     } catch (err2) {
       thinking.classList.remove('ycchat-dots');
-      thinking.textContent = 'The chat backend is unreachable right now — please try again in a minute.';
+      thinking.textContent = t('backendDown');
       logTurn({ event: 'error', role: state.role, question: question, error: String(err2) });
     }
   }
@@ -295,6 +388,7 @@
       body: JSON.stringify({
         session: state.session,
         role: state.role,
+        lang: lang(),
         question: question,
         history: state.history.slice(-6),
         contexts: results.map(function (r) {
@@ -400,14 +494,14 @@
 
   function showRolePicker() {
     els.body.textContent = '';
-    addMsg('note', 'Hi! I answer questions about YC, grounded in the pages of this site. Who\'s visiting?');
+    addMsg('note', t('greeting'));
     var wrap = h('div', 'ycchat-roles');
     Object.keys(state.roles.roles).forEach(function (id) {
       var role = state.roles.roles[id];
       var btn = h('button', 'ycchat-role');
       btn.type = 'button';
-      btn.appendChild(h('b', null, role.label));
-      btn.appendChild(h('span', null, role.tagline));
+      btn.appendChild(h('b', null, L(role, 'label')));
+      btn.appendChild(h('span', null, L(role, 'tagline')));
       btn.addEventListener('click', function () { pickRole(id); });
       wrap.appendChild(btn);
     });
@@ -418,17 +512,17 @@
     state.role = id;
     state.history = [];
     var role = state.roles.roles[id];
-    els.roleChip.textContent = role.label + ' ⌄';
+    els.roleChip.textContent = L(role, 'label') + ' ⌄';
     els.body.textContent = '';
     logTurn({ event: 'role_selected', role: id });
-    addMsg('note', 'Viewing as: ' + role.label + '. Ask me anything about YC — answers link back to the relevant pages.');
+    addMsg('note', t('viewingAs', L(role, 'label')));
     addStarters(role);
     els.input.focus();
   }
 
   function addStarters(role) {
     var starters = h('div', 'ycchat-starters');
-    role.starters.forEach(function (q) {
+    (L(role, 'starters') || []).forEach(function (q) {
       var chip = h('button', 'ycchat-starter', q);
       chip.type = 'button';
       chip.addEventListener('click', function () { send(q); });
@@ -462,7 +556,7 @@
       var record = { event: 'turn', role: state.role, question: question };
       var emb;
       try {
-        emb = await embedQuery(question, stripped || question);
+        emb = await embedQuery(question, gateForm(question, stripped));
       } catch (embErr) {
         if (String(embErr && embErr.message).indexOf('embedding service unavailable') !== 0) throw embErr;
         await degradedTurn(question, stripped, thinking, record);
@@ -492,9 +586,7 @@
       if (refused) {
         record.mode = 'off_topic_refused';
         thinking.classList.remove('ycchat-dots');
-        thinking.textContent =
-          'That doesn\'t look like a question about YC, and that\'s all I can help with here — ' +
-          'his projects, skills, education, and publications. Try one of these:';
+        thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
         record.answer = thinking.textContent;
         logTurn(record);
@@ -513,7 +605,7 @@
       } else {
         record.mode = 'retrieval-only';
         thinking.classList.remove('ycchat-dots');
-        thinking.textContent = 'Demo is in retrieval-only mode (no LLM connected yet), but here\'s what the semantic index surfaces for that — sources below:';
+        thinking.textContent = t('retrievalOnly');
         answer = thinking.textContent;
       }
       addSources(results);
@@ -522,7 +614,7 @@
       logTurn(record);
     } catch (err) {
       thinking.classList.remove('ycchat-dots');
-      thinking.textContent = 'Something went wrong (' + (err && err.message || err) + '). Please try again.';
+      thinking.textContent = t('somethingWrong', (err && err.message || err));
       logTurn({ event: 'error', role: state.role, question: question, error: String(err) });
     } finally {
       state.busy = false;
@@ -534,18 +626,20 @@
   function buildPanel() {
     els.panel = h('div', 'ycchat-panel');
     els.panel.setAttribute('role', 'dialog');
-    els.panel.setAttribute('aria-label', 'Chat with an AI about YC');
+    els.panel.setAttribute('aria-label', t('panelAria'));
 
     var head = h('div', 'ycchat-head');
-    head.appendChild(h('b', null, 'Ask about YC'));
-    els.roleChip = h('button', 'ycchat-rolechip', 'choose role');
+    els.header = h('b', null, t('header'));
+    head.appendChild(els.header);
+    els.roleChip = h('button', 'ycchat-rolechip', t('chooseRole'));
     els.roleChip.type = 'button';
-    els.roleChip.title = 'Change visitor role';
+    els.roleChip.title = t('roleChipTitle');
     els.roleChip.addEventListener('click', function () { if (state.roles) showRolePicker(); });
     head.appendChild(els.roleChip);
     var x = h('button', 'ycchat-x', '✕');
+    els.closeBtn = x;
     x.type = 'button';
-    x.setAttribute('aria-label', 'Close chat');
+    x.setAttribute('aria-label', t('closeAria'));
     x.addEventListener('click', toggle);
     head.appendChild(x);
 
@@ -555,10 +649,10 @@
     var foot = h('div', 'ycchat-foot');
     els.input = h('input', 'ycchat-in');
     els.input.type = 'text';
-    els.input.placeholder = 'Ask about projects, skills…';
+    els.input.placeholder = t('placeholder');
     els.input.maxLength = 500;
     els.input.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
-    els.send = h('button', 'ycchat-send', 'Send');
+    els.send = h('button', 'ycchat-send', t('send'));
     els.send.type = 'button';
     els.send.addEventListener('click', function () { send(); });
     foot.appendChild(els.input);
@@ -594,21 +688,16 @@
       // file:// blocks module imports and fetch — the widget needs a web
       // server. Explain instead of failing with a cryptic import error.
       if (window.location.protocol === 'file:') {
-        addMsg('note',
-          'The chat can\'t run from a file:// page (browsers block the model and index from loading). ' +
-          'Serve the site locally instead:\n\npython -m http.server 8000\n\n' +
-          'then open http://localhost:8000 — or just use the live site.');
+        addMsg('note', t('fileProtocol'));
         return;
       }
       var needLocalModel = !WORKER_URL; // backend embeds server-side when configured
-      var status = addMsg('note', needLocalModel
-        ? 'Loading the on-device search model (~23 MB, cached after the first visit)…'
-        : 'Loading…');
+      var status = addMsg('note', needLocalModel ? t('loadingModel') : t('loadingGeneric'));
       var ready = loadCore();
       if (needLocalModel) {
         ready = ready.then(function () {
           return ensureExtractor(function (pct) {
-            status.textContent = 'Loading the on-device search model… ' + pct + '%';
+            status.textContent = t('loadingModelPct', pct);
           });
         });
       }
@@ -616,20 +705,42 @@
         logTurn({ event: 'assets_loaded', remote_embed: !!WORKER_URL });
         showRolePicker();
       }).catch(function (err) {
-        status.textContent = 'Could not load the chat assets (' + (err && err.message || err) + ').';
+        status.textContent = t('assetsFail', (err && err.message || err));
         logTurn({ event: 'error', error: String(err) });
       });
     }
   }
 
+  // Re-localize every already-rendered piece of chrome when the site toggle
+  // fires. Live conversation messages keep their original language; only the
+  // role picker (if that's the current view) re-renders.
+  function applyLang() {
+    if (els.btn) {
+      els.btn.textContent = t('askBtn');
+      els.btn.setAttribute('aria-label', t('openAria'));
+    }
+    if (!els.panel) return;
+    els.panel.setAttribute('aria-label', t('panelAria'));
+    if (els.header) els.header.textContent = t('header');
+    els.roleChip.title = t('roleChipTitle');
+    els.roleChip.textContent = (state.role && state.roles)
+      ? L(state.roles.roles[state.role], 'label') + ' ⌄'
+      : t('chooseRole');
+    if (els.closeBtn) els.closeBtn.setAttribute('aria-label', t('closeAria'));
+    els.input.placeholder = t('placeholder');
+    els.send.textContent = t('send');
+    if (state.open && state.roles && !state.role) showRolePicker();
+  }
+
   function init() {
     injectStyles();
-    els.btn = h('button', 'ycchat-btn', '✦ ASK AI');
+    els.btn = h('button', 'ycchat-btn', t('askBtn'));
     els.btn.type = 'button';
     els.btn.setAttribute('aria-expanded', 'false');
-    els.btn.setAttribute('aria-label', 'Open AI chat about YC');
+    els.btn.setAttribute('aria-label', t('openAria'));
     els.btn.addEventListener('click', toggle);
     document.body.appendChild(els.btn);
+    window.addEventListener('yc-langchange', applyLang);
   }
 
   if (document.readyState === 'loading') {

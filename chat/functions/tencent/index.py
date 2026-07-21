@@ -458,6 +458,13 @@ class Handler(BaseHTTPRequestHandler):
             f"{roles_data['base_system_prompt']}\n\n"
             f"Visitor role: {role['label']}. {role['system_prompt']}"
         )
+        # Answer in the site's active language (the widget sends it from the
+        # 中/EN toggle), regardless of the question's own language.
+        answer_lang = body.get("lang") if body.get("lang") in ("en", "zh") else None
+        if answer_lang == "zh":
+            system_head += "\n\nAlways answer in Chinese (简体中文), regardless of the language the question is written in."
+        elif answer_lang == "en":
+            system_head += "\n\nAlways answer in English, regardless of the language the question is written in."
         system = f"{system_head}\n\nContext retrieved from the site for this question:\n{context_block}"
         messages = list(body.get("history") or []) + [{"role": "user", "content": body["question"]}]
 

@@ -86,6 +86,8 @@
     if (LANGS.indexOf(lang) < 0) lang = 'en';
     store(lang);
     apply(lang);
+    // Let other components (e.g. the chat widget) re-localize on toggle.
+    try { window.dispatchEvent(new CustomEvent('yc-langchange', { detail: lang })); } catch (e) {}
   }
 
   function init() {

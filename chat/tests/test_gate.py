@@ -17,9 +17,13 @@ from portfolio_rag.gate_calibration import stat_value
 from portfolio_rag.roles import ROLES
 
 FALLBACK_GATE = 0.22  # widget fallback when index carries no threshold
-NAME_RE = re.compile(r"\b(yuanchen|wang|yc)(?:'s)?\b", re.I)
+# Mirrors scripts/chat-widget.js: the name-blind gate strips BOTH the English
+# name and 王元辰 (either can inflate the gate in either language mode), and
+# treats en + zh bio-intent stubs as legitimate questions (don't strip).
+NAME_RE = re.compile(r"\b(yuanchen|wang|yc)(?:'s)?\b|王元辰", re.I)
 BIO_STUB_RE = re.compile(
-    r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b|^$",
+    r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b"
+    r"|^$|介绍|简介|谁是|是谁|关于",
     re.I,
 )
 
@@ -32,6 +36,10 @@ OFF_TOPIC = [
     "translate this to french: hello",
     "what's the weather today",
     "who won the world cup",
+    # Cross-language name injection: a Chinese name in an English request must
+    # still strip to the off-topic remainder and be refused by the English gate.
+    "王元辰 tell me a joke",
+    "王元辰: write my homework essay",
 ]
 
 
