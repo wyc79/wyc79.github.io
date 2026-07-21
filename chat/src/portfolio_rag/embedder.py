@@ -37,8 +37,18 @@ class OnnxEmbedder:
         self.pooling = pooling
         self.tokenizer = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
         self.tokenizer.enable_truncation(max_length=max_tokens)
+        # Deterministic, reproducible embeddings. Dynamically-quantized MatMul is
+        # otherwise nondeterministic run-to-run (CPU memory-arena reuse can corrupt
+        # a few activations), which flakes gate calibration and tests/test_gate.py
+        # near the threshold. This module runs only at build/test time on tiny
+        # single-text inputs, so single-threaded + no arena costs nothing.
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = 1
+        so.inter_op_num_threads = 1
+        so.enable_cpu_mem_arena = False
         self.session = ort.InferenceSession(
             str(model_dir / "onnx" / "model_quantized.onnx"),
+            so,
             providers=["CPUExecutionProvider"],
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
@@ -74,6 +84,17 @@ class OnnxEmbedder:
     def embed_query(self, text: str) -> np.ndarray:
         return self._run_one(self.query_prefix + text)
 
+    @classmethod
+    def from_preset(cls, preset: dict, model_dir, max_tokens: int) -> "OnnxEmbedder":
+        """Build from a MODEL_PRESETS entry — the one place prefixes/pooling are unpacked."""
+        return cls(
+            model_dir,
+            max_tokens=max_tokens,
+            query_prefix=preset["query_prefix"],
+            passage_prefix=preset["passage_prefix"],
+            pooling=preset.get("pooling", "mean"),
+        )
+
 
 def get_embedder() -> OnnxEmbedder:
     global _embedder
@@ -81,11 +102,9 @@ def get_embedder() -> OnnxEmbedder:
         from portfolio_rag.config import settings
 
         preset = settings.preset
-        _embedder = OnnxEmbedder(
+        _embedder = OnnxEmbedder.from_preset(
+            preset,
             settings.resolve_path(preset["dir"]),
-            max_tokens=settings.embedding_max_tokens,
-            query_prefix=preset["query_prefix"],
-            passage_prefix=preset["passage_prefix"],
-            pooling=preset.get("pooling", "mean"),
+            settings.embedding_max_tokens,
         )
     return _embedder

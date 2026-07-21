@@ -86,8 +86,17 @@ def _load_model(dir_name: str) -> tuple:
         raise FileNotFoundError(f"{dir_name} not packaged")
     tok = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
     tok.enable_truncation(max_length=int(env("EMBED_MAX_TOKENS", "256")))
+    # Deterministic session. Dynamically-quantized MatMul is otherwise
+    # nondeterministic run-to-run: with several quantized models loaded (embed +
+    # en/zh gates), CPU memory-arena reuse can corrupt a few activations and push
+    # a gate score across the threshold (a rare false refusal). One short query
+    # per request, so single-threaded + no arena costs nothing.
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = 1
+    so.inter_op_num_threads = 1
+    so.enable_cpu_mem_arena = False
     session = ort.InferenceSession(
-        str(model_dir / "onnx" / "model_quantized.onnx"), providers=["CPUExecutionProvider"]
+        str(model_dir / "onnx" / "model_quantized.onnx"), so, providers=["CPUExecutionProvider"]
     )
     return tok, session
 

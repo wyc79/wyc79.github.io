@@ -11,8 +11,8 @@ import re
 import numpy as np
 import pytest
 
-from portfolio_rag.config import settings
-from portfolio_rag.embedder import get_embedder
+from portfolio_rag.config import MODEL_PRESETS, settings
+from portfolio_rag.embedder import OnnxEmbedder, get_embedder
 from portfolio_rag.gate_calibration import stat_value
 from portfolio_rag.roles import ROLES
 
@@ -23,7 +23,7 @@ FALLBACK_GATE = 0.22  # widget fallback when index carries no threshold
 NAME_RE = re.compile(r"\b(yuanchen|wang|yc)(?:'s)?\b|王元辰", re.I)
 BIO_STUB_RE = re.compile(
     r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b"
-    r"|^$|介绍|简介|谁是|是谁|关于"
+    r"|^$|介绍<简介|谁是|是谁|关于"
     # "what can he do / skills" reads as general-about intent — a name-bearing
     # "王元辰都会什么" must NOT be stripped to the weak "都会什么" fragment. The
     # 会什么/擅长什么 forms are end-anchored so "会什么时候讲笑话" still strips.
@@ -53,26 +53,46 @@ def index():
 
 
 @pytest.fixture(scope="module")
-def matrix(index):
-    return np.array([c["vector"] for c in index["chunks"]], dtype=np.float32)
+def en_gate(index):
+    """The English off-topic gate exactly as the runtime applies it.
+
+    For an e5 retrieval index the gate is NOT the index itself: the backend runs
+    MiniLM against a MiniLM copy of the chunk vectors published in
+    gate_vectors.json["en"] (e5 cosines compress into a band that can't separate
+    on-/off-topic). For a light-mode MiniLM index there is no gate_vectors.json
+    and the index IS the gate matrix. Either way the query embedder must match
+    the matrix — dotting a MiniLM query against e5 chunk vectors is meaningless.
+    Returns (embedder, matrix, {stat, threshold}).
+    """
+    gate_vectors_path = settings.resolve_path(settings.gate_vectors_path)
+    en = None
+    if gate_vectors_path.exists():
+        en = json.loads(gate_vectors_path.read_text(encoding="utf-8")).get("en")
+    if en is not None:
+        preset = MODEL_PRESETS[en["model_preset"]]
+        embedder = OnnxEmbedder.from_preset(
+            preset, settings.resolve_path(preset["dir"]), settings.embedding_max_tokens
+        )
+        matrix = np.array(en["vectors"], dtype=np.float32)
+        gate = {"stat": en.get("gate_stat", "top"), "threshold": en["gate_threshold"]}
+    else:
+        embedder = get_embedder()
+        matrix = np.array([c["vector"] for c in index["chunks"]], dtype=np.float32)
+        gate = {
+            "stat": index.get("gate_stat", "top"),
+            "threshold": index.get("gate_threshold", FALLBACK_GATE),
+        }
+    return embedder, matrix, gate
 
 
-@pytest.fixture(scope="module")
-def gate(index):
-    return {
-        "stat": index.get("gate_stat", "top"),
-        "threshold": index.get("gate_threshold", FALLBACK_GATE),
-    }
-
-
-def gate_passes(question: str, matrix: np.ndarray, gate: dict) -> bool:
-    emb = get_embedder()
+def gate_passes(question: str, en_gate) -> bool:
+    embedder, matrix, gate = en_gate
     text = question
     if NAME_RE.search(question):
         stripped = re.sub(r"\s+", " ", NAME_RE.sub(" ", question)).strip().strip(":;,.!?—- ").strip()
         if not BIO_STUB_RE.match(stripped):
             text = stripped
-    scores = matrix @ emb.embed_query(text)
+    scores = matrix @ embedder.embed_query(text)
     return stat_value(scores, gate["stat"]) >= gate["threshold"]
 
 
@@ -81,16 +101,16 @@ def test_index_carries_a_calibrated_gate(index) -> None:
     assert isinstance(index["gate_threshold"], float) and index["gate_threshold"] > 0
 
 
-def test_every_role_starter_passes_the_gate(matrix, gate) -> None:
+def test_every_role_starter_passes_the_gate(en_gate) -> None:
     failures = [
         f"[{rid}] {starter}"
         for rid, role in ROLES.items()
         for starter in role["starters"]
-        if not gate_passes(starter, matrix, gate)
+        if not gate_passes(starter, en_gate)
     ]
     assert not failures, f"starters refused by the widget's own gate: {failures}"
 
 
 @pytest.mark.parametrize("question", OFF_TOPIC)
-def test_off_topic_questions_are_refused(question: str, matrix, gate) -> None:
-    assert not gate_passes(question, matrix, gate), f"off-topic question passed the gate: {question}"
+def test_off_topic_questions_are_refused(question: str, en_gate) -> None:
+    assert not gate_passes(question, en_gate), f"off-topic question passed the gate: {question}"

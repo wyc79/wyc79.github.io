@@ -47,13 +47,7 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
     if not sections:
         logger.info("zh gate: skipped (knowledge/about_zh.md has no sections yet)")
         return None
-    embedder = OnnxEmbedder(
-        model_dir,
-        max_tokens=settings.embedding_max_tokens,
-        query_prefix=zh_preset["query_prefix"],
-        passage_prefix=zh_preset["passage_prefix"],
-        pooling=zh_preset.get("pooling", "mean"),
-    )
+    embedder = OnnxEmbedder.from_preset(zh_preset, model_dir, settings.embedding_max_tokens)
     vecs = np.round(embedder.embed_documents([s.text for s in sections]).astype(float), ndigits)
     gate = compute_gate(embedder, vecs.astype(np.float32), on=ON_TOPIC_ZH, off=OFF_TOPIC_ZH)
     if gate["margin"] <= 0 and not os.environ.get("RAG_ZH_GATE_FORCE"):
@@ -143,12 +137,10 @@ def build_index(site_root: Path | None = None) -> dict:
     gate_model = preset.get("gate_model")
     if gate_model:
         gate_preset = MODEL_PRESETS[gate_model]
-        gate_embedder = OnnxEmbedder(
+        gate_embedder = OnnxEmbedder.from_preset(
+            gate_preset,
             settings.resolve_path(gate_preset["dir"]),
-            max_tokens=settings.embedding_max_tokens,
-            query_prefix=gate_preset["query_prefix"],
-            passage_prefix=gate_preset["passage_prefix"],
-            pooling=gate_preset.get("pooling", "mean"),
+            settings.embedding_max_tokens,
         )
         # The MiniLM en gate (and the degraded fallback) cover ONLY the English
         # chunks: MiniLM can't embed Chinese, so including zh chunks re-adds the
