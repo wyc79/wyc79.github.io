@@ -718,3 +718,24 @@ html[data-theme="dark"] .p3-root {
   background: #000000;
 }
 
+
+/* Section headings inside project detail pages — bold + an underline rule so
+   they read clearly against the body copy (added per feedback: hard to see). */
+.project-body h3 {
+  font-weight: 700;
+  border-bottom: 2px solid var(--fg);
+  padding-bottom: .3rem;
+  margin-bottom: .6rem;
+}
+.project-body h4 {
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: .25rem;
+  margin-bottom: .5rem;
+}
+/* Diagram-card titles already sit inside a bordered card — keep them plain. */
+.project-body .diagram-card h3 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: .25rem;
+}

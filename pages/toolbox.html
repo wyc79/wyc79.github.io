@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Toolbox</title>
+  <title data-en="Toolbox — Yuanchen Wang" data-zh="工具箱 — Yuanchen Wang">Toolbox</title>
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
   <style>
@@ -45,39 +46,39 @@
       <section>
         <div class="tabs">
           <div class="tablist" role="tablist" aria-label="Toolbox tabs">
-            <button class="tab-button" role="tab" type="button" id="tab-wordcloud" data-tab-target="panel-wordcloud" aria-controls="panel-wordcloud" aria-selected="false">Word Cloud</button>
-            <button class="tab-button" role="tab" type="button" id="tab-qrcode" data-tab-target="panel-qrcode" aria-controls="panel-qrcode" aria-selected="true">QR Code Generator</button>
+            <button class="tab-button" role="tab" type="button" id="tab-wordcloud" data-tab-target="panel-wordcloud" aria-controls="panel-wordcloud" aria-selected="false" data-en="Word Cloud" data-zh="词云">Word Cloud</button>
+            <button class="tab-button" role="tab" type="button" id="tab-qrcode" data-tab-target="panel-qrcode" aria-controls="panel-qrcode" aria-selected="true" data-en="QR Code Generator" data-zh="二维码生成器">QR Code Generator</button>
           </div>
           <div class="tab-panel" id="panel-wordcloud" role="tabpanel" aria-labelledby="tab-wordcloud" tabindex="0" hidden>
-            <h2>Word Cloud Generator</h2>
-            <p class="meta">Paste text below and click Generate.</p>
+            <h2><span data-lang="en">Word Cloud Generator</span><span data-lang="zh">词云生成器</span></h2>
+            <p class="meta"><span data-lang="en">Paste text below and click Generate.</span><span data-lang="zh">在下方粘贴文本，然后点击“生成”。</span></p>
             <label for="wc-input" class="visually-hidden">Text input</label>
-            <textarea id="wc-input" rows="12" style="width:100%;" placeholder="Paste or type text here...">Nothing Can Go Wrong is a design exploration in indirect control and consequence-driven planning. Instead of piloting the protagonist moment-to-moment, players design a route and then watch their plan unfold, for better or worse, as environmental objects react in surprising ways. The appeal—and the difficulty—comes from predicting emergent interactions while still feeling empowered by a plan that was yours. My responsibilities covered concept ideation, systems design, engineering, and integration of artist-created assets in Godot. The core loop began with a lightweight pathing tool, but the heart of the experience emerged from environmental 'verbs': train tracks, whirlpools, spring pads, trapdoors, and chain reactions that could delight or derail. Balancing readability with surprise required strict rules and effective feedback animation that help the player learn the world's grammar. Difficulty tuning was driven by data rather than guesswork; I exposed parameters for moving speeds, impulse strength, and trigger sequencing, allowing tight loops of test–tweak–test within the jam's limited timeframe. The art pass focused on clarity and charm: silhouettes that read at a glance, restrained palettes, and motion that communicates function. We achieved a polished, playable demo on schedule and ranked in the top 20% overall. Post-jam, I'd extend the system with better text and visual explanation so players can gradually learn the mechanics, add optional objectives for mastery, and implement robust replays to encourage sharing. Most importantly, the project validated a personal design interest: agency through foresight. When players laugh at a plan that almost worked—and instantly want to iterate—you've got a loop worth growing.</textarea>
+            <textarea id="wc-input" rows="12" style="width:100%;" placeholder="Paste or type text here..." data-ph-en="Paste or type text here..." data-ph-zh="在此粘贴或输入文本…">Nothing Can Go Wrong is a design exploration in indirect control and consequence-driven planning. Instead of piloting the protagonist moment-to-moment, players design a route and then watch their plan unfold, for better or worse, as environmental objects react in surprising ways. The appeal—and the difficulty—comes from predicting emergent interactions while still feeling empowered by a plan that was yours. My responsibilities covered concept ideation, systems design, engineering, and integration of artist-created assets in Godot. The core loop began with a lightweight pathing tool, but the heart of the experience emerged from environmental 'verbs': train tracks, whirlpools, spring pads, trapdoors, and chain reactions that could delight or derail. Balancing readability with surprise required strict rules and effective feedback animation that help the player learn the world's grammar. Difficulty tuning was driven by data rather than guesswork; I exposed parameters for moving speeds, impulse strength, and trigger sequencing, allowing tight loops of test–tweak–test within the jam's limited timeframe. The art pass focused on clarity and charm: silhouettes that read at a glance, restrained palettes, and motion that communicates function. We achieved a polished, playable demo on schedule and ranked in the top 20% overall. Post-jam, I'd extend the system with better text and visual explanation so players can gradually learn the mechanics, add optional objectives for mastery, and implement robust replays to encourage sharing. Most importantly, the project validated a personal design interest: agency through foresight. When players laugh at a plan that almost worked—and instantly want to iterate—you've got a loop worth growing.</textarea>
             <div style="margin-top:.5rem; display:flex; gap:.75rem; align-items:center; flex-wrap: wrap;">
-              <label>Max words: <input type="number" id="wc-max" min="10" max="1000" value="200" style="width:6rem;" /></label>
-              <label>Rotation: <select id="wc-rotate"><option value="0">0°</option><option value="90">0°/90°</option></select></label>
-              <label>Scale: <select id="wc-scale"><option value="sqrt">√n</option><option value="linear">n</option><option value="log">log n</option></select></label>
-              <button class="toggle" id="wc-generate" type="button">Generate</button>
-              <button class="toggle" id="wc-download" type="button" disabled>Download SVG</button>
-              <button class="toggle" id="wc-download-png" type="button" disabled>Download PNG</button>
+              <label><span data-lang="en">Max words:</span><span data-lang="zh">最大词数：</span> <input type="number" id="wc-max" min="10" max="1000" value="200" style="width:6rem;" /></label>
+              <label><span data-lang="en">Rotation:</span><span data-lang="zh">旋转：</span> <select id="wc-rotate"><option value="0">0°</option><option value="90">0°/90°</option></select></label>
+              <label><span data-lang="en">Scale:</span><span data-lang="zh">缩放：</span> <select id="wc-scale"><option value="sqrt">√n</option><option value="linear">n</option><option value="log">log n</option></select></label>
+              <button class="toggle" id="wc-generate" type="button" data-en="Generate" data-zh="生成">Generate</button>
+              <button class="toggle" id="wc-download" type="button" disabled data-en="Download SVG" data-zh="下载 SVG">Download SVG</button>
+              <button class="toggle" id="wc-download-png" type="button" disabled data-en="Download PNG" data-zh="下载 PNG">Download PNG</button>
             </div>
             <div id="wc-container" style="width:100%; border: 1px dashed var(--border, #ccc); margin-top: .75rem;"></div>
-            <p class="meta" style="margin-top:.75rem;">Reference: <a href="https://www.jasondavies.com/wordcloud/" target="_blank" rel="noopener">Jason Davies’ Word Cloud</a></p>
+            <p class="meta" style="margin-top:.75rem;"><span data-lang="en">Reference: </span><span data-lang="zh">参考：</span><a href="https://www.jasondavies.com/wordcloud/" target="_blank" rel="noopener">Jason Davies’ Word Cloud</a></p>
           </div>
           <div class="tab-panel" id="panel-qrcode" role="tabpanel" aria-labelledby="tab-qrcode" tabindex="0">
-            <h2>QR Code Generator</h2>
-            <p class="meta">Enter text or a URL below and click Generate.</p>
+            <h2><span data-lang="en">QR Code Generator</span><span data-lang="zh">二维码生成器</span></h2>
+            <p class="meta"><span data-lang="en">Enter text or a URL below and click Generate.</span><span data-lang="zh">在下方输入文本或网址，然后点击“生成”。</span></p>
             <label for="qr-input" class="visually-hidden">QR code text input</label>
-            <textarea id="qr-input" rows="6" style="width:100%;" placeholder="Enter text or a URL..."></textarea>
+            <textarea id="qr-input" rows="6" style="width:100%;" placeholder="Enter text or a URL..." data-ph-en="Enter text or a URL..." data-ph-zh="输入文本或网址…"></textarea>
             <div style="margin-top:.5rem; display:flex; gap:.75rem; align-items:center; flex-wrap: wrap;">
-              <label>Size (px): <input type="number" id="qr-size" min="64" max="1024" value="512" style="width:6rem;" /></label>
-              <button class="toggle" id="qr-generate" type="button">Generate</button>
-              <button class="toggle" id="qr-download" type="button" disabled>Download PNG</button>
+              <label><span data-lang="en">Size (px):</span><span data-lang="zh">尺寸 (px)：</span> <input type="number" id="qr-size" min="64" max="1024" value="512" style="width:6rem;" /></label>
+              <button class="toggle" id="qr-generate" type="button" data-en="Generate" data-zh="生成">Generate</button>
+              <button class="toggle" id="qr-download" type="button" disabled data-en="Download PNG" data-zh="下载 PNG">Download PNG</button>
             </div>
             <div id="qr-output" style="max-width:512px; min-height:160px; border: 1px dashed var(--border, #ccc); margin: .75rem auto 0; display:flex; align-items:center; justify-content:center; padding:1rem;">
-              <p class="meta" style="text-align:center;">QR code preview will appear here.</p>
+              <p class="meta" style="text-align:center;"><span data-lang="en">QR code preview will appear here.</span><span data-lang="zh">二维码预览将显示在此处。</span></p>
             </div>
-            <p class="meta" style="margin-top:.75rem;">Reference: <a href="https://github.com/davidshimjs/qrcodejs" target="_blank" rel="noopener">QRCode.js</a></p>
+            <p class="meta" style="margin-top:.75rem;"><span data-lang="en">Reference: </span><span data-lang="zh">参考：</span><a href="https://github.com/davidshimjs/qrcodejs" target="_blank" rel="noopener">QRCode.js</a></p>
           </div>
         </div>
       </section>
@@ -90,5 +91,3 @@
   <script src="../scripts/wordcloud.js"></script>
 </body>
 </html>
-
-

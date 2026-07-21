@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Yuanchen Wang — Portfolio</title>
+  <title data-en="Yuanchen Wang — Portfolio" data-zh="王元辰 — 作品集">Yuanchen Wang — Portfolio</title>
   <meta name="description" content="Portfolio of YC Wang — aspiring game developer with a background in psychology, neuroscience, and biomedical informatics." />
   <link rel="icon" type="image/png" href="images/wyc.png" />
   <link rel="stylesheet" href="styles.css" />
   <script src="scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
   <script src="scripts/theme.js"></script>
+  <script src="scripts/i18n.js"></script>
   <script src="scripts/chat-widget.js" defer></script>
 </head>
 <body id="top" class="p3-body">
@@ -19,10 +20,13 @@
       <img src="images/wyc.png" alt="Yuanchen Wang logo" />
       <div>
         <div class="p3-brand-name">YUANCHEN WANG</div>
-        <div class="p3-brand-sub">GAME&nbsp;DEVELOPER&nbsp;&middot;&nbsp;USC&nbsp;MSCS</div>
+        <div class="p3-brand-sub">
+          <span data-lang="en">GAME&nbsp;DEVELOPER&nbsp;&middot;&nbsp;USC&nbsp;MSCS</span>
+          <span data-lang="zh">游戏开发者&nbsp;&middot;&nbsp;USC&nbsp;计算机硕士</span>
+        </div>
       </div>
       <button type="button" id="themeToggle" class="p3-theme-toggle" aria-label="Toggle theme">THEME</button>
-      <button type="button" id="languageToggle" class="p3-theme-toggle" aria-label="Change language">中 / EN</button>
+      <button type="button" id="languageToggle" class="p3-theme-toggle" aria-label="Change language">中文</button>
     </div>
 
     <div class="p3-brand-links">
@@ -34,8 +38,8 @@
     <nav class="p3-menu" aria-label="Primary sections"></nav>
 
     <div class="p3-hint" aria-hidden="true">
-      <div class="p3-hint-row"><span class="p3-hint-key">&uarr;&darr;</span><span>NAVIGATE</span></div>
-      <div class="p3-hint-row"><span class="p3-hint-key">&crarr;</span><span>CONFIRM</span></div>
+      <div class="p3-hint-row"><span class="p3-hint-key">&uarr;&darr;</span><span data-lang="en">NAVIGATE</span><span data-lang="zh">导航</span></div>
+      <div class="p3-hint-row"><span class="p3-hint-key">&crarr;</span><span data-lang="en">CONFIRM</span><span data-lang="zh">确认</span></div>
     </div>
   </section>
 
