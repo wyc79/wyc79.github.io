@@ -44,7 +44,7 @@ OFF_TOPIC = [
 ]
 
 # Chinese sets: used to calibrate the zh gate (bge-zh vs the hand-written
-# knowledge_zh corpus), and appended for multilingual presets.
+# knowledge/about_zh.md corpus), and appended for multilingual presets.
 ON_TOPIC_ZH = [
     "他做过哪些战斗设计工作",
     "介绍一下他的游戏引擎开发经验",

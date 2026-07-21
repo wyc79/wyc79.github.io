@@ -29,23 +29,23 @@ SCHEMA_VERSION = 2
 
 
 def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
-    """Chinese first-pass gate: bge-zh over the hand-written knowledge_zh
-    corpus. Evidence-gated — only enabled if calibration on the zh query
-    sets actually separates (otherwise the backend keeps the CJK bypass).
-    Set RAG_ZH_GATE_FORCE=1 to write it despite overlap (testing only)."""
+    """Chinese first-pass gate: bge-zh over the hand-written
+    knowledge/about_zh.md corpus. Evidence-gated — only enabled if calibration
+    on the zh query sets actually separates (otherwise the backend keeps the
+    CJK bypass). Set RAG_ZH_GATE_FORCE=1 to write it despite overlap (testing)."""
     zh_model = preset.get("gate_model_zh")
     if not zh_model:
         return None
     zh_preset = MODEL_PRESETS[zh_model]
     model_dir = settings.resolve_path(zh_preset["dir"])
-    corpus_dir = settings.chat_root / "knowledge_zh"
+    corpus_dir = settings.chat_root / "knowledge"
     if not model_dir.is_dir() or not corpus_dir.is_dir():
-        logger.info("zh gate: skipped (%s missing)", "model" if not model_dir.is_dir() else "knowledge_zh/")
+        logger.info("zh gate: skipped (%s missing)", "model" if not model_dir.is_dir() else "knowledge/")
         return None
 
-    sections = load_knowledge(corpus_dir)
+    sections = load_knowledge(corpus_dir, "zh")
     if not sections:
-        logger.info("zh gate: skipped (knowledge_zh has no sections yet)")
+        logger.info("zh gate: skipped (knowledge/about_zh.md has no sections yet)")
         return None
     embedder = OnnxEmbedder(
         model_dir,
@@ -76,27 +76,50 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
 def build_index(site_root: Path | None = None) -> dict:
     t0 = time.time()
     site_root = site_root or settings.site_root
-    sections = load_site(site_root)
+    preset = settings.preset
+
+    # A multilingual retrieval model (e5) gets a DE-INTERLEAVED bilingual index:
+    # clean English-only sections then clean Chinese-only sections (en first),
+    # instead of the en+zh-interleaved chunks the bilingual pages would produce
+    # under one get_text(). Two payoffs: (1) each chunk vector is monolingual,
+    # so retrieval isn't muddied; (2) the MiniLM en gate + degraded fallback
+    # (below) can cover just the English prefix — MiniLM can't embed zh, and
+    # mixing zh in poisons the gate. A monolingual model (minilm) keeps the
+    # original single-view build and id scheme (no lang segment).
+    if preset["multilingual"]:
+        tagged = [(s, "en") for s in load_site(site_root, "en")] + [
+            (s, "zh") for s in load_site(site_root, "zh")
+        ]
+    else:
+        tagged = [(s, None) for s in load_site(site_root)]
 
     chunks: list[dict] = []
-    section_ordinal: dict[str, int] = defaultdict(int)  # per-page section counter
-    for sec in sections:
-        ordinal = section_ordinal[sec.url]
-        section_ordinal[sec.url] += 1
+    section_ordinal: dict[tuple, int] = defaultdict(int)  # per (page, lang) counter
+    for sec, lang in tagged:
+        ordinal = section_ordinal[(sec.url, lang)]
+        section_ordinal[(sec.url, lang)] += 1
         # Anchor-less sections fall back to their per-page ordinal so two of
-        # them on the same page can never share an id.
+        # them on the same page can never share an id. In the bilingual build
+        # the en/zh copies of a section share url+anchor, so a lang segment in
+        # the id keeps them distinct.
         anchor_part = sec.anchor or f"sec{ordinal}"
         for i, piece in enumerate(chunk_text(sec.text, settings.chunk_size, settings.chunk_overlap)):
-            chunks.append(
-                {
-                    "id": f"{sec.url}#{anchor_part}:{i}",
-                    "url": sec.url,
-                    "anchor": sec.anchor,
-                    "page_title": sec.page_title,
-                    "section_title": sec.section_title,
-                    "text": piece,
-                }
+            cid = (
+                f"{sec.url}#{anchor_part}:{i}"
+                if lang is None
+                else f"{sec.url}#{anchor_part}:{lang}:{i}"
             )
+            chunk = {
+                "id": cid,
+                "url": sec.url,
+                "anchor": sec.anchor,
+                "page_title": sec.page_title,
+                "section_title": sec.section_title,
+                "text": piece,
+            }
+            if lang is not None:
+                chunk["lang"] = lang
+            chunks.append(chunk)
 
     ids = [c["id"] for c in chunks]
     if len(set(ids)) != len(ids):
@@ -104,7 +127,6 @@ def build_index(site_root: Path | None = None) -> dict:
         raise ValueError(f"duplicate chunk ids: {dupes[:5]}")
 
     embedder = get_embedder()
-    preset = settings.preset
     vectors = embedder.embed_documents([c["text"] for c in chunks])
     ndigits = settings.vector_round_decimals
     for chunk, vector in zip(chunks, vectors):
@@ -124,7 +146,15 @@ def build_index(site_root: Path | None = None) -> dict:
             passage_prefix=gate_preset["passage_prefix"],
             pooling=gate_preset.get("pooling", "mean"),
         )
-        gate_vecs = gate_embedder.embed_documents([c["text"] for c in chunks])
+        # The MiniLM en gate (and the degraded fallback) cover ONLY the English
+        # chunks: MiniLM can't embed Chinese, so including zh chunks re-adds the
+        # off-topic hubness the gate exists to avoid. In the bilingual build the
+        # en chunks are the index PREFIX (built first), so fallback.vectors[i]
+        # still lines up with index.chunks[i] and the widget's English-only
+        # degraded loop naturally stops before the zh chunks. For a monolingual
+        # build every chunk is "en" here, so this is a no-op.
+        en_chunks = [c for c in chunks if c.get("lang") != "zh"]
+        gate_vecs = gate_embedder.embed_documents([c["text"] for c in en_chunks])
         gate_vecs = np.round(gate_vecs.astype(float), ndigits)
         gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
                             multilingual=gate_preset["multilingual"])
@@ -136,7 +166,7 @@ def build_index(site_root: Path | None = None) -> dict:
                 "pooling": gate_preset.get("pooling", "mean"),
                 "gate_stat": gate["stat"],
                 "gate_threshold": gate["threshold"],
-                "chunk_ids": [c["id"] for c in chunks],
+                "chunk_ids": [c["id"] for c in en_chunks],
                 "vectors": gate_vecs.tolist(),
             }
         }
@@ -147,7 +177,8 @@ def build_index(site_root: Path | None = None) -> dict:
         gate_path.write_text(json.dumps(gate_payload, ensure_ascii=False), encoding="utf-8")
 
         # Published fallback for the widget's degraded mode (backend down):
-        # same MiniLM vectors, chunk-order aligned with index.json.
+        # MiniLM vectors of the English chunks, order-aligned with the English
+        # prefix of index.json (see en_chunks note above).
         fallback = {
             "model": gate_preset["name"],
             "query_prefix": gate_preset["query_prefix"],
@@ -187,10 +218,10 @@ def build_index(site_root: Path | None = None) -> dict:
         json.dumps(roles_payload(), ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    pages = {s.url for s in sections}
+    pages = {c["url"] for c in chunks}
     return {
         "pages": len(pages),
-        "sections": len(sections),
+        "sections": len(tagged),
         "chunks": len(chunks),
         "index_kb": round(index_path.stat().st_size / 1024, 1),
         "gate_stat": gate["stat"],

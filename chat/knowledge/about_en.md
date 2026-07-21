@@ -1,9 +1,14 @@
-# Curated chunks for the chat index
+# knowledge/about_en.md — English curated chunks (retrieval + en gate)
 
 Sections below are indexed alongside the site pages (see loader.load_knowledge).
 They exist because visitors ask in hiring vocabulary the pages themselves never
 use — resume, CV, background, qualifications. Keep every fact consistent with
 the actual site pages; rebuild the index after editing.
+
+Naming: both languages live in this one folder split by suffix — about_en.md
+(this file, English) and about_zh.md (Chinese, the bge-zh gate corpus).
+load_knowledge(dir, lang) reads only *_<lang>.md, so the en gate never ingests
+zh chunks and vice-versa.
 
 ## Resume highlights
 link: pages/projects.html

@@ -51,7 +51,7 @@ _rate_lock = threading.Lock()
 _embed = {"lock": threading.Lock(), "session": None, "tokenizer": None, "error": None,
           "prefix": "", "pooling": "mean"}
 # Two gate bundles: "en" (MiniLM vs the chunk vectors) and optionally "zh"
-# (bge-zh vs the hand-written knowledge_zh corpus). CJK queries use zh when
+# (bge-zh vs the hand-written knowledge/about_zh.md corpus). CJK queries use zh when
 # available, otherwise bypass to the LLM-prompt guard.
 _gates: dict = {"en": None, "zh": None}
 

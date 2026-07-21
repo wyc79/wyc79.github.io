@@ -25,7 +25,7 @@ MODEL_PRESETS: dict[str, dict] = {
         # MiniLM copy of the chunk vectors + threshold via gate_vectors.json.
         "gate_model": "minilm",
         # Chinese first-pass gate: bge-zh scores zh queries against the
-        # hand-written zh gate corpus (knowledge_zh/). Enabled by the build
+        # hand-written zh gate corpus (knowledge/about_zh.md). Enabled by the build
         # only if its calibration actually separates on/off-topic.
         "gate_model_zh": "bge_zh",
     },

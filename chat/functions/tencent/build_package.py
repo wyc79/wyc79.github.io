@@ -138,10 +138,12 @@ def main() -> None:
 
     # If the zh gate corpus has content, its model must exist BEFORE the
     # index build (which embeds + calibrates it). Empty corpus = zh gate off.
-    zh_corpus_dir = CHAT / "knowledge_zh"
+    # zh corpus lives in the shared knowledge/ folder as about_zh.md (English
+    # is about_en.md); match *_zh.md so we never trip on the English file.
+    zh_corpus_dir = CHAT / "knowledge"
     zh_wanted = args.preset == "e5" and any(
         line.startswith("## ")
-        for md in zh_corpus_dir.glob("*.md")
+        for md in zh_corpus_dir.glob("*_zh.md")
         for line in md.read_text(encoding="utf-8").splitlines()
     )
     if zh_wanted:
@@ -154,7 +156,7 @@ def main() -> None:
     )
 
     # Server-side gate artifacts (e5 delegates gating to MiniLM; a zh gate is
-    # bundled too if build_index enabled one — see knowledge_zh/gate.md).
+    # bundled too if build_index enabled one — see knowledge/about_zh.md).
     gate_models: dict[str, Path] = {}
     gate_file = CHAT / "data" / "gate_vectors.json"
     if gate_file.exists() and args.preset == "e5":
