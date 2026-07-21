@@ -119,6 +119,8 @@
       offlineUse: 'Use offline search (~23 MB)',
       offlineBrowse: 'Just browse the site',
       offlineDeclined: 'No problem — here are some pages to explore. Ask again anytime to turn on offline search.',
+      clearLabel: 'Clear',
+      clearTitle: 'Clear this conversation',
     },
     zh: {
       askBtn: '✦ 问 AI',
@@ -148,6 +150,8 @@
       offlineUse: '使用离线检索（约 23 MB）',
       offlineBrowse: '直接浏览站点',
       offlineDeclined: '没问题 —— 这里有一些页面可以看看。你随时可以再问一次来启用离线检索。',
+      clearLabel: '清空',
+      clearTitle: '清空当前对话',
     },
   };
   function t(key) {
@@ -177,9 +181,85 @@
     remoteEmbedDown: false, // /embed said 503 or errored -> stop trying
     busy: false,
     session: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
-    history: [], // [{role:'user'|'assistant', content}]
+    history: [], // [{role:'user'|'assistant', content}], alias of transcripts[role].history
     offlineConsent: null, // null = undecided; true/false = this session's choice (TODO#5)
+    transcripts: {}, // TODO#3: {roleId: {history:[...], log:[...]}} persisted in sessionStorage
   };
+
+  // ── Session memory (TODO#3): per-role transcripts persist across page
+  // navigations WITHIN the tab (sessionStorage, deliberately NOT localStorage,
+  // so nothing survives closing the tab). We persist the session id too, so the
+  // server-side logs correlate the same visitor across pages by sid. `log` is a
+  // replayable record of rendered turns; `history` is the {role,content} pairs
+  // fed back to /chat (capped when sent). ──────────────────────────────────
+  var STORE_KEY = 'yc-chat-session';
+  var HISTORY_CAP = 40; // stored user+assistant entries kept per role (sent is capped separately)
+
+  function saveSession() {
+    try {
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({
+        v: 1,
+        session: state.session,
+        role: state.role,
+        transcripts: state.transcripts,
+      }));
+    } catch (e) { /* private mode / quota: memory just won't persist */ }
+  }
+
+  function loadSession() {
+    try {
+      var data = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null');
+      if (!data || data.v !== 1) return;
+      if (data.session) state.session = data.session;
+      state.transcripts = data.transcripts || {};
+      state.role = data.role || null;
+      if (state.role && state.transcripts[state.role]) {
+        state.history = state.transcripts[state.role].history || [];
+      }
+    } catch (e) { /* corrupt store: start fresh */ }
+  }
+
+  function transcript(id) {
+    if (!state.transcripts[id]) state.transcripts[id] = { history: [], log: [] };
+    return state.transcripts[id];
+  }
+
+  // Append a replayable entry to the active role's transcript and persist.
+  function pushLog(entry) {
+    if (!state.role) return;
+    transcript(state.role).log.push(entry);
+    saveSession();
+  }
+
+  // Minimal source data needed to re-render a sources block after navigation.
+  function sourcesForLog(results) {
+    return dedupeForDisplay(results).map(function (r) {
+      return {
+        chunk: {
+          url: r.chunk.url, anchor: r.chunk.anchor,
+          page_title: r.chunk.page_title, section_title: r.chunk.section_title,
+          text: r.chunk.text, id: r.chunk.id,
+        },
+        score: r.score,
+      };
+    });
+  }
+
+  // Replay a role's stored transcript into the body (on open / role switch /
+  // page load). Messages keep the language they were written in; interactive
+  // starters re-render in the current language.
+  function renderLog() {
+    els.body.textContent = '';
+    var tr = state.transcripts[state.role];
+    if (!tr) return;
+    tr.log.forEach(function (e) {
+      if (e.type === 'user' || e.type === 'bot' || e.type === 'note') addMsg(e.type, e.text);
+      else if (e.type === 'sources') addSources(e.results);
+      else if (e.type === 'pagelinks') addPageLinks();
+      else if (e.type === 'starters' && state.roles && state.roles.roles[state.role]) addStarters(state.roles.roles[state.role]);
+    });
+    els.body.scrollTop = els.body.scrollHeight;
+  }
 
   // Static page suggestions for the "just browse" path — no model, no embedding.
   var SUGGESTED_PAGES = [
@@ -367,6 +447,8 @@
       thinking.classList.remove('ycchat-dots');
       thinking.textContent = t('degradedCJK');
       addPageLinks();
+      pushLog({ type: 'bot', text: thinking.textContent });
+      pushLog({ type: 'pagelinks' });
       record.mode = 'degraded-cjk';
       record.answer = thinking.textContent;
       logTurn(record);
@@ -407,6 +489,8 @@
     thinking.classList.remove('ycchat-dots');
     thinking.textContent = t('offlineDeclined');
     addPageLinks();
+    pushLog({ type: 'bot', text: thinking.textContent });
+    pushLog({ type: 'pagelinks' });
     record.mode = 'degraded-declined';
     record.answer = thinking.textContent;
     logTurn(record);
@@ -433,9 +517,13 @@
       if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
         thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
+        pushLog({ type: 'bot', text: thinking.textContent });
+        pushLog({ type: 'starters' });
       } else {
         thinking.textContent = t('degradedSources');
         addSources(retrieved.results);
+        pushLog({ type: 'bot', text: thinking.textContent });
+        if (retrieved.results.length) pushLog({ type: 'sources', results: sourcesForLog(retrieved.results) });
       }
       record.retrieved = retrieved.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
       record.answer = thinking.textContent;
@@ -498,6 +586,9 @@
       '.ycchat-head b{font-size:.95rem;}',
       '.ycchat-rolechip{margin-left:auto;font-size:.72rem;color:var(--muted,#666);border:1px solid var(--border,#ccc);',
       ' border-radius:999px;padding:.15rem .55rem;cursor:pointer;background:var(--bg,#fff);}',
+      '.ycchat-clearchip{font-size:.72rem;color:var(--muted,#666);border:1px solid var(--border,#ccc);',
+      ' border-radius:999px;padding:.15rem .55rem;cursor:pointer;background:var(--bg,#fff);}',
+      '.ycchat-clearchip:hover{border-color:var(--link,#0b57d0);}',
       '.ycchat-x{border:0;background:none;color:var(--muted,#666);font-size:1.1rem;cursor:pointer;padding:.2rem .4rem;}',
       '.ycchat-body{flex:1;overflow-y:auto;padding:.9rem;display:flex;flex-direction:column;gap:.6rem;}',
       '.ycchat-msg{max-width:88%;padding:.55rem .75rem;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;}',
@@ -587,18 +678,66 @@
       wrap.appendChild(btn);
     });
     els.body.appendChild(wrap);
+    updateClearVisibility();
   }
 
+  // TODO#3: on open / page load, restore the remembered role and its transcript
+  // instead of forcing the role picker. Falls back to the picker when no role
+  // was chosen yet (or the stored role no longer exists after a rebuild).
+  function restoreView() {
+    if (state.role && state.roles && state.roles.roles[state.role]) {
+      var role = state.roles.roles[state.role];
+      els.roleChip.textContent = L(role, 'label') + ' ⌄';
+      var tr = transcript(state.role);
+      if (!tr.log.length) {
+        pushLog({ type: 'note', text: t('viewingAs', L(role, 'label')) });
+        pushLog({ type: 'starters' });
+      }
+      state.history = tr.history;
+      renderLog();
+      updateClearVisibility();
+    } else {
+      showRolePicker();
+    }
+  }
+
+  // TODO#3: picking a role restores that role's stored transcript instead of
+  // wiping history. Switching between two roles hops between two conversations;
+  // switching to a fresh role starts one. The active role is remembered too.
   function pickRole(id) {
     state.role = id;
-    state.history = [];
+    var tr = transcript(id);
+    state.history = tr.history;
     var role = state.roles.roles[id];
     els.roleChip.textContent = L(role, 'label') + ' ⌄';
-    els.body.textContent = '';
     logTurn({ event: 'role_selected', role: id });
-    addMsg('note', t('viewingAs', L(role, 'label')));
-    addStarters(role);
+    if (!tr.log.length) {
+      pushLog({ type: 'note', text: t('viewingAs', L(role, 'label')) });
+      pushLog({ type: 'starters' });
+    }
+    renderLog();
+    updateClearVisibility();
+    saveSession();
     els.input.focus();
+  }
+
+  // Wipe the active role's conversation and start it over (the "clear chat"
+  // affordance). Only the current role is cleared; other roles keep theirs.
+  function clearChat() {
+    if (!state.role) return;
+    var tr = transcript(state.role);
+    tr.log = [];
+    tr.history.length = 0;
+    logTurn({ event: 'chat_cleared', role: state.role });
+    var role = state.roles.roles[state.role];
+    pushLog({ type: 'note', text: t('viewingAs', L(role, 'label')) });
+    pushLog({ type: 'starters' });
+    renderLog();
+    els.input.focus();
+  }
+
+  function updateClearVisibility() {
+    if (els.clearBtn) els.clearBtn.style.display = state.role ? '' : 'none';
   }
 
   function addStarters(role) {
@@ -620,6 +759,7 @@
     state.busy = true;
     els.send.disabled = true;
     addMsg('user', question);
+    pushLog({ type: 'user', text: question }); // TODO#3: persist as it happens
     var thinking = addMsg('bot', '');
     thinking.classList.add('ycchat-dots');
 
@@ -670,6 +810,8 @@
         thinking.classList.remove('ycchat-dots');
         thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
+        pushLog({ type: 'bot', text: thinking.textContent });
+        pushLog({ type: 'starters' });
         record.answer = thinking.textContent;
         logTurn(record);
         return;
@@ -694,11 +836,15 @@
       }
       addSources(results);
       state.history.push({ role: 'user', content: question }, { role: 'assistant', content: answer });
+      if (state.history.length > HISTORY_CAP) state.history.splice(0, state.history.length - HISTORY_CAP);
+      pushLog({ type: 'bot', text: answer });
+      if (results.length) pushLog({ type: 'sources', results: sourcesForLog(results) });
       record.answer = answer;
       logTurn(record);
     } catch (err) {
       thinking.classList.remove('ycchat-dots');
       thinking.textContent = t('somethingWrong', (err && err.message || err));
+      pushLog({ type: 'bot', text: thinking.textContent }); // keep the transcript paired
       logTurn({ event: 'error', role: state.role, question: question, error: String(err) });
     } finally {
       state.busy = false;
@@ -720,6 +866,12 @@
     els.roleChip.title = t('roleChipTitle');
     els.roleChip.addEventListener('click', function () { if (state.roles) showRolePicker(); });
     head.appendChild(els.roleChip);
+    els.clearBtn = h('button', 'ycchat-clearchip', t('clearLabel')); // TODO#3
+    els.clearBtn.type = 'button';
+    els.clearBtn.title = t('clearTitle');
+    els.clearBtn.style.display = state.role ? '' : 'none';
+    els.clearBtn.addEventListener('click', function () { if (state.role) clearChat(); });
+    head.appendChild(els.clearBtn);
     var x = h('button', 'ycchat-x', '✕');
     els.closeBtn = x;
     x.type = 'button';
@@ -787,7 +939,7 @@
       }
       ready.then(function () {
         logTurn({ event: 'assets_loaded', remote_embed: !!WORKER_URL });
-        showRolePicker();
+        restoreView();
       }).catch(function (err) {
         status.textContent = t('assetsFail', (err && err.message || err));
         logTurn({ event: 'error', error: String(err) });
@@ -810,6 +962,8 @@
     els.roleChip.textContent = (state.role && state.roles)
       ? L(state.roles.roles[state.role], 'label') + ' ⌄'
       : t('chooseRole');
+    if (els.clearBtn) { els.clearBtn.textContent = t('clearLabel'); els.clearBtn.title = t('clearTitle'); }
+    updateClearVisibility();
     if (els.closeBtn) els.closeBtn.setAttribute('aria-label', t('closeAria'));
     els.input.placeholder = t('placeholder');
     els.send.textContent = t('send');
@@ -817,6 +971,7 @@
   }
 
   function init() {
+    loadSession(); // TODO#3: restore per-role transcripts + session id for this tab
     injectStyles();
     els.btn = h('button', 'ycchat-btn', t('askBtn'));
     els.btn.type = 'button';
