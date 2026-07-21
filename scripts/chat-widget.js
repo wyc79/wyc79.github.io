@@ -57,7 +57,7 @@
   // stubs match at the start; the zh stubs (介绍/简介/谁是/是谁/关于) match
   // anywhere so "用一段话介绍一下" and "…是谁" survive. Mirrored by
   // chat/tests/test_gate.py — keep the two in sync.
-  var BIO_STUB_RE = /^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b|^$|介绍|简介|谁是|是谁|关于/i;
+  var BIO_STUB_RE = /^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b|^$|介绍|简介|谁是|是谁|关于|(?:都会什么|会做什么|会什么|擅长什么)[?？。!！\s]*$|有(?:哪些|什么)?技能/i;
   var MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
 
   // Gate input. When the name was stripped (off-topic detection), gate on the

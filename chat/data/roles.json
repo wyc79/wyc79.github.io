@@ -8,9 +8,16 @@
       "system_prompt": "The visitor is a recruiter or hiring manager for a game CLIENT DEVELOPMENT role: gameplay programming in a commercial engine — 3C (movement/camera/control), combat logic, UI systems, scene management, performance/memory optimization, solid CS fundamentals. Emphasize: Prime Engine C++ work (view frustum culling, physics collision + sliding response, debug visualization), the 3D rendering project, engine breadth (Unreal 5, Unity, Godot with C++/C#), gameplay systems built on team projects like Cemented Dreams, and CS coursework (data structures & algorithms, AI at Rochester; ML at Harvard). His applied-AI work (this site's chat agent) is a bonus signal for AI-assisted development.",
       "starters": [
         "What C++ or engine-level work has YC done?",
-        "Has he built 3C or combat systems in an engine?",
-        "How solid are his CS fundamentals?"
-      ]
+        "Has he built 3C or combat systems in an engine?"
+      ],
+      "zh": {
+        "label": "招聘方 — 游戏客户端开发",
+        "tagline": "客户端/玩法工程师（引擎、3C、战斗逻辑）",
+        "starters": [
+          "王元辰做过哪些 C++ 或引擎层面的工作？",
+          "他在引擎里做过 3C 或战斗系统吗？"
+        ]
+      }
     },
     "ai_agent_recruiter": {
       "label": "Recruiter — Game AI / Agent",
@@ -18,9 +25,16 @@
       "system_prompt": "The visitor is a recruiter for a GAME AI AGENT engineering role: LLM-based agent systems (task planning, memory, tool calling, multi-turn interaction, evaluation), AI toolchains for game development, smart NPCs and interactive narrative. Emphasize: the AI chat agent on this very site that YC built end-to-end (RAG with semantic chunking and embeddings, client-side retrieval, role-conditioned prompting, prompt-injection defenses, logging and evaluation, LLM serving via an edge worker), his ML background (Harvard biomedical informatics: machine learning, Bayesian analysis), the Automatic Differentiation toolbox (Python developer & QA lead), peer-reviewed ML publications, and game engine familiarity (UE5/Unity, Prime Engine C++).",
       "starters": [
         "What AI agent or LLM projects has YC built?",
-        "Tell me about the chat agent on this site.",
-        "What's his machine learning background?"
-      ]
+        "Tell me about the chat agent on this site."
+      ],
+      "zh": {
+        "label": "招聘方 — 游戏 AI / 智能体",
+        "tagline": "AI 智能体工程师（LLM、RAG、工具调用、NPC）",
+        "starters": [
+          "王元辰做过哪些 AI 智能体或大模型项目？",
+          "介绍一下本站的对话助手。"
+        ]
+      }
     },
     "combat_design_recruiter": {
       "label": "Recruiter — Combat Design",
@@ -28,9 +42,16 @@
       "system_prompt": "The visitor is a recruiter for a COMBAT DESIGN role: designing characters, monsters, skills, weapons and 3C, prototyping in an engine, and collaborating with art and engineering. Emphasize: combat designer & level designer role on Cemented Dreams (combat systems, grapple traversal, Hive level design), the Game Design Workshop (mechanics prototyping and iteration, selected for in-class presentation), physical game prototypes (designer & producer), playtest / focus-group / usability methods, and that he can implement his own prototypes (Unity/UE/Godot, C#/C++). Mention his breadth of game literacy when asked.",
       "starters": [
         "What combat design work has YC done?",
-        "How does he prototype and playtest designs?",
         "Can he implement his own design prototypes?"
-      ]
+      ],
+      "zh": {
+        "label": "招聘方 — 战斗设计",
+        "tagline": "战斗/系统设计师（角色、技能、3C）",
+        "starters": [
+          "王元辰做过哪些战斗设计工作？",
+          "他有哪些设计原型？"
+        ]
+      }
     },
     "visitor": {
       "label": "Curious Visitor",
@@ -38,9 +59,16 @@
       "system_prompt": "The visitor is browsing casually. Give a friendly, balanced picture of YC: game developer at USC (MSCS) with a psychology / neuroscience research past, and point to fun projects to explore.",
       "starters": [
         "Who is YC in one paragraph?",
-        "What's his most interesting project?",
-        "How did he get from neuroscience to games?"
-      ]
+        "What's his most interesting project?"
+      ],
+      "zh": {
+        "label": "随便看看",
+        "tagline": "只是逛逛",
+        "starters": [
+          "用一段话介绍一下王元辰？",
+          "他做过哪些项目？"
+        ]
+      }
     }
   }
 }

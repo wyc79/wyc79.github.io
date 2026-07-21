@@ -23,7 +23,11 @@ FALLBACK_GATE = 0.22  # widget fallback when index carries no threshold
 NAME_RE = re.compile(r"\b(yuanchen|wang|yc)(?:'s)?\b|王元辰", re.I)
 BIO_STUB_RE = re.compile(
     r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b"
-    r"|^$|介绍|简介|谁是|是谁|关于",
+    r"|^$|介绍|简介|谁是|是谁|关于"
+    # "what can he do / skills" reads as general-about intent — a name-bearing
+    # "王元辰都会什么" must NOT be stripped to the weak "都会什么" fragment. The
+    # 会什么/擅长什么 forms are end-anchored so "会什么时候讲笑话" still strips.
+    r"|(?:都会什么|会做什么|会什么|擅长什么)[?？。!！\s]*$|有(?:哪些|什么)?技能",
     re.I,
 )
 

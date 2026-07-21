@@ -53,7 +53,6 @@ ROLES: dict[str, dict] = {
         "starters": [
             "What C++ or engine-level work has YC done?",
             "Has he built 3C or combat systems in an engine?",
-            "How solid are his CS fundamentals?",
         ],
         # Localized UI only (label/tagline/starters). system_prompt is shared +
         # English; answer language is set per-request ("answer in Chinese").
@@ -88,7 +87,6 @@ ROLES: dict[str, dict] = {
         "starters": [
             "What AI agent or LLM projects has YC built?",
             "Tell me about the chat agent on this site.",
-            "What's his machine learning background?",
         ],
         "zh": {
             "label": "招聘方 — 游戏 AI / 智能体",
@@ -117,7 +115,6 @@ ROLES: dict[str, dict] = {
         ),
         "starters": [
             "What combat design work has YC done?",
-            "How does he prototype and playtest designs?",
             "Can he implement his own design prototypes?",
         ],
         "zh": {
@@ -140,7 +137,6 @@ ROLES: dict[str, dict] = {
         "starters": [
             "Who is YC in one paragraph?",
             "What's his most interesting project?",
-            "How did he get from neuroscience to games?",
         ],
         "zh": {
             "label": "随便看看",
