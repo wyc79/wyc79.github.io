@@ -60,6 +60,13 @@
   var BIO_STUB_RE = /^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b|^$|介绍|简介|谁是|是谁|关于|(?:都会什么|会做什么|会什么|擅长什么)[?？。!！\s]*$|有(?:哪些|什么)?技能/i;
   var MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
 
+  // CJK detection — one definition, mirrors index.py CJK_RE: hiragana/katakana
+  // + CJK unified + compatibility ideographs. Used both for the offline
+  // English-only notice and to route name-normalization by the question's
+  // language. (Explicit \u escapes: the literal compat-range start char is a
+  // homoglyph of the unified one and easy to mistype.)
+  var CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
+
   // Gate input. When the name was stripped (off-topic detection), gate on the
   // remainder. When it was KEPT (a bio question), normalize the name to the
   // gate's own language — so a Chinese question that uses "YC", or an English
@@ -67,7 +74,7 @@
   // gate). Retrieval always uses the original, unmodified question.
   function gateForm(question, stripped) {
     if (stripped != null) return stripped;
-    return /[㐀-鿿]/.test(question)
+    return CJK_RE.test(question)
       ? question.replace(NAME_STRIP_RE, '王元辰')
       : question.replace(/王元辰/g, 'YC');
   }
@@ -294,18 +301,19 @@
     return { vector: out.data, gate: null, rid: null }; // Float32Array(384), unit norm
   }
 
-  function retrieve(queryVec) {
-    var chunks = state.index.chunks;
+  // Dot-product retrieval + gate stats. vecAt(i) yields the i-th chunk vector,
+  // chunkAt(i) the chunk it maps to — the only thing that differs between the
+  // primary (index.json) and degraded (fallback_vectors.json) paths.
+  function scoreChunks(count, queryVec, vecAt, chunkAt) {
     var scored = [], sum = 0, sumSq = 0;
-    for (var i = 0; i < chunks.length; i++) {
-      var v = chunks[i].vector, s = 0;
+    for (var i = 0; i < count; i++) {
+      var v = vecAt(i), s = 0;
       for (var j = 0; j < v.length; j++) s += v[j] * queryVec[j];
-      scored.push({ chunk: chunks[i], score: s });
+      scored.push({ chunk: chunkAt(i), score: s });
       sum += s;
       sumSq += s * s;
     }
-    var n = scored.length || 1;
-    var mean = sum / n;
+    var n = scored.length || 1, mean = sum / n;
     scored.sort(function (a, b) { return b.score - a.score; });
     return {
       results: scored.slice(0, TOP_K).filter(function (r) { return r.score >= MIN_SCORE; }),
@@ -315,6 +323,12 @@
         std: Math.sqrt(Math.max(sumSq / n - mean * mean, 0)),
       },
     };
+  }
+
+  function retrieve(queryVec) {
+    var chunks = state.index.chunks;
+    return scoreChunks(chunks.length, queryVec,
+      function (i) { return chunks[i].vector; }, function (i) { return chunks[i]; });
   }
 
   function dedupeForDisplay(results) {
@@ -340,24 +354,13 @@
   }
 
   function retrieveFallback(fb, queryVec) {
-    var scored = [], sum = 0, sumSq = 0;
-    for (var i = 0; i < fb.vectors.length; i++) {
-      var v = fb.vectors[i], s = 0;
-      for (var j = 0; j < v.length; j++) s += v[j] * queryVec[j];
-      scored.push({ chunk: state.index.chunks[i], score: s });
-      sum += s; sumSq += s * s;
-    }
-    var n = scored.length || 1, mean = sum / n;
-    scored.sort(function (a, b) { return b.score - a.score; });
-    return {
-      results: scored.slice(0, TOP_K).filter(function (r) { return r.score >= MIN_SCORE; }),
-      stats: { top: scored.length ? scored[0].score : 0, mean: mean, std: Math.sqrt(Math.max(sumSq / n - mean * mean, 0)) },
-    };
+    return scoreChunks(fb.vectors.length, queryVec,
+      function (i) { return fb.vectors[i]; }, function (i) { return state.index.chunks[i]; });
   }
 
   async function degradedTurn(question, stripped, thinking, record) {
     record.mode = 'degraded-local';
-    if (/[぀-ヿ㐀-鿿豈-﫿]/.test(question)) {
+    if (CJK_RE.test(question)) {
       // The local fallback model is English-only — be honest for CJK, never
       // download it for a question it can't serve, but still offer static page
       // links (localized) so a Chinese visitor isn't left at a dead end.

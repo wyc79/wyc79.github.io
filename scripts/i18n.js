@@ -51,7 +51,7 @@
     var pre = document.getElementById('yc-i18n-prehide');
     if (pre && pre.parentNode) pre.parentNode.removeChild(pre);
 
-    // 1. Dual-language element pairs — show the active language, hide the other.
+    // 1. Dual-language element pairs - show the active language, hide the other.
     var blocks = document.querySelectorAll('[data-lang]');
     for (var i = 0; i < blocks.length; i++) {
       var l = blocks[i].getAttribute('data-lang');

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-en="Prime Engine — Engine Systems Implementation — Yuanchen Wang" data-zh="Prime Engine — 引擎系统实现 — Yuanchen Wang">Prime Engine — Engine Systems Implementation — Yuanchen Wang</title>
-  <meta name="description" content="Prime Engine — Engine Systems Implementation (frustum culling, physics/collision, animation blending, debug visualization)." />
+  <title data-en="Prime Engine - Engine Systems Implementation - Yuanchen Wang" data-zh="Prime Engine - 引擎系统实现 - Yuanchen Wang">Prime Engine - Engine Systems Implementation - Yuanchen Wang</title>
+  <meta name="description" content="Prime Engine - Engine Systems Implementation (frustum culling, physics/collision, animation blending, debug visualization)." />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
@@ -20,9 +20,9 @@
 
     <main>
       <section class="project-hero" style="background-image: url('../images/prime_engine.png');">
-        <span class="sr-only" role="img" aria-label="Prime Engine — Engine Systems Implementation"></span>
+        <span class="sr-only" role="img" aria-label="Prime Engine - Engine Systems Implementation"></span>
         <div class="project-hero__content">
-          <h2 class="project-hero__title"><span data-lang="en">Prime Engine — Engine Systems Implementation</span><span data-lang="zh">Prime Engine — 引擎系统实现</span></h2>
+          <h2 class="project-hero__title"><span data-lang="en">Prime Engine - Engine Systems Implementation</span><span data-lang="zh">Prime Engine - 引擎系统实现</span></h2>
           <div class="project-hero__meta">
             <div class="project-hero__meta-item"><span data-lang="en">Role: Engine Programmer</span><span data-lang="zh">职责： 引擎程序</span></div>
             <div class="project-hero__meta-item"><span data-lang="en">Tool: C++, Prime Engine</span><span data-lang="zh">工具： C++、Prime Engine</span></div>
@@ -92,7 +92,7 @@
           <ul>
             <li data-lang="en">Compute the world-space bounding box of each mesh instance.</li>
             <li data-lang="zh">计算每个网格实例的世界空间包围盒。</li>
-            <li data-lang="en">Transform the box corners into clip space using the projection–view matrix.</li>
+            <li data-lang="en">Transform the box corners into clip space using the projection-view matrix.</li>
             <li data-lang="zh">使用投影-视图矩阵将包围盒顶点变换到裁剪空间。</li>
             <li data-lang="en">Test the box against the six planes of the camera frustum.</li>
             <li data-lang="zh">将包围盒与相机视锥的六个平面进行测试。</li>
@@ -255,16 +255,16 @@
           </article>
 
           <h4><span data-lang="en">Animation Blending</span><span data-lang="zh">动画混合</span></h4>
-          <p class="meta"><span data-lang="en">I extended the soldier's animation state machine with several blending modes, chosen at spawn via an <code>npcType</code> value from Lua. The skeleton is split into an upper body (joints 2–37) and a lower body (joints 38–47), so clips can drive different parts at once.</span><span data-lang="zh">我为士兵的动画状态机扩展了多种混合模式，在生成时通过来自 Lua 的 <code>npcType</code> 值选择。骨架被划分为上半身（关节 2–37）与下半身（关节 38–47），因此不同片段可同时驱动不同部位。</span></p>
+          <p class="meta"><span data-lang="en">I extended the soldier's animation state machine with several blending modes, chosen at spawn via an <code>npcType</code> value from Lua. The skeleton is split into an upper body (joints 2-37) and a lower body (joints 38-47), so clips can drive different parts at once.</span><span data-lang="zh">我为士兵的动画状态机扩展了多种混合模式，在生成时通过来自 Lua 的 <code>npcType</code> 值选择。骨架被划分为上半身（关节 2-37）与下半身（关节 38-47），因此不同片段可同时驱动不同部位。</span></p>
           <ul>
-            <li data-lang="en">Full-body blend — two clips mixed by a factor (e.g. idle + run, weighted 0.5 each).</li>
+            <li data-lang="en">Full-body blend - two clips mixed by a factor (e.g. idle + run, weighted 0.5 each).</li>
             <li data-lang="zh">全身混合：按权重混合两个片段（例如待机 + 奔跑，各占 0.5）。</li>
-            <li data-lang="en">Partial blend — a clip overrides only a joint range via <code>PARTIAL_BODY_ANIMATION</code> (e.g. upper-body shoot over a full-body idle).</li>
+            <li data-lang="en">Partial blend - a clip overrides only a joint range via <code>PARTIAL_BODY_ANIMATION</code> (e.g. upper-body shoot over a full-body idle).</li>
             <li data-lang="zh">局部混合：某个片段通过 <code>PARTIAL_BODY_ANIMATION</code> 仅覆盖某一关节范围（例如在全身待机之上叠加上半身射击）。</li>
-            <li data-lang="en">Additive blend — a clip layered <em>on top of</em> the existing pose instead of replacing it.</li>
+            <li data-lang="en">Additive blend - a clip layered <em>on top of</em> the existing pose instead of replacing it.</li>
             <li data-lang="zh">叠加混合：将某个片段<em>叠加</em>在现有姿势之上，而非替换它。</li>
           </ul>
-          <p class="meta"><span data-lang="en">For additive motion I added an <code>ADDITIVE</code> slot flag. The additive pass takes the clip's delta from its reference pose (frame 0) as a rotation-only quaternion and pre-multiplies it onto the joint's local transform — so a base motion stays intact while extra movement is layered on (e.g. lower-body run + upper-body shoot, running and aiming at once).</span><span data-lang="zh">为实现叠加运动，我增加了一个 <code>ADDITIVE</code> 槽位标志。叠加阶段将片段相对其参考姿势（第 0 帧）的增量作为仅含旋转的四元数，并左乘到关节的局部变换上，这样基础动作保持不变，而额外动作被叠加其上（例如下半身奔跑 + 上半身射击，边跑边瞄准）。</span></p>
+          <p class="meta"><span data-lang="en">For additive motion I added an <code>ADDITIVE</code> slot flag. The additive pass takes the clip's delta from its reference pose (frame 0) as a rotation-only quaternion and pre-multiplies it onto the joint's local transform - so a base motion stays intact while extra movement is layered on (e.g. lower-body run + upper-body shoot, running and aiming at once).</span><span data-lang="zh">为实现叠加运动，我增加了一个 <code>ADDITIVE</code> 槽位标志。叠加阶段将片段相对其参考姿势（第 0 帧）的增量作为仅含旋转的四元数，并左乘到关节的局部变换上，这样基础动作保持不变，而额外动作被叠加其上（例如下半身奔跑 + 上半身射击，边跑边瞄准）。</span></p>
 
           <div class="diagram-card">
             <h3><span data-lang="en">Animation Blending Modes</span><span data-lang="zh">动画混合模式</span></h3>
@@ -290,10 +290,10 @@
               <circle cx="480" cy="80" r="20" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
               <rect x="448" y="105" width="64" height="70" rx="8" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
               <rect x="448" y="180" width="64" height="75" rx="8" fill="#eceef2" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="525" y="145" font-size="12" fill="#c94b4b">Shoot (2–37)</text>
+              <text x="525" y="145" font-size="12" fill="#c94b4b">Shoot (2-37)</text>
               <text x="525" y="222" font-size="12" fill="#777">STAND (lower)</text>
               <text x="480" y="280" text-anchor="middle" font-size="13" fill="#444">upper-body override</text>
-              <text x="480" y="298" text-anchor="middle" font-size="12" fill="#777">replaces joints 2–37</text>
+              <text x="480" y="298" text-anchor="middle" font-size="12" fill="#777">replaces joints 2-37</text>
 
               <!-- Additive blend -->
               <text x="800" y="40" text-anchor="middle" font-size="16" font-weight="bold">Additive blend</text>
@@ -301,7 +301,7 @@
               <rect x="768" y="105" width="64" height="70" rx="8" fill="url(#additiveHatch)" stroke="#c94b4b" stroke-width="2"/>
               <rect x="768" y="180" width="64" height="75" rx="8" fill="#d9f0e0" stroke="#3f9b57" stroke-width="2"/>
               <text x="845" y="145" font-size="12" fill="#c94b4b">STAND + Shoot</text>
-              <text x="845" y="222" font-size="12" fill="#3f9b57">RUN (38–47)</text>
+              <text x="845" y="222" font-size="12" fill="#3f9b57">RUN (38-47)</text>
               <text x="800" y="280" text-anchor="middle" font-size="13" fill="#444">layered on top</text>
               <text x="800" y="298" text-anchor="middle" font-size="12" fill="#777">delta pose added to upper body</text>
 
@@ -321,15 +321,15 @@
             </iframe>
           </article>
 
-          <h4><span data-lang="en">Hierarchical Culling — Static &amp; Dynamic BVH</span><span data-lang="zh">层级式剔除：静态与动态 BVH</span></h4>
+          <h4><span data-lang="en">Hierarchical Culling - Static &amp; Dynamic BVH</span><span data-lang="zh">层级式剔除：静态与动态 BVH</span></h4>
           <p class="meta"><span data-lang="en">I extended frustum culling into a Bounding Volume Hierarchy managed by a central <code>CullingManager</code>, so large groups of objects can be rejected with a few AABB-vs-frustum tests instead of one test per mesh. Each instance is bucketed as static or dynamic.</span><span data-lang="zh">我将视锥剔除扩展为由中央 <code>CullingManager</code> 管理的包围体层级（BVH），从而只需少量 AABB 与视锥的测试即可剔除大批物体，而非对每个网格逐一测试。每个实例被归类为静态或动态。</span></p>
           <ul>
-            <li data-lang="en">Static BVH — built once, recursively median-split along the widest centroid axis, with leaves holding ≤ 8 instances. Traversal prunes whole subtrees whose bounds miss the frustum.</li>
+            <li data-lang="en">Static BVH - built once, recursively median-split along the widest centroid axis, with leaves holding ≤ 8 instances. Traversal prunes whole subtrees whose bounds miss the frustum.</li>
             <li data-lang="zh">静态 BVH：一次性构建，沿质心分布最广的轴递归进行中位数划分，叶节点最多容纳 8 个实例。遍历时会剪除包围盒未命中视锥的整棵子树。</li>
-            <li data-lang="en">Dynamic BVH — rebuilt every frame for moving objects (to stress-test it I spawned many small meshes given simple random movement). Centroids are normalized and encoded as 30-bit Morton codes (Z-order), sorted, then split at the midpoint — a linear, cache-friendly construction.</li>
+            <li data-lang="en">Dynamic BVH - rebuilt every frame for moving objects (to stress-test it I spawned many small meshes given simple random movement). Centroids are normalized and encoded as 30-bit Morton codes (Z-order), sorted, then split at the midpoint - a linear, cache-friendly construction.</li>
             <li data-lang="zh">动态 BVH：针对运动物体每帧重建（为了给它加压测试，我生成了大量随机运动的小网格）。质心被归一化并编码为 30 位 Morton 码（Z 序），排序后在中点划分：一种线性、对缓存友好的构建方式。</li>
           </ul>
-          <p class="meta"><span data-lang="en">The static tree gives better quality for buildings and terrain, while the Morton-code rebuild is cheap enough to run per frame for many moving units — Z-order keeps spatially close objects adjacent in memory, so the build and traversal access nodes nearly linearly, staying cache-friendly. Both are roughly <em>O(n log n)</em>, dominated by the sort.</span><span data-lang="zh">静态树对建筑与地形能提供更高的质量，而 Morton 码重建足够廉价，可对大量运动单位每帧执行，Z 序使空间上相近的物体在内存中也相邻，因此构建与遍历几乎线性地访问节点，保持缓存友好。两者的复杂度都约为 <em>O(n log n)</em>，主要由排序决定。</span></p>
+          <p class="meta"><span data-lang="en">The static tree gives better quality for buildings and terrain, while the Morton-code rebuild is cheap enough to run per frame for many moving units - Z-order keeps spatially close objects adjacent in memory, so the build and traversal access nodes nearly linearly, staying cache-friendly. Both are roughly <em>O(n log n)</em>, dominated by the sort.</span><span data-lang="zh">静态树对建筑与地形能提供更高的质量，而 Morton 码重建足够廉价，可对大量运动单位每帧执行，Z 序使空间上相近的物体在内存中也相邻，因此构建与遍历几乎线性地访问节点，保持缓存友好。两者的复杂度都约为 <em>O(n log n)</em>，主要由排序决定。</span></p>
 
           <div class="diagram-card">
             <h3><span data-lang="en">Static vs. Dynamic BVH Construction</span><span data-lang="zh">静态与动态 BVH 的构建对比</span></h3>
@@ -337,7 +337,7 @@
               <rect x="0" y="0" width="960" height="280" rx="16" fill="#ffffff"/>
 
               <!-- Static side -->
-              <text x="240" y="40" text-anchor="middle" font-size="16" font-weight="bold">Static BVH — median split</text>
+              <text x="240" y="40" text-anchor="middle" font-size="16" font-weight="bold">Static BVH - median split</text>
               <rect x="190" y="60" width="100" height="34" rx="8" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
               <text x="240" y="82" text-anchor="middle" font-size="13">root AABB</text>
               <rect x="110" y="120" width="90" height="32" rx="8" fill="#fff3d6" stroke="#c9a93f" stroke-width="2"/>
@@ -359,7 +359,7 @@
               <line x1="480" y1="55" x2="480" y2="225" stroke="#e0e0e0" stroke-width="2"/>
 
               <!-- Dynamic side: Z-order curve -->
-              <text x="720" y="40" text-anchor="middle" font-size="16" font-weight="bold">Dynamic BVH — Morton (Z-order)</text>
+              <text x="720" y="40" text-anchor="middle" font-size="16" font-weight="bold">Dynamic BVH - Morton (Z-order)</text>
               <polyline points="600,80 660,80 600,130 660,130 740,80 800,80 740,130 800,130 600,180 660,180 600,210 660,210 740,180 800,180 740,210 800,210"
                         fill="none" stroke="#3f6fb9" stroke-width="2"/>
               <g fill="#c94b4b">
@@ -387,7 +387,7 @@
                 title="Static BVH debug demo"
                 style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
               </iframe>
-              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Static BVH — rainbow boxes from root (red) to leaf (purple).</span><span data-lang="zh">静态 BVH：从根节点（红色）到叶节点（紫色）的彩虹色包围盒。</span></p>
+              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Static BVH - rainbow boxes from root (red) to leaf (purple).</span><span data-lang="zh">静态 BVH：从根节点（红色）到叶节点（紫色）的彩虹色包围盒。</span></p>
             </article>
             <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
               <iframe
@@ -398,7 +398,7 @@
                 title="Dynamic BVH debug demo"
                 style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
               </iframe>
-              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Dynamic BVH — white boxes over randomly moving meshes, leaves shown as dots.</span><span data-lang="zh">动态 BVH：覆盖在随机运动网格上的白色包围盒，叶节点以圆点表示。</span></p>
+              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Dynamic BVH - white boxes over randomly moving meshes, leaves shown as dots.</span><span data-lang="zh">动态 BVH：覆盖在随机运动网格上的白色包围盒，叶节点以圆点表示。</span></p>
             </article>
           </div>
         </section>
@@ -408,7 +408,7 @@
     </main>
 
     <footer>
-      <p><span data-lang="en">© 2025 Yuanchen Wang — HTML portfolio. Last updated 2025-09-16.</span><span data-lang="zh">© 2025 Yuanchen Wang — 网页作品集。最后更新于 2025-09-16。</span></p>
+      <p><span data-lang="en">© 2025 Yuanchen Wang - HTML portfolio. Last updated 2025-09-16.</span><span data-lang="zh">© 2025 Yuanchen Wang - 网页作品集。最后更新于 2025-09-16。</span></p>
     </footer>
   </div>
 </body>

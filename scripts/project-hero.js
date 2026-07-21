@@ -2,8 +2,8 @@
 // <section class="project-hero">:
 //   1. Injects a round "back to projects" button (‹) on the LEFT of the banner.
 //   2. Builds a compact sticky bar that freezes to the top of the viewport once
-//      the big banner scrolls out of view — back button on the left, and
-//      "GameName — role · role · role" on the right. Bilingual: it clones the
+//      the big banner scrolls out of view - back button on the left, and
+//      "GameName - role · role · role" on the right. Bilingual: it clones the
 //      title + first meta-item (the Role/职责 line) in both languages and lets
 //      i18n.js show the active one.
 // Load AFTER i18n.js so window.YCI18N exists when we re-apply the language.
@@ -20,9 +20,8 @@
   }
 
   function gameName(fullTitle) {
-    // "Cemented Dreams — Gameplay Systems" -> "Cemented Dreams"
-    var i = fullTitle.indexOf('—');            // em dash
-    if (i < 0) i = fullTitle.indexOf(' - ');
+    // "Cemented Dreams - Gameplay Systems" -> "Cemented Dreams"
+    var i = fullTitle.indexOf(' - ');
     return (i > 0 ? fullTitle.slice(0, i) : fullTitle).trim();
   }
 
@@ -55,12 +54,12 @@
       hero.appendChild(back);
     }
 
-    // 2. Compact sticky bar. Build a "name — roles" string per language.
+    // 2. Compact sticky bar. Build a "name - roles" string per language.
     var compact = { en: '', zh: '' };
     ['en', 'zh'].forEach(function (lang) {
       var name = titleEl ? gameName(langText(titleEl, lang)) : '';
       var roles = roleEl ? stripRolePrefix(langText(roleEl, lang)) : '';
-      compact[lang] = roles ? (name + ' — ' + roles) : name;
+      compact[lang] = roles ? (name + ' - ' + roles) : name;
     });
 
     var bar = document.createElement('div');

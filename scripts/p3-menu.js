@@ -2,11 +2,11 @@
   'use strict';
 
   // Per-item design data:
-  //   tilt     — fixed rotation (deg) on the VISUAL layer only; the <a>'s hit
+  //   tilt     - fixed rotation (deg) on the VISUAL layer only; the <a>'s hit
   //              area stays axis-aligned.
-  //   shift    — fixed translateY (px) on the visual layer so tabs can overlap
+  //   shift    - fixed translateY (px) on the visual layer so tabs can overlap
   //              visually without overlapping hitboxes.
-  //   wedge    — polygon variant params so no two rows share the same silhouette:
+  //   wedge    - polygon variant params so no two rows share the same silhouette:
   //              baseTop/baseBot set the left base height,
   //              leanBot pushes the bottom-left corner inward (angled left edge),
   //              tipY places the tip, tipScale lengthens the right taper,
@@ -33,7 +33,7 @@
   //   [shadow text][top red wedge][bottom pink wedge][dark base text][bright text, clipped to top wedge]
   // The top wedge is drawn behind the text but the bright text layer is clipped
   // to the top wedge, so the uncovered portion of each letter shows the dark
-  // base fill while the covered portion shows the bright fill — no blend modes.
+  // base fill while the covered portion shows the bright fill - no blend modes.
   function buildHeroSvg(entry) {
     var fs    = entry.item.fontSize;
     var label = entry.item.label;
@@ -45,9 +45,9 @@
     var labelW  = Math.max(lblRect.width, fs * 0.5 * label.length);
 
     // Asymmetric padding:
-    //   LEFT  — tight, plus a small margin for the pink back wedge to peek out
+    //   LEFT  - tight, plus a small margin for the pink back wedge to peek out
     //           without getting clipped.
-    //   RIGHT — long taper room; tipScale makes some tabs reach farther.
+    //   RIGHT - long taper room; tipScale makes some tabs reach farther.
     var padLeft  = Math.max(fs * 0.11, 14);
     var padRight = Math.max(fs * 0.55 * w.tipScale, 48);
     var padY     = Math.max(fs * 0.28, 22);
@@ -87,7 +87,7 @@
     var shadowDx = Math.max(3, fs * 0.04);
     var shadowDy = Math.max(4, fs * 0.06);
 
-    // Build as markup then parse — lets us keep the structure readable and
+    // Build as markup then parse - lets us keep the structure readable and
     // avoids the SVG-innerHTML namespace quirks in older browsers.
     var svgMarkup = [
       '<svg xmlns="', SVG_NS, '" class="p3-hero-svg" ',
@@ -99,21 +99,21 @@
             '<polygon points="', topPtsStr, '"/>',
           '</clipPath>',
         '</defs>',
-        // Shadow text — offset behind everything for depth.
+        // Shadow text - offset behind everything for depth.
         '<text class="p3-hero-text p3-hero-shadow" ',
           'x="', (textX + shadowDx).toFixed(1), '" ',
           'y="', (textY + shadowDy).toFixed(1), '" ',
           'font-size="', fs, '">', escapeXml(label), '</text>',
-        // Back pink wedge — drawn first so it sits BEHIND the red one, with
+        // Back pink wedge - drawn first so it sits BEHIND the red one, with
         // only a small sliver exposed around the lower-right edge.
         '<polygon class="p3-hero-wedge-bottom" points="', botPtsStr, '"/>',
-        // Front red wedge — sits on top, covering most of the pink.
+        // Front red wedge - sits on top, covering most of the pink.
         '<polygon class="p3-hero-wedge-top" points="', topPtsStr, '"/>',
         // Dark base text over the wedges (visible where bright layer does not cover).
         '<text class="p3-hero-text p3-hero-dark" ',
           'x="', textX.toFixed(1), '" y="', textY.toFixed(1), '" ',
           'font-size="', fs, '">', escapeXml(label), '</text>',
-        // Bright text clipped to the top wedge — only the covered portion reads bright.
+        // Bright text clipped to the top wedge - only the covered portion reads bright.
         '<g clip-path="url(#', clipId, ')">',
           '<text class="p3-hero-text p3-hero-bright" ',
             'x="', textX.toFixed(1), '" y="', textY.toFixed(1), '" ',
@@ -157,7 +157,7 @@
     var active = 0;
 
     ITEMS.forEach(function (item, i) {
-      // <a> owns the hit area and stays axis-aligned — no rotation applied
+      // <a> owns the hit area and stays axis-aligned - no rotation applied
       // here, so hitboxes never overlap their neighbors regardless of how
       // much the visual layer leans.
       var a = document.createElement('a');
@@ -178,7 +178,7 @@
       rot.style.setProperty('--tilt',  (item.tilt  || 0) + 'deg');
       rot.style.setProperty('--shift', (item.shift || 0) + 'px');
 
-      // Kept in the DOM for backward-compatible styling — hidden by CSS.
+      // Kept in the DOM for backward-compatible styling - hidden by CSS.
       var hl = document.createElement('div');
       hl.className = 'p3-highlight';
 
@@ -250,7 +250,7 @@
     }
 
     document.addEventListener('keydown', function (e) {
-      // Ignore keys typed into form fields (e.g. the chat widget's input) —
+      // Ignore keys typed into form fields (e.g. the chat widget's input) , 
       // Enter there means "send the message", not "open the hovered page".
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable ||

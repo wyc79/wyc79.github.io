@@ -1,4 +1,4 @@
-// Shared sub-page header — injects the same .p3-brand / .p3-brand-links markup
+// Shared sub-page header - injects the same .p3-brand / .p3-brand-links markup
 // into every page that has <header class="page-head" data-page-header></header>.
 // Must load BEFORE theme.js so its DOMContentLoaded handler registers first and
 // the #themeToggle button exists when theme.js wires it up. Load i18n.js AFTER

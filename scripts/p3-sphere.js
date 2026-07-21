@@ -154,7 +154,7 @@
   // c0 is the darkest toon band (deepest shadow); c6 is the brightest
   // highlight. Both palettes step smoothly through 7 stops so the banding
   // reads cleanly. The JS reads the live `data-theme` attribute set by
-  // scripts/theme.js — same source the rest of the site uses.
+  // scripts/theme.js - same source the rest of the site uses.
   var DARK_BANDS = new Float32Array([
     0.060, 0.075, 0.150,   // c0 deep navy shadow
     0.095, 0.145, 0.330,   // c1 dark blue
@@ -162,10 +162,10 @@
     0.240, 0.435, 0.800,   // c3 brighter blue
     0.350, 0.560, 0.895,   // c4 lit blue
     0.480, 0.700, 0.970,   // c5 saturated blue highlight
-    0.920, 0.955, 0.995    // c6 brightest band — almost white
+    0.920, 0.955, 0.995    // c6 brightest band - almost white
   ]);
   // Light theme: muted dark red base, building toward warm pink highlights.
-  // Tuned to stay tasteful on a white page — no neon, no pure red.
+  // Tuned to stay tasteful on a white page - no neon, no pure red.
   var LIGHT_BANDS = new Float32Array([
     0.220, 0.075, 0.090,   // c0 dark muted red
     0.360, 0.130, 0.155,   // c1 deep red
@@ -173,7 +173,7 @@
     0.720, 0.380, 0.420,   // c3 dusty rose
     0.840, 0.530, 0.565,   // c4 lit pinkish red
     0.925, 0.685, 0.710,   // c5 soft pink highlight
-    0.995, 0.955, 0.945    // c6 brightest — warm near-white
+    0.995, 0.955, 0.945    // c6 brightest - warm near-white
   ]);
   var DARK_CLEAR  = [0.0, 0.0, 0.0];
   var LIGHT_CLEAR = [1.0, 1.0, 1.0];
@@ -307,7 +307,7 @@
 
     // Portrait viewports push the sphere center further right (by half a
     // radius) so the sphere stops swallowing the left-side menu. Landscape
-    // keeps the original layout — center exactly on the right-edge midpoint,
+    // keeps the original layout - center exactly on the right-edge midpoint,
     // so only the left half is visible.
     var portrait = window.innerHeight > window.innerWidth;
     var centerOffsetWorld = portrait ? sphereRadius * 0.5 : 0;
@@ -319,7 +319,7 @@
     // midpoint (domeCenter = (viewportWidth, viewportHeight/2)) with radius
     // slightly smaller than the viewport width. Mouse offsets are measured
     // from THAT point (not from screen center). Offsets are clamped to the
-    // dome rim — no wraparound — and z is solved from the sphere equation.
+    // dome rim - no wraparound - and z is solved from the sphere equation.
     //
     // The dome's forward axis is aligned with the direction from the sphere
     // center to the camera (NOT world +Z). Because the sphere is offset to
@@ -348,7 +348,7 @@
     var dx_px = mouseX_px - domeCx_px;
     var dy_px = mouseY_px - domeCy_px;
 
-    // 2. Radial clamp to the dome rim. No wraparound — if the mouse is past
+    // 2. Radial clamp to the dome rim. No wraparound - if the mouse is past
     //    the rim, pin the offset to the rim and let the light sit there.
     var d2 = dx_px * dx_px + dy_px * dy_px;
     var r2 = domeR_px * domeR_px;
@@ -401,7 +401,7 @@
     gl.uniform3f(uViewPos, eye[0], eye[1], eye[2]);
     // Legacy single-color base (still bound for back-compat with shader history).
     gl.uniform3f(uBaseColor, 0.14, 0.30, 0.72);
-    // Active toon palette — swapped by the theme observer above.
+    // Active toon palette - swapped by the theme observer above.
     gl.uniform3fv(uBands, bands);
 
     gl.drawElements(gl.TRIANGLES, sphere.indices.length, gl.UNSIGNED_SHORT, 0);

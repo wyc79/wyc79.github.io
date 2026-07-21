@@ -306,7 +306,7 @@ details > summary { cursor: pointer; color: var(--link); font-weight: 600; }
 details > summary::-webkit-details-marker { display: none; }
 
 
-/* Flip card minigame — granular columns so portrait doesn’t get larger cards than landscape */
+/* Flip card minigame - granular columns so portrait doesn’t get larger cards than landscape */
 .flip-ui { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .flip-stats { display: flex; gap: 1rem; color: var(--muted); }
 .flip-grid {
@@ -372,7 +372,7 @@ details > summary::-webkit-details-marker { display: none; }
   align-items: flex-start;
   max-width: 100%;
   padding: 16px 32px;
-  /* Compact — rows can visually overlap via their inner .p3-rot transforms
+  /* Compact - rows can visually overlap via their inner .p3-rot transforms
      without affecting their axis-aligned hit areas. */
   gap: 2px;
 }
@@ -391,7 +391,7 @@ details > summary::-webkit-details-marker { display: none; }
 /* .p3-rot is the VISUAL layer. The tilt and translateY shift live here so
    the row's hit area stays clean while the label + SVG composition can lean
    and drift freely. pointer-events: none makes the visual subtree invisible
-   to hit-testing — events land on the <a> parent. */
+   to hit-testing - events land on the <a> parent. */
 .p3-rot {
   --tilt: 0deg;
   --shift: 0px;
@@ -504,7 +504,7 @@ details > summary::-webkit-details-marker { display: none; }
   background: rgba(0,0,0,0.25);
 }
 
-/* Responsive scaling — label font-size set inline via JS is treated as px base;
+/* Responsive scaling - label font-size set inline via JS is treated as px base;
    we scale it down on narrow viewports using transform-origin on the menu. */
 @media (max-width: 760px) {
   .p3-menu { padding: 24px; transform: scale(0.72); transform-origin: center center; }
@@ -513,7 +513,7 @@ details > summary::-webkit-details-marker { display: none; }
   .p3-menu { transform: scale(0.52); }
 }
 
-/* Branding plate — shared between landing page (.p3-root) and sub-page headers
+/* Branding plate - shared between landing page (.p3-root) and sub-page headers
    (.page-head). Base rules cover layout + typography; the landing-only rules
    below add absolute positioning, white-on-dark coloring, and fade-in. */
 .p3-brand {
@@ -719,7 +719,7 @@ html[data-theme="dark"] .p3-root {
 }
 
 
-/* Section headings inside project detail pages — bold + an underline rule so
+/* Section headings inside project detail pages - bold + an underline rule so
    they read clearly against the body copy (added per feedback: hard to see). */
 .project-body h3 {
   font-weight: 700;
@@ -733,7 +733,7 @@ html[data-theme="dark"] .p3-root {
   padding-bottom: .25rem;
   margin-bottom: .5rem;
 }
-/* Diagram-card titles already sit inside a bordered card — keep them plain. */
+/* Diagram-card titles already sit inside a bordered card - keep them plain. */
 .project-body .diagram-card h3 {
   border-bottom: none;
   padding-bottom: 0;
