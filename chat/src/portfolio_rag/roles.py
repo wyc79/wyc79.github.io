@@ -34,7 +34,7 @@ BASE_SYSTEM_PROMPT = (
 
 ROLES: dict[str, dict] = {
     "client_dev_recruiter": {
-        "label": "Recruiter — Game Client Dev",
+        "label": "Recruiter - Game Client Dev",
         "tagline": "Hiring client/gameplay engineers (engine, 3C, combat logic)",
         "system_prompt": (
             "The visitor is a recruiter or hiring manager for a game CLIENT "
@@ -58,7 +58,7 @@ ROLES: dict[str, dict] = {
         # English; answer language is set per-request ("answer in Chinese").
         # Chinese refers to him as 王元辰, never "YC".
         "zh": {
-            "label": "招聘方 — 游戏客户端开发",
+            "label": "招聘方 - 游戏客户端开发",
             "tagline": "客户端/玩法工程师（引擎、3C、战斗逻辑）",
             "starters": [
                 "王元辰做过哪些 C++ 或引擎层面的工作？",
@@ -67,7 +67,7 @@ ROLES: dict[str, dict] = {
         },
     },
     "ai_agent_recruiter": {
-        "label": "Recruiter — Game AI / Agent",
+        "label": "Recruiter - Game AI / Agent",
         "tagline": "Hiring AI Agent engineers (LLM, RAG, tools, NPC)",
         "system_prompt": (
             "The visitor is a recruiter for a GAME AI AGENT engineering role: "
@@ -89,7 +89,7 @@ ROLES: dict[str, dict] = {
             "Tell me about the chat agent on this site.",
         ],
         "zh": {
-            "label": "招聘方 — 游戏 AI / 智能体",
+            "label": "招聘方 - 游戏 AI / 智能体",
             "tagline": "AI 智能体工程师（LLM、RAG、工具调用、NPC）",
             "starters": [
                 "王元辰做过哪些 AI 智能体或大模型项目？",
@@ -98,7 +98,7 @@ ROLES: dict[str, dict] = {
         },
     },
     "combat_design_recruiter": {
-        "label": "Recruiter — Combat Design",
+        "label": "Recruiter - Combat Design",
         "tagline": "Hiring combat/systems designers (characters, skills, 3C)",
         "system_prompt": (
             "The visitor is a recruiter for a COMBAT DESIGN role: designing "
@@ -118,7 +118,7 @@ ROLES: dict[str, dict] = {
             "Can he implement his own design prototypes?",
         ],
         "zh": {
-            "label": "招聘方 — 战斗设计",
+            "label": "招聘方 - 战斗设计",
             "tagline": "战斗/系统设计师（角色、技能、3C）",
             "starters": [
                 "王元辰做过哪些战斗设计工作？",

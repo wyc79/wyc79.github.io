@@ -687,7 +687,7 @@
   function restoreView() {
     if (state.role && state.roles && state.roles.roles[state.role]) {
       var role = state.roles.roles[state.role];
-      els.roleChip.textContent = L(role, 'label') + ' ⌄';
+      els.roleChip.textContent = L(role, 'label');
       var tr = transcript(state.role);
       if (!tr.log.length) {
         pushLog({ type: 'note', text: t('viewingAs', L(role, 'label')) });
@@ -709,7 +709,7 @@
     var tr = transcript(id);
     state.history = tr.history;
     var role = state.roles.roles[id];
-    els.roleChip.textContent = L(role, 'label') + ' ⌄';
+    els.roleChip.textContent = L(role, 'label');
     logTurn({ event: 'role_selected', role: id });
     if (!tr.log.length) {
       pushLog({ type: 'note', text: t('viewingAs', L(role, 'label')) });
@@ -960,7 +960,7 @@
     if (els.header) els.header.textContent = t('header');
     els.roleChip.title = t('roleChipTitle');
     els.roleChip.textContent = (state.role && state.roles)
-      ? L(state.roles.roles[state.role], 'label') + ' ⌄'
+      ? L(state.roles.roles[state.role], 'label')
       : t('chooseRole');
     if (els.clearBtn) { els.clearBtn.textContent = t('clearLabel'); els.clearBtn.title = t('clearTitle'); }
     updateClearVisibility();

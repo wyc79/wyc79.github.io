@@ -691,9 +691,16 @@ html[data-theme="light"] .p3-hint-key {
   opacity: 1;
 }
 
+/* Landing header: below this width the absolutely-positioned brand and
+   links would collide, so drop the links to a second row (matches the
+   sub-page header wrap). */
+@media (max-width: 820px) {
+  .p3-root .p3-brand-links { top: 80px; left: 40px; right: auto; }
+}
+
 @media (max-width: 600px) {
   .p3-root .p3-brand { top: 16px; left: 20px; }
-  .p3-root .p3-brand-links { top: 16px; right: 20px; font-size: 11px; gap: 10px; }
+  .p3-root .p3-brand-links { top: 60px; left: 20px; right: auto; font-size: 11px; gap: 10px; }
   .p3-brand img { height: 28px; }
   .p3-brand-name { font-size: 16px; }
   .p3-brand-sub { font-size: 10px; }
