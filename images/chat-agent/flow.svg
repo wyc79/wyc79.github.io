@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 960" width="1120" height="960" role="img" aria-labelledby="ttl desc">
   <title id="ttl">Portfolio Chat Agent: information flow</title>
-  <desc id="desc">Build-time embeddings (e5 retrieval index, MiniLM English gate, bge-small-zh Chinese gate) are served as static JSON. Per turn: the browser sends the query to the serverless /embed endpoint which returns an e5 query vector and a relevance gate verdict; off-topic queries stop after one call. On a pass, the browser runs cosine similarity over index.json to get top-k passages, injects them into the prompt, and calls /chat which invokes the cloud LLM API. If the function is unavailable, a consent-gated in-browser MiniLM model handles retrieval locally.</desc>
+  <desc id="desc">At build time three sources (every site page in English and Chinese, about_en.md, and about_zh.md) are embedded: the e5 encoder embeds all of them into the retrieval index (index.json); the MiniLM English gate embeds the English page text and about_en; the bge-small-zh Chinese gate embeds about_zh only. All are served as static JSON. Per turn: the browser sends the query to the serverless /embed endpoint which returns an e5 query vector and a relevance gate verdict; off-topic queries stop after one call. On a pass, the browser runs cosine similarity over index.json to get top-k passages, injects them into the prompt, and calls /chat which invokes the cloud LLM API. If the function is unavailable, a consent-gated in-browser MiniLM model handles retrieval locally.</desc>
   <style>
     text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
     .bg{fill:#ffffff;}
@@ -60,27 +60,30 @@
   <rect class="band" x="30" y="54" width="1060" height="228" rx="16"/>
   <text class="t-band" x="50" y="80">BUILD TIME · one-time, offline</text>
 
-  <rect class="node" x="54" y="112" width="196" height="150" rx="12"/>
-  <text class="t-node" x="152" y="160">Knowledge sources</text>
-  <text class="t-sub"  x="152" y="184">about_en.md</text>
-  <text class="t-sub"  x="152" y="204">about_zh.md</text>
+  <rect class="node" x="54" y="114" width="196" height="44" rx="10"/>
+  <text class="t-node" x="152" y="134">every page</text>
+  <text class="t-sub"  x="152" y="150">EN + ZH · all sections</text>
+  <rect class="node" x="54" y="174" width="196" height="44" rx="10"/>
+  <text class="t-node" x="152" y="201">about_en</text>
+  <rect class="node" x="54" y="234" width="196" height="44" rx="10"/>
+  <text class="t-node" x="152" y="261">about_zh</text>
 
   <rect class="node" x="330" y="112" width="182" height="48" rx="10"/>
-  <text class="t-node" x="421" y="132">e5 encoder</text>
-  <text class="t-sub"  x="421" y="149">retrieval</text>
+  <text class="t-node" x="421" y="132">MiniLM</text>
+  <text class="t-sub"  x="421" y="149">English gate</text>
   <rect class="node" x="330" y="172" width="182" height="48" rx="10"/>
-  <text class="t-node" x="421" y="192">MiniLM</text>
-  <text class="t-sub"  x="421" y="209">English gate</text>
+  <text class="t-node" x="421" y="192">e5 encoder</text>
+  <text class="t-sub"  x="421" y="209">retrieval · all sources</text>
   <rect class="node" x="330" y="232" width="182" height="48" rx="10"/>
   <text class="t-node" x="421" y="252">bge-small-zh</text>
   <text class="t-sub"  x="421" y="269">Chinese gate</text>
 
   <rect class="node" x="592" y="112" width="214" height="48" rx="10"/>
-  <text class="t-node" x="699" y="132">index.json</text>
-  <text class="t-sub"  x="699" y="149">retrieval index · e5</text>
+  <text class="t-node" x="699" y="132">gate vectors · EN</text>
+  <text class="t-sub"  x="699" y="149">MiniLM</text>
   <rect class="node" x="592" y="172" width="214" height="48" rx="10"/>
-  <text class="t-node" x="699" y="192">gate vectors · EN</text>
-  <text class="t-sub"  x="699" y="209">MiniLM</text>
+  <text class="t-node" x="699" y="192">index.json</text>
+  <text class="t-sub"  x="699" y="209">retrieval index · e5</text>
   <rect class="node" x="592" y="232" width="214" height="48" rx="10"/>
   <text class="t-node" x="699" y="252">gate vectors · ZH</text>
   <text class="t-sub"  x="699" y="269">bge-zh</text>
@@ -92,15 +95,20 @@
   <text class="t-subL"  x="862" y="212">downloaded by the</text>
   <text class="t-subL"  x="862" y="230">browser.</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M250,150 C295,150 295,136 328,136"/>
-  <path class="flow" marker-end="url(#arrow)" d="M250,180 C295,180 295,196 328,196"/>
-  <path class="flow" marker-end="url(#arrow)" d="M250,210 C295,210 295,256 328,256"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,130 C292,130 292,132 328,132"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,140 C296,140 296,190 328,190"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,190 C296,190 296,140 328,140"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,200 C292,200 292,196 328,196"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,250 C296,250 296,202 328,202"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,258 C292,258 292,256 328,256"/>
+
   <path class="flow" marker-end="url(#arrow)" d="M512,136 H590"/>
   <path class="flow" marker-end="url(#arrow)" d="M512,196 H590"/>
   <path class="flow" marker-end="url(#arrow)" d="M512,256 H590"/>
-  <path class="flow" marker-end="url(#arrow)" d="M806,136 C824,136 824,178 840,178"/>
+
+  <path class="flow" marker-end="url(#arrow)" d="M806,136 C824,136 824,164 840,164"/>
   <path class="flow" marker-end="url(#arrow)" d="M806,196 H840"/>
-  <path class="flow" marker-end="url(#arrow)" d="M806,256 C824,256 824,210 840,210"/>
+  <path class="flow" marker-end="url(#arrow)" d="M806,256 C824,256 824,212 840,212"/>
 
   <path class="flow-dash" marker-end="url(#arrow)" d="M953,254 C953,306 640,300 474,332"/>
   <text class="t-edge" x="690" y="300">downloaded to browser</text>

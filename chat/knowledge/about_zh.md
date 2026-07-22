@@ -99,7 +99,7 @@ link: pages/publications.html
 
 ## AI 与大模型项目
 link: index.html
-王元辰为本作品集网站做了一个 AI 智能问答助手，用检索增强生成技术回答访客关于他项目与经历的问题。
+王元辰用 Python 为本作品集网站做了一个 AI 智能问答助手，用检索增强生成（RAG）技术回答访客关于他项目与经历的问题。
 
 ## 他会什么、都会什么、擅长什么
 link: pages/skills.html

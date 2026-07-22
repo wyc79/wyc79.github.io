@@ -38,15 +38,17 @@ Artificial Intelligence).
 ## AI chat agent project (LLM, RAG, agents)
 link: index.html
 LLM and AI agent engineering: YC designed and built the AI chat agent on
-this website end-to-end. It is a retrieval-augmented generation (RAG)
-system: site content is chunked and embedded into a static vector index,
-sentence embeddings run in the visitor's browser (MiniLM via
-transformers.js / ONNX), retrieval is client-side vector search, and answer
-generation uses an LLM served through a Cloudflare Worker. The system
-includes role-conditioned prompting, prompt-injection and off-topic
-defenses, per-turn logging for evaluation, and a tested Python ingestion
-pipeline. It demonstrates practical experience with LLM applications,
-embeddings, semantic search, and agent-style system design.
+this website end-to-end, in Python and JavaScript. It is a
+retrieval-augmented generation (RAG) system: site content is chunked and
+embedded into a prebuilt vector index, semantic search retrieves the most
+relevant passages, and a Python backend embeds each query, runs an
+injection-resistant relevance gate, and calls an LLM to generate the
+answer. The gate is name-blind and works across English and Chinese, and
+the whole system is bilingual (knowledge, gate, and UI), role-conditioned,
+and instrumented with per-turn logging for evaluation. It is built on a
+tested Python ingestion and indexing pipeline, and demonstrates practical
+experience with LLM applications, sentence embeddings, semantic search,
+prompt-injection defense, and agent-style system design.
 
 ## Machine learning research background
 link: pages/publications.html

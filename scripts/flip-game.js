@@ -11,7 +11,8 @@
     { key: 'codebreaker', src: IMG_BASE + 'images/codebreaker_thumbnail.png', alt: 'CodeBreaker - screenshot' },
     { key: 'workshop', src: IMG_BASE + 'images/ctin488_thumbnail.png', alt: 'Game Design Workshop' },
     { key: '3Drendering', src: IMG_BASE + 'images/3Drendering_thumbnail.png', alt: '3D Rendering Project Video' },
-    { key: 'prime-engine', src: IMG_BASE + 'images/prime_engine_thumbnail.png', alt: 'Prime Engine - Engine Systems Implementation' }
+    { key: 'prime-engine', src: IMG_BASE + 'images/prime_engine_thumbnail.png', alt: 'Prime Engine - Engine Systems Implementation' },
+    { key: 'chat-agent', src: IMG_BASE + 'images/chat_agent_thumbnail.png', alt: 'Portfolio Chat Agent - RAG assistant' }
   ];
 
   function initFlipGame() {
