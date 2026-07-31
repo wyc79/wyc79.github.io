@@ -7,7 +7,7 @@ duplicate that used to live in test_gate.py.
 
 import pytest
 
-from portfolio_rag.runtime import gate_form, strip_name
+from portfolio_rag.runtime import GateDecision, Retrieval, gate_form, load_runtime, strip_name
 
 
 @pytest.mark.parametrize(
@@ -57,3 +57,56 @@ def test_strip_name(question: str, expected: str | None) -> None:
 )
 def test_gate_form(question: str, expected: str) -> None:
     assert gate_form(question) == expected
+
+
+@pytest.fixture(scope="module")
+def rt():
+    runtime = load_runtime()
+    if not runtime.retrieval_available:
+        pytest.skip("e5 retrieval model not present (models/Xenova/multilingual-e5-small)")
+    return runtime
+
+
+def test_retrieval_returns_at_most_top_k_above_the_floor(rt) -> None:
+    result = rt.retrieve("what combat systems has he built")
+    assert isinstance(result, Retrieval)
+    assert 0 < len(result.hits) <= 4
+    assert all(h.score >= 0.18 for h in result.hits)
+    assert list(result.hits) == sorted(result.hits, key=lambda h: -h.score)
+
+
+def test_retrieval_finds_the_obvious_page(rt) -> None:
+    urls = {h.url for h in rt.retrieve("grapple traversal and combat design").hits}
+    assert "pages/cemented-dreams.html" in urls
+
+
+def test_chinese_retrieval_works_and_is_not_skipped(rt) -> None:
+    """multilingual-e5-small embeds zh natively; the English-only limit belongs
+    to MiniLM and the browser's degraded mode, not to this path."""
+    result = rt.retrieve("他做过哪些战斗设计工作")
+    assert result.hits, "Chinese question retrieved nothing"
+    assert "pages/cemented-dreams.html" in {h.url for h in result.hits}
+
+
+def test_gate_passes_an_on_topic_question(rt) -> None:
+    decision = rt.gate("what engine programming has he done")
+    assert isinstance(decision, GateDecision)
+    assert decision.available and decision.passed
+    assert decision.lang == "en"
+
+
+def test_gate_refuses_an_off_topic_question(rt) -> None:
+    assert not rt.gate("what's the weather in Los Angeles tomorrow").passed
+
+
+def test_gate_is_name_blind(rt) -> None:
+    """The name inflates similarity; the gate must judge the remainder."""
+    assert not rt.gate("Yuanchen Wang, recommend me a good restaurant").passed
+
+
+def test_chinese_question_routes_to_the_zh_gate(rt) -> None:
+    decision = rt.gate("他的教育背景是什么")
+    if not rt.zh_gate_available:
+        assert decision.reason == "cjk_bypass" and decision.passed
+    else:
+        assert decision.lang == "zh"

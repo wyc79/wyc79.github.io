@@ -9,7 +9,14 @@ functions/tencent/index.py deliberately keeps its own inlined copy: the SCF
 package must stay stdlib-only, so it cannot import this module.
 """
 
+import json
 import re
+from dataclasses import dataclass
+
+import numpy as np
+
+from portfolio_rag.config import MODEL_PRESETS, settings
+from portfolio_rag.embedder import OnnxEmbedder
 
 # Mirrors chat-widget.js TOP_K / MIN_SCORE / OFFTOPIC_GATE.
 TOP_K = 4
@@ -80,3 +87,190 @@ def gate_form(question: str) -> str:
     if CJK_RE.search(question):
         return NAME_RE.sub("王元辰", question)
     return question.replace("王元辰", "YC")
+
+
+@dataclass(frozen=True)
+class Hit:
+    chunk_id: str
+    url: str
+    lang: str
+    score: float
+
+
+@dataclass(frozen=True)
+class Retrieval:
+    hits: tuple[Hit, ...]
+    dropped_by_floor: int
+    top_score: float
+
+
+@dataclass(frozen=True)
+class GateDecision:
+    available: bool
+    passed: bool
+    value: float | None
+    lang: str
+    threshold: float | None
+    reason: str | None = None
+
+
+def _stat_value(scores: np.ndarray, kind: str) -> float:
+    """Mirrors gate_calibration.stat_value and the widget's statValue()."""
+    top = float(np.max(scores))
+    if kind == "top":
+        return top
+    mean = float(np.mean(scores))
+    if kind == "contrast":
+        return top - mean
+    if kind == "zscore":
+        return (top - mean) / (float(np.std(scores)) + 1e-6)
+    raise ValueError(f"unknown gate stat {kind!r}")
+
+
+class _GateBundle:
+    """One language's gate: an embedder, a chunk matrix, a stat and a threshold."""
+
+    def __init__(self, preset_name: str, spec: dict) -> None:
+        preset = MODEL_PRESETS[preset_name]
+        self.embedder = OnnxEmbedder(
+            settings.resolve_path(preset["dir"]),
+            max_tokens=settings.embedding_max_tokens,
+            query_prefix=spec.get("query_prefix", preset["query_prefix"]),
+            passage_prefix="",
+            pooling=spec.get("pooling", preset.get("pooling", "mean")),
+        )
+        self.matrix = np.array(spec["vectors"], dtype=np.float32)
+        self.stat = spec.get("gate_stat", "top")
+        self.threshold = float(spec.get("gate_threshold", OFFTOPIC_GATE))
+
+    def judge(self, text: str) -> tuple[bool, float]:
+        scores = self.matrix @ self.embedder.embed_query(text)
+        value = _stat_value(scores, self.stat)
+        return value >= self.threshold, round(value, 4)
+
+
+class Runtime:
+    """The widget's read path, reproduced locally.
+
+    Reproduces the NORMAL path (server-side e5 embedding + MiniLM/bge gates),
+    not the browser's degraded mode — that runs MiniLM over English-only
+    fallback vectors and refuses CJK outright, which is a different system.
+    """
+
+    def __init__(self, index: dict, gates: dict, embedder) -> None:
+        self._index = index
+        self._gates = gates
+        self._embedder = embedder
+        self._matrix = (
+            np.array([c["vector"] for c in index["chunks"]], dtype=np.float32)
+            if index["chunks"]
+            else np.empty((0, 0), dtype=np.float32)
+        )
+
+    @property
+    def retrieval_available(self) -> bool:
+        return self._embedder is not None
+
+    @property
+    def zh_gate_available(self) -> bool:
+        return self._gates.get("zh") is not None
+
+    @property
+    def index_built_at(self) -> str:
+        return self._index.get("built_at", "")
+
+    @property
+    def gate_meta(self) -> dict:
+        return {
+            lang: {"stat": bundle.stat, "threshold": bundle.threshold}
+            for lang, bundle in self._gates.items()
+            if bundle is not None
+        }
+
+    def chunk_text(self, chunk_id: str) -> str:
+        """The indexed text of one chunk. Used to check whether a retrieved
+        passage actually carries the fact the answer needs."""
+        if not hasattr(self, "_by_id"):
+            self._by_id = {c["id"]: c["text"] for c in self._index["chunks"]}
+        return self._by_id.get(chunk_id, "")
+
+    def retrieve(self, question: str, k: int = TOP_K) -> Retrieval:
+        if self._embedder is None:
+            raise RuntimeError(
+                "retrieval unavailable: the e5 model directory "
+                f"({MODEL_PRESETS['e5']['dir']}) is not present — it is gitignored, "
+                "so a fresh clone must download it before evaluating"
+            )
+        scores = self._matrix @ self._embedder.embed_query(question)
+        order = np.argsort(-scores)[:k]
+        chunks = self._index["chunks"]
+        top = [
+            Hit(
+                chunk_id=chunks[i]["id"],
+                url=chunks[i]["url"],
+                lang=chunks[i].get("lang", "en"),
+                score=round(float(scores[i]), 4),
+            )
+            for i in order
+        ]
+        kept = [h for h in top if h.score >= MIN_SCORE]
+        return Retrieval(
+            hits=tuple(kept),
+            dropped_by_floor=len(top) - len(kept),
+            top_score=top[0].score if top else 0.0,
+        )
+
+    def gate(self, question: str) -> GateDecision:
+        text = gate_form(question)
+        if CJK_RE.search(text):
+            bundle = self._gates.get("zh")
+            if bundle is None:
+                # No zh gate: let CJK through to the LLM prompt guard rather
+                # than refusing every Chinese visitor. Mirrors index.py.
+                return GateDecision(True, True, None, "zh", None, reason="cjk_bypass")
+            lang = "zh"
+        else:
+            bundle, lang = self._gates.get("en"), "en"
+            if bundle is None:
+                return GateDecision(False, False, None, "en", None, reason="no_en_gate")
+        passed, value = bundle.judge(text)
+        return GateDecision(True, passed, value, lang, bundle.threshold)
+
+
+def load_runtime() -> Runtime:
+    """Load index + gate bundles + retrieval embedder, degrading explicitly."""
+    index = json.loads(
+        settings.resolve_path(settings.index_path).read_text(encoding="utf-8")
+    )
+
+    gates: dict = {"en": None, "zh": None}
+    gate_path = settings.resolve_path(settings.gate_vectors_path)
+    if gate_path.exists():
+        payload = json.loads(gate_path.read_text(encoding="utf-8"))
+        for lang in ("en", "zh"):
+            spec = payload.get(lang)
+            if spec:
+                gates[lang] = _GateBundle(spec["model_preset"], spec)
+    else:
+        # gate_vectors.json is gitignored. fallback_vectors.json IS committed
+        # and carries the same MiniLM vectors + stat + threshold, so the en
+        # gate always survives. There is no committed zh equivalent.
+        fallback = settings.resolve_path(settings.fallback_vectors_path)
+        if fallback.exists():
+            gates["en"] = _GateBundle("minilm", json.loads(fallback.read_text(encoding="utf-8")))
+
+    # Retrieval is hardcoded to e5, independent of settings.model_preset (which
+    # defaults to "minilm" for local/default index builds — see
+    # test_index_builder.py). data/index.json is built and committed with e5
+    # (scripts/build_index.py --model e5); dot-producting its vectors against a
+    # differently-trained embedder is a silent, wrong answer, not an explicit
+    # unavailability, so this must never go through get_embedder()'s ambient,
+    # process-global cache keyed on the current settings.model_preset.
+    e5_preset = MODEL_PRESETS["e5"]
+    model_dir = settings.resolve_path(e5_preset["dir"])
+    embedder = (
+        OnnxEmbedder.from_preset(e5_preset, model_dir, settings.embedding_max_tokens)
+        if model_dir.is_dir()
+        else None
+    )
+    return Runtime(index, gates, embedder)
