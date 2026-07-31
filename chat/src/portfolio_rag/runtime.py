@@ -157,10 +157,11 @@ class Runtime:
     fallback vectors and refuses CJK outright, which is a different system.
     """
 
-    def __init__(self, index: dict, gates: dict, embedder) -> None:
+    def __init__(self, index: dict, gates: dict, embedder, model_dir=None) -> None:
         self._index = index
         self._gates = gates
         self._embedder = embedder
+        self._model_dir = model_dir
         self._matrix = (
             np.array([c["vector"] for c in index["chunks"]], dtype=np.float32)
             if index["chunks"]
@@ -197,9 +198,10 @@ class Runtime:
     def retrieve(self, question: str, k: int = TOP_K) -> Retrieval:
         if self._embedder is None:
             raise RuntimeError(
-                "retrieval unavailable: the e5 model directory "
-                f"({MODEL_PRESETS['e5']['dir']}) is not present — it is gitignored, "
-                "so a fresh clone must download it before evaluating"
+                f"retrieval unavailable: the model directory {self._model_dir} "
+                f"declared by index.json (model_preset="
+                f"{self._index.get('model_preset')!r}) is not present — it is "
+                "gitignored, so a fresh clone must download it before evaluating"
             )
         scores = self._matrix @ self._embedder.embed_query(question)
         order = np.argsort(-scores)[:k]
@@ -259,18 +261,19 @@ def load_runtime() -> Runtime:
         if fallback.exists():
             gates["en"] = _GateBundle("minilm", json.loads(fallback.read_text(encoding="utf-8")))
 
-    # Retrieval is hardcoded to e5, independent of settings.model_preset (which
-    # defaults to "minilm" for local/default index builds — see
-    # test_index_builder.py). data/index.json is built and committed with e5
-    # (scripts/build_index.py --model e5); dot-producting its vectors against a
-    # differently-trained embedder is a silent, wrong answer, not an explicit
-    # unavailability, so this must never go through get_embedder()'s ambient,
-    # process-global cache keyed on the current settings.model_preset.
-    e5_preset = MODEL_PRESETS["e5"]
-    model_dir = settings.resolve_path(e5_preset["dir"])
+    # The INDEX declares which model built it — not settings, and not a
+    # hardcoded preset. settings.model_preset defaults to "minilm" while the
+    # committed index.json was built with e5, so resolving from settings would
+    # dot MiniLM query vectors against e5 chunk vectors and return
+    # plausible-looking garbage (measured: top score ~0.10 instead of ~0.86).
+    # get_embedder()'s module-level cache is shared with the other test modules,
+    # so build a dedicated instance rather than reusing it.
+    preset_name = index.get("model_preset", settings.model_preset)
+    preset = MODEL_PRESETS[preset_name]
+    model_dir = settings.resolve_path(preset["dir"])
     embedder = (
-        OnnxEmbedder.from_preset(e5_preset, model_dir, settings.embedding_max_tokens)
+        OnnxEmbedder.from_preset(preset, model_dir, settings.embedding_max_tokens)
         if model_dir.is_dir()
         else None
     )
-    return Runtime(index, gates, embedder)
+    return Runtime(index, gates, embedder, model_dir=model_dir)
