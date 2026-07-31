@@ -1,0 +1,33 @@
+{
+  "k": 4,
+  "generated_at": "2026-07-31T21:31:19+00:00",
+  "index_built_at": "2026-07-21T22:35:27+00:00",
+  "gate": {
+    "en": {
+      "stat": "top",
+      "threshold": 0.2312
+    },
+    "zh": {
+      "stat": "top",
+      "threshold": 0.4919
+    }
+  },
+  "cells": {
+    "combat_design_recruiter/en": {
+      "role": "combat_design_recruiter",
+      "lang": "en",
+      "n_positive": 12,
+      "n_negative": 8,
+      "gate_pass": 12,
+      "refusal": 0,
+      "hit_at_4": 7,
+      "keywords_found": 9,
+      "keywords_total": 20,
+      "gate_available": true,
+      "retrieved_langs": {
+        "en": 46,
+        "zh": 2
+      }
+    }
+  }
+}
