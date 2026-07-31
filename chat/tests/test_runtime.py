@@ -116,16 +116,9 @@ def test_retrieval_embedder_matches_the_index_that_was_built(rt) -> None:
     """The index declares its own model. Resolving the embedder from settings
     instead would dot MiniLM query vectors against e5 chunk vectors — scores
     stay in [0,1] and look plausible while ranking is meaningless."""
-    import json
-
-    from portfolio_rag.config import settings
-
-    index = json.loads(
-        settings.resolve_path(settings.index_path).read_text(encoding="utf-8")
-    )
     result = rt.retrieve("what combat systems has he built")
     assert result.top_score > 0.5, (
         f"top score {result.top_score} is too low for an on-topic query — "
-        f"the query embedder is probably not the {index['model_preset']} model "
+        f"the query embedder is probably not the {rt.model_preset} model "
         "that built the index"
     )

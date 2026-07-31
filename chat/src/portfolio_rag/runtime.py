@@ -181,6 +181,11 @@ class Runtime:
         return self._index.get("built_at", "")
 
     @property
+    def model_preset(self) -> str:
+        """Which embedding model built the index this runtime is serving."""
+        return self._index.get("model_preset", "")
+
+    @property
     def gate_meta(self) -> dict:
         return {
             lang: {"stat": bundle.stat, "threshold": bundle.threshold}
@@ -259,7 +264,15 @@ def load_runtime() -> Runtime:
         # gate always survives. There is no committed zh equivalent.
         fallback = settings.resolve_path(settings.fallback_vectors_path)
         if fallback.exists():
-            gates["en"] = _GateBundle("minilm", json.loads(fallback.read_text(encoding="utf-8")))
+            fallback_spec = json.loads(fallback.read_text(encoding="utf-8"))
+            gates["en"] = _GateBundle(
+                # fallback_vectors.json records no model identity today, so
+                # "minilm" is the documented default. Read the key if a future
+                # build starts writing it, rather than silently mismatching the
+                # way the settings-based embedder lookup did.
+                fallback_spec.get("model_preset", "minilm"),
+                fallback_spec,
+            )
 
     # The INDEX declares which model built it — not settings, and not a
     # hardcoded preset. settings.model_preset defaults to "minilm" while the
