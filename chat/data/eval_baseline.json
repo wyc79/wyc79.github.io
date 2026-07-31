@@ -1,6 +1,6 @@
 {
   "k": 4,
-  "generated_at": "2026-07-31T22:35:10+00:00",
+  "generated_at": "2026-07-31T22:48:34+00:00",
   "index_built_at": "2026-07-21T22:35:27+00:00",
   "gate": {
     "en": {
@@ -51,12 +51,13 @@
       "n_negative": 8,
       "gate_pass": 12,
       "refusal": 1,
-      "hit_at_4": 8,
-      "keywords_found": 14,
+      "hit_at_4": 9,
+      "keywords_found": 15,
       "keywords_total": 24,
       "gate_available": true,
       "retrieved_langs": {
-        "en": 48
+        "en": 47,
+        "zh": 1
       }
     },
     "client_dev_recruiter/zh": {
@@ -66,8 +67,8 @@
       "n_negative": 8,
       "gate_pass": 11,
       "refusal": 3,
-      "hit_at_4": 10,
-      "keywords_found": 16,
+      "hit_at_4": 9,
+      "keywords_found": 15,
       "keywords_total": 25,
       "gate_available": true,
       "retrieved_langs": {
