@@ -1,6 +1,6 @@
 {
   "k": 4,
-  "generated_at": "2026-07-31T21:31:19+00:00",
+  "generated_at": "2026-07-31T22:14:00+00:00",
   "index_built_at": "2026-07-21T22:35:27+00:00",
   "gate": {
     "en": {
@@ -27,6 +27,21 @@
       "retrieved_langs": {
         "en": 46,
         "zh": 2
+      }
+    },
+    "combat_design_recruiter/zh": {
+      "role": "combat_design_recruiter",
+      "lang": "zh",
+      "n_positive": 12,
+      "n_negative": 8,
+      "gate_pass": 7,
+      "refusal": 3,
+      "hit_at_4": 4,
+      "keywords_found": 5,
+      "keywords_total": 15,
+      "gate_available": true,
+      "retrieved_langs": {
+        "zh": 48
       }
     }
   }
