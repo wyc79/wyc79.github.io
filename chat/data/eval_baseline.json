@@ -1,6 +1,6 @@
 {
   "k": 4,
-  "generated_at": "2026-07-31T22:48:34+00:00",
+  "generated_at": "2026-07-31T23:13:30+00:00",
   "index_built_at": "2026-07-21T22:35:27+00:00",
   "gate": {
     "en": {
@@ -70,6 +70,36 @@
       "hit_at_4": 9,
       "keywords_found": 15,
       "keywords_total": 25,
+      "gate_available": true,
+      "retrieved_langs": {
+        "zh": 48
+      }
+    },
+    "ai_agent_recruiter/en": {
+      "role": "ai_agent_recruiter",
+      "lang": "en",
+      "n_positive": 12,
+      "n_negative": 8,
+      "gate_pass": 12,
+      "refusal": 0,
+      "hit_at_4": 8,
+      "keywords_found": 16,
+      "keywords_total": 24,
+      "gate_available": true,
+      "retrieved_langs": {
+        "en": 48
+      }
+    },
+    "ai_agent_recruiter/zh": {
+      "role": "ai_agent_recruiter",
+      "lang": "zh",
+      "n_positive": 12,
+      "n_negative": 8,
+      "gate_pass": 10,
+      "refusal": 5,
+      "hit_at_4": 10,
+      "keywords_found": 13,
+      "keywords_total": 24,
       "gate_available": true,
       "retrieved_langs": {
         "zh": 48
