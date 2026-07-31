@@ -6,10 +6,13 @@ chat/knowledge/*.md, which is corpus and does.
 """
 
 import json
-from dataclasses import dataclass
+import re
+from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from portfolio_rag.config import settings
+from portfolio_rag.runtime import TOP_K, Runtime
 
 CASE_TYPES = ("positive", "off_topic", "injection")
 CELL_COMPOSITION = {"positive": 12, "off_topic": 4, "injection": 4}
@@ -63,3 +66,124 @@ def load_cases(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
             )
         )
     return cases
+
+
+# ASCII-only word characters, deliberately NOT \w. Python's \w is
+# Unicode-aware and treats CJK as word characters, so r"(?<!\w)Hive" would
+# refuse to match inside "在Hive关卡中" — every Latin keyword in a Chinese
+# chunk would read as missing. JavaScript's \w is ASCII-only, which is the
+# semantics we actually want here. (runtime.NAME_RE carries the same fix.)
+_WORD_CHAR = "a-zA-Z0-9_"
+
+
+def _keyword_pattern(keyword: str) -> re.Pattern:
+    """Word boundaries only where the keyword's own edge is ASCII alphanumeric.
+
+    'AI' gets both boundaries, so it cannot match inside 'available'. 'C++'
+    gets a leading boundary only, because '+' is not a word character and a
+    trailing boundary would never fire after it. CJK keywords get neither —
+    Chinese has no word separators, so a plain substring match is correct.
+    """
+    left = f"(?<![{_WORD_CHAR}])" if keyword[:1].isascii() and keyword[:1].isalnum() else ""
+    right = f"(?![{_WORD_CHAR}])" if keyword[-1:].isascii() and keyword[-1:].isalnum() else ""
+    return re.compile(left + re.escape(keyword) + right, re.I)
+
+
+def keyword_matches(text: str, keywords) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Split keywords into (found, missing) against one blob of retrieved text."""
+    found, missing = [], []
+    for kw in keywords:
+        (found if _keyword_pattern(kw).search(text) else missing).append(kw)
+    return tuple(found), tuple(missing)
+
+
+@dataclass(frozen=True)
+class CaseResult:
+    case: GoldenCase
+    gate_passed: bool
+    gate_value: float | None
+    gate_available: bool
+    hit: bool | None
+    top_urls: tuple[str, ...]
+    top_scores: tuple[float, ...]
+    keywords_found: tuple[str, ...] = ()
+    keywords_missing: tuple[str, ...] = ()
+    retrieved_langs: dict[str, int] = field(default_factory=dict)
+    dropped_by_floor: int = 0
+
+    @property
+    def ok(self) -> bool:
+        """Did this case behave as the dataset says it should?"""
+        if self.case.type == "positive":
+            return self.gate_passed and bool(self.hit) and not self.keywords_missing
+        return not self.gate_passed
+
+
+def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
+    # Retrieval runs for every case type, and hit/keywords are computed WITHOUT
+    # consulting the gate: a gate failure must never mask retrieval quality.
+    retrieval = rt.retrieve(case.q, k=TOP_K)
+    decision = rt.gate(case.q)
+    urls = tuple(h.url for h in retrieval.hits)
+    hit = None
+    found: tuple[str, ...] = ()
+    missing: tuple[str, ...] = ()
+    if case.type == "positive":
+        hit = bool(set(urls) & set(case.expected_urls))
+        # Matched against the concatenated post-floor top-4 — exactly the text
+        # that becomes `contexts`. This is "was the fact available to the model?"
+        blob = " ".join(rt.chunk_text(h.chunk_id) for h in retrieval.hits)
+        found, missing = keyword_matches(blob, case.expected_keywords)
+    return CaseResult(
+        case=case,
+        gate_passed=decision.passed,
+        gate_value=decision.value,
+        gate_available=decision.available,
+        hit=hit,
+        top_urls=urls,
+        top_scores=tuple(h.score for h in retrieval.hits),
+        keywords_found=found,
+        keywords_missing=missing,
+        retrieved_langs=dict(Counter(h.lang for h in retrieval.hits)),
+        dropped_by_floor=retrieval.dropped_by_floor,
+    )
+
+
+def run_cases(rt: Runtime, cases: list[GoldenCase]) -> list[CaseResult]:
+    return [score_case(rt, c) for c in cases]
+
+
+def aggregate(results: list[CaseResult]) -> dict[str, dict]:
+    """Per (role, lang) cell. Metrics are reported side by side and never
+    blended: 90% from gate refusals and 90% from retrieval misses demand
+    opposite fixes, and an average hides which one you have."""
+    cells: dict[str, dict] = {}
+    for r in results:
+        cell = cells.setdefault(
+            r.case.cell,
+            {
+                "role": r.case.role, "lang": r.case.lang,
+                "n_positive": 0, "n_negative": 0,
+                "gate_pass": 0, "refusal": 0, "hit_at_4": 0,
+                "keywords_found": 0, "keywords_total": 0,
+                "gate_available": True,
+                "retrieved_langs": {},
+            },
+        )
+        if r.case.type == "positive":
+            cell["n_positive"] += 1
+            cell["gate_pass"] += int(r.gate_passed)
+            cell["hit_at_4"] += int(bool(r.hit))
+            # Coverage, not all-or-nothing: 1/4 and 3/4 must stay distinguishable.
+            cell["keywords_found"] += len(r.keywords_found)
+            cell["keywords_total"] += len(r.keywords_found) + len(r.keywords_missing)
+            for lang, n in r.retrieved_langs.items():
+                cell["retrieved_langs"][lang] = cell["retrieved_langs"].get(lang, 0) + n
+        else:
+            cell["n_negative"] += 1
+            cell["refusal"] += int(not r.gate_passed)
+        # A cjk_bypass decision means there is no zh gate; the gate columns for
+        # that cell are unmeasured rather than perfect.
+        if not r.gate_available or r.gate_value is None and r.case.lang == "zh":
+            cell["gate_available"] = False
+    return cells
