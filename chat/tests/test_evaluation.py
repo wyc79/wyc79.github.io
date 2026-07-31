@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from portfolio_rag.evaluation import GoldenCase, aggregate, keyword_matches, run_cases, score_case
@@ -73,17 +75,46 @@ def test_negative_is_gate_only(rt) -> None:
 
 
 def test_hit_is_independent_of_the_gate(rt) -> None:
-    """A positive whose gate refuses must still report its retrieval quality —
-    otherwise a gate failure silently masks retrieval health."""
+    """A positive whose gate REFUSES must still report retrieval quality.
+
+    The gate decision and the retrieval score answer different questions, and
+    a gate failure must never mask retrieval health — that separation is the
+    whole reason the two are scored independently. Forced with a stub rather
+    than a probe query: no real question is guaranteed to stay below the
+    threshold as the corpus and calibration change, and a probe that quietly
+    stops refusing turns this into a test that passes for the wrong reason.
+    """
+    # NOTE: deviates from task-5-brief.md's keyword ("Hive"), which does not
+    # land in this query's post-floor top-4 on this build. Verified directly:
+    # for q="Which action game did he own the combat mechanics on?", the top-4
+    # blob contains "Cemented Dreams" (the page's own title text, chunk
+    # pages/cemented-dreams.html#top) but not "Hive". "Cemented Dreams" is
+    # confirmed present so the non-stubbed assertions below are meaningful.
     case = GoldenCase(
         id="t-en-03", role="visitor", lang="en", type="positive",
-        q="zzzz qqqq xxxx nonsense",
+        q="Which action game did he own the combat mechanics on?",
         expected_urls=("pages/cemented-dreams.html",),
-        expected_keywords=("Hive",),
+        expected_keywords=("Cemented Dreams",),
     )
-    result = score_case(rt, case)
-    assert result.hit is not None
-    assert len(result.keywords_found) + len(result.keywords_missing) == 1
+
+    class _RefusingGate:
+        """rt with gate() forced to refuse; retrieval untouched."""
+
+        def __init__(self, inner):
+            self._inner = inner
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+        def gate(self, question):
+            decision = self._inner.gate(question)
+            return replace(decision, passed=False)
+
+    result = score_case(_RefusingGate(rt), case)
+
+    assert result.gate_passed is False, "the stub did not take effect"
+    assert result.hit is True, "a gate refusal masked the retrieval hit"
+    assert result.keywords_found, "a gate refusal masked keyword coverage"
 
 
 def test_aggregate_keys_by_role_and_lang(rt) -> None:
