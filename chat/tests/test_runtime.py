@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Gate text normalization — the Python mirror of scripts/chat-widget.js.
 
 The widget is the source of truth: these cases were read off its NAME_TEST_RE /
@@ -46,8 +45,11 @@ def test_strip_name(question: str, expected: str | None) -> None:
         # zh gate corpus, which only ever writes 王元辰.
         ("介绍一下YC这个人", "介绍一下王元辰这个人"),
         ("王元辰是谁", "王元辰是谁"),
-        # Kept + English question: normalize 王元辰 to "YC" for the English gate.
-        ("who is 王元辰", "who is YC"),
+        # Kept + a question that contains 王元辰: CJK_RE is a PRESENCE check and
+        # 王元辰 is itself CJK, so the widget takes the Chinese branch and the
+        # name is rewritten to itself — unchanged. The English branch is only
+        # reachable for questions containing no CJK at all.
+        ("who is 王元辰", "who is 王元辰"),
         ("who is Yuanchen Wang", "who is Yuanchen Wang"),
         # No name at all: identity.
         ("what engine work has he done", "what engine work has he done"),

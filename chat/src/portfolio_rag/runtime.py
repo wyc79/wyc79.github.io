@@ -27,8 +27,10 @@ NAME_RE = re.compile(r"(?<![a-zA-Z0-9_])(yuanchen|wang|yc)(?:'s)?(?![a-zA-Z0-9_]
 # English stubs anchor at the start; the zh stubs match ANYWHERE, so
 # "用一段话介绍一下" and "…是谁" survive. Used with re.search to mirror the
 # widget's .test() — an anchored .match() would strip zh bio questions.
+# Like NAME_RE, use ASCII-only lookahead instead of \b to avoid Python's CJK
+# classification issue.
 BIO_STUB_RE = re.compile(
-    r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)\b"
+    r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)(?![a-zA-Z0-9_])"
     r"|^$|介绍|简介|谁是|是谁|关于"
     r"|(?:都会什么|会做什么|会什么|擅长什么)[?？。!！\s]*$"
     r"|有(?:哪些|什么)?技能",
@@ -65,13 +67,16 @@ def gate_form(question: str) -> str:
     name is normalized to the gate's own language — each gate corpus is
     single-language, so a Chinese question saying "YC" (or an English one
     saying 王元辰) would otherwise miss it. Retrieval always uses the original.
+
+    The language branch is determined by PRESENCE of CJK characters (not ratio),
+    mirroring the widget's CJK_RE.test() presence check. This must not be
+    changed to a majority vote, as that silently changes which questions get
+    refused by the gate.
     """
     stripped = strip_name(question)
     if stripped is not None:
         return stripped
-    # Detect language by checking if majority of content is CJK.
-    cjk_chars = len(CJK_RE.findall(question))
-    is_cjk_question = (cjk_chars * 2 > len(question))  # > 50% CJK
-    if is_cjk_question:
+    # Presence check, not majority vote: any CJK character routes to Chinese branch.
+    if CJK_RE.search(question):
         return NAME_RE.sub("王元辰", question)
     return question.replace("王元辰", "YC")
