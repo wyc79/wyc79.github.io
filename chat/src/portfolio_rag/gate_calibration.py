@@ -118,4 +118,14 @@ def compute_gate(
         threshold = round((best["lo"] + best["hi"]) / 2, 4)
 
     logger.info("gate calibration: chose stat=%s threshold=%.4f", best["stat"], threshold)
-    return {"stat": best["stat"], "threshold": threshold, "margin": round(best["margin"], 4)}
+    # lo/hi (off-topic max / on-topic min, in the chosen stat's units) ride
+    # along so a caller that rejects a non-separating margin (index_builder's
+    # en floor, task 20) can name both distribution bounds in its error, not
+    # just the derived margin number.
+    return {
+        "stat": best["stat"],
+        "threshold": threshold,
+        "margin": round(best["margin"], 4),
+        "lo": round(best["lo"], 4),
+        "hi": round(best["hi"], 4),
+    }

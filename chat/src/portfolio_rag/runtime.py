@@ -142,6 +142,12 @@ class _GateBundle:
         self.matrix = np.array(spec["vectors"], dtype=np.float32)
         self.stat = spec.get("gate_stat", "top")
         self.threshold = float(spec.get("gate_threshold", OFFTOPIC_GATE))
+        # None (not 0.0) on any artifact built before task 20 -- gate_margin
+        # is a reported diagnostic, and an absent measurement must render as
+        # unavailable, never as an implied-healthy 0% margin. Only build_index
+        # (index_builder.py) ever writes this key.
+        margin = spec.get("gate_margin")
+        self.margin = None if margin is None else float(margin)
 
     def judge(self, text: str) -> tuple[bool, float]:
         scores = self.matrix @ self.embedder.embed_query(text)
@@ -188,7 +194,7 @@ class Runtime:
     @property
     def gate_meta(self) -> dict:
         return {
-            lang: {"stat": bundle.stat, "threshold": bundle.threshold}
+            lang: {"stat": bundle.stat, "threshold": bundle.threshold, "margin": bundle.margin}
             for lang, bundle in self._gates.items()
             if bundle is not None
         }

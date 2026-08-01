@@ -13,12 +13,12 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime, timezone
 
 from portfolio_rag.evaluation import (
-    BASELINE_PATH, GOLDEN_PATH, SHARED_ROLE, aggregate, load_cases, run_cases,
+    BASELINE_PATH, GOLDEN_PATH, SHARED_ROLE, aggregate, build_baseline, format_margin,
+    load_cases, run_cases,
 )
-from portfolio_rag.runtime import TOP_K, load_runtime
+from portfolio_rag.runtime import load_runtime
 
 # Every "n_*" key a shared cell can carry WITHOUT a not-yet-migrated negative
 # in it: the two bookkeeping counts plus the three adjacency buckets (see
@@ -29,14 +29,23 @@ from portfolio_rag.runtime import TOP_K, load_runtime
 _SHARED_N_KEYS = {"n_positive", "n_negative", "n_easy", "n_adjacent", "n_injection"}
 
 
-def build_baseline(rt, cells: dict) -> dict:
-    return {
-        "k": TOP_K,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "index_built_at": rt.index_built_at,
-        "gate": rt.gate_meta,
-        "cells": cells,
-    }
+def print_gate_summary(gate_meta: dict) -> None:
+    """Build-time gate calibration, per language -- stat/threshold/margin.
+
+    A language with no bundle at all (e.g. no zh gate) is simply absent from
+    gate_meta and prints no row here; that's covered separately by the
+    "note: no zh gate" message in main(). margin specifically renders "n/a"
+    (never 0 or 0.0%) whenever the underlying artifact predates task 20's
+    gate_margin field -- see evaluation.format_margin.
+    """
+    if not gate_meta:
+        return
+    print(f"\n{'gate calibration':<10} {'stat':>10} {'threshold':>10} {'margin':>10}")
+    print("-" * 44)
+    for lang in sorted(gate_meta):
+        meta = gate_meta[lang]
+        print(f"{lang:<10} {meta['stat']:>10} {meta['threshold']:>10.4f} "
+              f"{format_margin(meta['margin']):>10}")
 
 
 def print_positive_table(cells: dict) -> None:
@@ -179,6 +188,7 @@ def main() -> int:
             print_positive_table(positive_cells)
         if shared_cells:
             print_shared_table(shared_cells)
+        print_gate_summary(rt.gate_meta)
         print("\nMetrics are reported side by side on purpose -- a blended score cannot")
         print("distinguish a gate problem from a retrieval problem, and hit@4 passing")
         print("while keywords fail means the right PAGE came back with the wrong chunk.")
