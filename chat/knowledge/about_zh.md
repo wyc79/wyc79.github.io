@@ -139,7 +139,7 @@ link: pages/game-design-workshop.html
 
 ## 团队项目里当过制作人
 link: pages/game-design-workshop.html
-在 CTIN 488 的期末团队项目里，王元辰的职责是制作人：帮助锁定核心循环、推动规则书清理、主导以模拟为依据的平衡检查，并负责最终幻灯片与展示视频的整理。
+在 CTIN 488 的期末团队项目里，王元辰的职责是制作人：帮助锁定核心循环、推动规则书清理、主导以模拟为依据的平衡检查，并协助了最终幻灯片与展示视频的准备。
 
 ## Codebreaker 的玩法架构
 link: pages/codebreaker.html
@@ -227,7 +227,7 @@ link: pages/gyrotris.html
 
 ## 只能看一个项目该看哪个
 link: pages/projects.html
-预算有限只挑一个项目看的话，Cemented Dreams 是王元辰身兼设计与工程职责最重的一个：他同时担任战斗设计师、玩法工程师和关卡设计师，在项目列表里也是篇幅最大的一张卡片。
+预算有限只挑一个项目看的话，Cemented Dreams 是王元辰身兼设计与工程职责最重的一个：他同时担任战斗设计师、玩法工程师和关卡设计师，在项目页的游戏开发项目分类里也排在第一位。
 
 ## 挂过的职位头衔都有哪些
 link: pages/projects.html
