@@ -31,7 +31,7 @@ POSITIVE = GoldenCase(
 # so this fixture test is not coupled to incidental corpus vocabulary overlap.
 OFF_TOPIC = GoldenCase(
     id="t-en-02", role="combat_design_recruiter", lang="en", type="off_topic",
-    q="what is the capital of France",
+    q="what is the capital of France", adjacency="easy",
 )
 
 
@@ -117,12 +117,48 @@ def test_hit_is_independent_of_the_gate(rt) -> None:
     assert result.keywords_found, "a gate refusal masked keyword coverage"
 
 
-def test_aggregate_keys_by_role_and_lang(rt) -> None:
-    cells = aggregate(run_cases(rt, [POSITIVE, OFF_TOPIC]))
-    cell = cells["combat_design_recruiter/en"]
-    assert cell["n_positive"] == 1 and cell["n_negative"] == 1
-    assert cell["gate_pass"] == 1 and cell["refusal"] == 1
-    assert cell["hit_at_4"] == 1
-    assert cell["keywords_total"] == 2
-    assert 0 <= cell["keywords_found"] <= 2
-    assert cell["retrieved_langs"]["en"] >= 1
+def test_aggregate_keys_positives_by_role_and_negatives_by_shared_pool(rt) -> None:
+    """Positives key into their own (role, lang) cell; negatives -- whatever
+    role they still carry in the not-yet-migrated dataset -- key into the
+    one shared/lang pool, and the two shapes are never blended.
+
+    gate_pass is checked against the CaseResult's own decision rather than a
+    hardcoded 1: this test is about aggregate()'s counting/shape, not about
+    whether the real calibrated gate happens to pass this fixture question on
+    this build (see test_positive_is_scored_for_gate_hit_and_keywords, which
+    already independently covers -- and currently fails on -- that)."""
+    results = run_cases(rt, [POSITIVE, OFF_TOPIC])
+    positive_result, negative_result = results
+    cells = aggregate(results)
+
+    positive_cell = cells["combat_design_recruiter/en"]
+    assert positive_cell["n_positive"] == 1 and positive_cell["n_negative"] == 0
+    assert positive_cell["gate_pass"] == int(positive_result.gate_passed)
+    assert positive_cell["hit_at_4"] == 1
+    assert positive_cell["keywords_total"] == 2
+    assert 0 <= positive_cell["keywords_found"] <= 2
+    assert positive_cell["retrieved_langs"]["en"] >= 1
+    assert "refusal_easy" not in positive_cell, "positive cells carry no refusal metric"
+
+    shared_cell = cells["shared/en"]
+    assert shared_cell["n_positive"] == 0 and shared_cell["n_negative"] == 1
+    assert shared_cell["refusal_easy"] == int(not negative_result.gate_passed)
+    assert shared_cell["n_easy"] == 1
+    assert shared_cell["refusal_adjacent"] == 0 and shared_cell["n_adjacent"] == 0
+    assert shared_cell["refusal_injection"] == 0 and shared_cell["n_injection"] == 0
+    assert "hit_at_4" not in shared_cell, "shared cells carry no retrieval metric"
+
+
+def test_aggregate_does_not_raise_on_off_topic_without_adjacency(rt) -> None:
+    """load_cases deliberately does not validate adjacency, so aggregate()
+    must keep working over an off_topic case that has none -- otherwise
+    scripts/run_eval.py bricks on the not-yet-migrated golden.jsonl."""
+    unmigrated = GoldenCase(
+        id="t-en-04", role="combat_design_recruiter", lang="en", type="off_topic",
+        q="what is the capital of France",
+    )
+    cells = aggregate(run_cases(rt, [unmigrated]))
+    shared_cell = cells["shared/en"]
+    assert shared_cell["n_negative"] == 1
+    assert shared_cell["n_easy"] == 0 and shared_cell["n_adjacent"] == 0
+    assert shared_cell["n_unmigrated"] == 1

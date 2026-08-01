@@ -11,10 +11,13 @@ import pytest
 
 from portfolio_rag.config import settings
 from portfolio_rag.evaluation import (
+    ADJACENCY,
     BASELINE_PATH,
     CASE_TYPES,
-    CELL_COMPOSITION,
     GOLDEN_PATH,
+    NEGATIVES_PER_LANG,
+    POSITIVES_PER_CELL,
+    SHARED_ROLE,
     aggregate,
     load_cases,
     run_cases,
@@ -99,18 +102,70 @@ def test_cases_are_disjoint_from_fit_data(cases) -> None:
     assert not collisions, f"golden cases reuse fit-on data: {collisions}"
 
 
-def test_each_present_cell_has_the_right_composition(cases) -> None:
-    """Checks every cell PRESENT in the file, so the suite stays green while the
-    dataset is being built out cell by cell."""
+def test_positive_cells_have_the_right_composition(cases) -> None:
+    """Checks every positive cell PRESENT in the file, so the suite stays
+    green while the dataset is being built out cell by cell."""
     by_cell: dict[str, Counter] = {}
     for c in cases:
-        by_cell.setdefault(c.cell, Counter())[c.type] += 1
+        if c.type == "positive":
+            by_cell.setdefault(c.cell, Counter())["positive"] += 1
     wrong = {
         cell: dict(counts)
         for cell, counts in by_cell.items()
-        if dict(counts) != CELL_COMPOSITION
+        if dict(counts) != {"positive": POSITIVES_PER_CELL}
     }
-    assert not wrong, f"cells with the wrong composition (want {CELL_COMPOSITION}): {wrong}"
+    assert not wrong, f"positive cells with the wrong count (want {POSITIVES_PER_CELL}): {wrong}"
+
+
+def test_shared_negative_pool_has_the_right_composition(cases) -> None:
+    """Negatives share ONE pool per language, keyed by SHARED_ROLE, split by
+    off_topic's adjacency (easy/adjacent) plus injection. An off_topic case
+    with no valid adjacency buckets under 'off_topic_' + whatever it carries
+    (including '' on a not-yet-migrated case), which cannot match
+    NEGATIVES_PER_LANG and so surfaces as a failure instead of silently
+    miscounting."""
+    by_lang: dict[str, Counter] = {}
+    for c in cases:
+        if c.type == "positive":
+            continue
+        assert c.cell == f"{SHARED_ROLE}/{c.lang}", f"{c.id}: negative not keyed to the shared pool"
+        bucket = "injection" if c.type == "injection" else f"off_topic_{c.adjacency}"
+        by_lang.setdefault(c.lang, Counter())[bucket] += 1
+    wrong = {
+        lang: dict(counts)
+        for lang, counts in by_lang.items()
+        if dict(counts) != NEGATIVES_PER_LANG
+    }
+    assert not wrong, (
+        f"shared negative pools with the wrong composition (want {NEGATIVES_PER_LANG}): {wrong}"
+    )
+
+
+def test_all_eight_positive_cells_are_present(cases) -> None:
+    """Unlike the composition test above (which only checks cells that
+    already exist), this insists all 8 -- one per (role, lang) -- actually
+    are present, so a future edit cannot silently delete a whole cell and
+    still read as "nothing wrong here" from the per-cell composition check."""
+    want = {f"{role}/{lang}" for role in ROLES for lang in ("en", "zh")}
+    have = {c.cell for c in cases if c.type == "positive"}
+    missing = want - have
+    assert not missing, f"positive cells missing entirely: {sorted(missing)}"
+
+
+def test_off_topic_adjacency_is_valid(cases) -> None:
+    """adjacency drives NEGATIVES_PER_LANG bucketing (see above), so it is
+    required on off_topic and forbidden everywhere else."""
+    bad = [
+        f"{c.id}: adjacency {c.adjacency!r} not in {ADJACENCY}"
+        for c in cases
+        if c.type == "off_topic" and c.adjacency not in ADJACENCY
+    ]
+    bad += [
+        f"{c.id}: {c.type} must not carry adjacency (has {c.adjacency!r})"
+        for c in cases
+        if c.type != "off_topic" and c.adjacency
+    ]
+    assert not bad, f"invalid adjacency: {bad}"
 
 
 def test_no_metric_regressed(cases, rt) -> None:
@@ -124,23 +179,37 @@ def test_no_metric_regressed(cases, rt) -> None:
               f"{baseline.get('index_built_at')}, current index is "
               f"{rt.index_built_at} — comparison is cross-build.")
 
+    # Task 14 replaced the single per-role "refusal" metric with a shared
+    # pool split into refusal_easy / refusal_adjacent / refusal_injection,
+    # and the baseline on disk predates that split entirely (it has no
+    # shared/lang cells at all -- see eval/README.md and
+    # .superpowers/sdd/EVAL_PLAN/task-14-report.md for why it was left
+    # stale). A metric or cell present on only ONE side is a SCHEMA change,
+    # not a regression, so it is skipped rather than compared; a metric
+    # present on BOTH sides (gate_pass/hit_at_4 on a positive cell whose
+    # role/lang key hasn't moved) is still compared strictly.
+    gate_metrics = {"gate_pass", "refusal_easy", "refusal_adjacent", "refusal_injection"}
+    metrics = ("gate_pass", "hit_at_4", "refusal_easy", "refusal_adjacent", "refusal_injection")
+
     drops = []
     for cell, want in baseline["cells"].items():
         got = current.get(cell)
         if got is None:
             drops.append(f"{cell}: missing from the dataset entirely")
             continue
-        # Counts are comparable because composition is locked at 12/4/4.
-        for metric in ("gate_pass", "refusal", "hit_at_4"):
-            if not want.get("gate_available", True) and metric in ("gate_pass", "refusal"):
+        for metric in metrics:
+            if metric not in want or metric not in got:
+                continue  # metric renamed/restructured since the baseline; not comparable
+            if metric in gate_metrics and not want.get("gate_available", True):
                 continue
             if got[metric] < want[metric]:
                 drops.append(f"{cell}.{metric}: {want[metric]} -> {got[metric]}")
-        # Keyword coverage compares as a RATIO. Each positive carries 1-4
-        # keywords, so the denominator genuinely moves when a case is edited —
-        # raw found-counts would flag a shrinking keyword list as a regression.
-        want_cov = want["keywords_found"] / max(want["keywords_total"], 1)
-        got_cov = got["keywords_found"] / max(got["keywords_total"], 1)
-        if got_cov < want_cov - 1e-9:
-            drops.append(f"{cell}.keyword_coverage: {want_cov:.1%} -> {got_cov:.1%}")
+        if "keywords_total" in want and "keywords_total" in got:
+            # Keyword coverage compares as a RATIO. Each positive carries 1-4
+            # keywords, so the denominator genuinely moves when a case is edited —
+            # raw found-counts would flag a shrinking keyword list as a regression.
+            want_cov = want["keywords_found"] / max(want["keywords_total"], 1)
+            got_cov = got["keywords_found"] / max(got["keywords_total"], 1)
+            if got_cov < want_cov - 1e-9:
+                drops.append(f"{cell}.keyword_coverage: {want_cov:.1%} -> {got_cov:.1%}")
     assert not drops, "metrics regressed against the baseline:\n  " + "\n  ".join(drops)
