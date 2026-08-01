@@ -14,15 +14,36 @@ One JSON object per line. Adding a case is a one-line diff.
 | field | required | meaning |
 |---|---|---|
 | `id` | yes | unique, `{role-short}-{lang}-{nn}`; role-short ∈ `client`, `aiagent`, `combat`, `visitor` |
-| `role` | yes | a role id present in `../data/roles.json` |
+| `role` | positives only | a role id present in `../data/roles.json`. Negatives belong to no role — see below |
 | `lang` | yes | `en` or `zh` |
 | `type` | yes | `positive`, `off_topic`, or `injection` |
 | `q` | yes | the question, as a visitor would type it |
 | `expected_urls` | positives only | site-relative page paths; a hit is a non-empty intersection with the top-4 |
 | `expected_keywords` | positives only | 1–4 terms that must appear in the retrieved text; scored as coverage |
+| `adjacency` | `off_topic` only | `"easy"` or `"adjacent"` — how close the probe sits to the site's domain. Empty on `positive` and `injection` (an injection is always adjacent by design: it is worded to look on-topic) |
 | `note` | no | why this case exists |
 
-Each (role, lang) cell holds exactly 12 `positive`, 4 `off_topic`, 4 `injection`.
+**Positives are per (role, lang).** Every `(role, lang)` cell holds exactly
+12 `positive` cases — one cell per role in `roles.json` crossed with `en`/`zh`.
+
+**Negatives are one shared pool per language**, not per role: the gate either
+refuses off-domain and injected probes or it doesn't, and that has nothing to
+do with which role's system prompt is loaded. Each language's pool holds
+exactly 4 `off_topic` tagged `"easy"`, 4 `off_topic` tagged `"adjacent"`, and
+4 `injection` (`NEGATIVES_PER_LANG` in `evaluation.py`).
+
+`adjacency` splits `off_topic` into two questions that demand opposite fixes:
+
+- **`easy`** — obviously unrelated to the site (weather, recipes, tax law).
+  A refusal failure here means the gate itself is broken.
+- **`adjacent`** — plausibly related but still off-domain (game industry
+  news, a *different* studio's postmortem, general career advice that
+  happens to mention games). A refusal failure here means the gate can't
+  separate *this* domain from things that merely resemble it.
+
+Reporting them separately is the point: 90% refusal on `easy` with 90% pass
+on `adjacent` is a precise, actionable gate. A single blended refusal number
+would report the same 90% either way.
 
 `expected_urls` names **pages, never chunk ids**. Ids like
 `pages/prime-engine.html#sec2:en:3` move whenever the page is edited or
@@ -68,20 +89,41 @@ edge is ASCII alphanumeric, so `AI` will not match inside "available" while
    technology survives. Avoid Latin keywords shorter than three characters.
 5. **Never edit a case to make a regression pass.** A failing case is a work
    queue item. Record reality in the baseline.
+6. **A negative's `adjacency` must be `"easy"` or `"adjacent"`, never guessed
+   under time pressure.** It is the label a later reader uses to tell "the
+   gate is broken" apart from "the gate can't see this specific edge" —
+   picking the easy bucket for a case that's actually adjacent (or vice
+   versa) quietly corrupts that signal instead of raising a visible error.
 
 ## Running
 
 ```bash
-python scripts/run_eval.py                      # the table
+python scripts/run_eval.py                      # positive table + shared negatives block
 python scripts/run_eval.py --role visitor --lang zh --verbose
 python scripts/run_eval.py --update-baseline    # after a deliberate change
 ```
+
+The table prints two blocks that are never blended into each other: a
+per-`(role, lang)` positive-cell table (gate-pass, `hit@4`, keyword coverage,
+retrieved languages), then a shared-negatives block with one row per
+language showing `off_topic/easy`, `off_topic/adjacent` and `injection`
+refusal counts side by side.
+
+`--role` filters the positive table only — negatives belong to no role, so
+the shared-negatives block always covers the full pool for whichever
+language(s) are selected, regardless of `--role`. Filtering it too would
+make the block look like the shared pool while actually showing an
+arbitrary, incomplete slice of it. `run_eval.py` prints a note to stderr
+whenever `--role` is set, so this is never silent.
 
 `tests/test_golden.py` fails only when a metric drops below
 `../data/eval_baseline.json` — an absolute threshold would be meaningless,
 because `hit@4` measures this file's difficulty as much as the system's quality.
 Keyword coverage is compared as a ratio, not a raw count, so editing a case's
-keyword list does not read as a regression.
+keyword list does not read as a regression. A metric or cell that exists on
+only one side of the comparison (because the schema changed since the
+baseline was generated) is treated as new, not a regression, and skipped;
+anything present on both sides is still compared strictly.
 
 ## Known limits
 
@@ -95,3 +137,14 @@ keyword list does not read as a regression.
 - Only the gate and retrieval are scored. Answer quality and role emphasis need
   the LLM and are deliberately out of scope; the `role` field is carried on
   every case so that tier can be added without re-authoring.
+- **`golden.jsonl`'s 48 legacy negatives are not yet migrated to this schema.**
+  They still carry a per-role `role` (from before negatives were pooled) and
+  no `adjacency`, so they load, and `cell` correctly routes them into the
+  shared pool for their language. But two `tests/test_golden.py` checks fail
+  against them (composition and adjacency validity, see that file) until they
+  are rewritten as 12 `easy` + 12 `adjacent` + 24 `injection` per language
+  with `adjacency` set (24 off-topic + 24 injection total). `load_cases` and
+  `aggregate` deliberately tolerate the unmigrated file — a case with no
+  `adjacency` still counts, under its own bucket, so
+  `scripts/run_eval.py --verbose` keeps working and can be used to harvest
+  real gate values for the rewrite.

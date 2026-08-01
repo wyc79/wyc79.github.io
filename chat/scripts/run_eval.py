@@ -16,9 +16,17 @@ import sys
 from datetime import datetime, timezone
 
 from portfolio_rag.evaluation import (
-    BASELINE_PATH, GOLDEN_PATH, aggregate, load_cases, run_cases,
+    BASELINE_PATH, GOLDEN_PATH, SHARED_ROLE, aggregate, load_cases, run_cases,
 )
 from portfolio_rag.runtime import TOP_K, load_runtime
+
+# Every "n_*" key a shared cell can carry WITHOUT a not-yet-migrated negative
+# in it: the two bookkeeping counts plus the three adjacency buckets (see
+# evaluation.aggregate). Anything else starting with "n_" is a dynamic
+# leftover bucket for a negative with no valid adjacency -- reported as a
+# count of excluded cases rather than silently folded into a bucket it
+# doesn't belong to.
+_SHARED_N_KEYS = {"n_positive", "n_negative", "n_easy", "n_adjacent", "n_injection"}
 
 
 def build_baseline(rt, cells: dict) -> dict:
@@ -31,15 +39,17 @@ def build_baseline(rt, cells: dict) -> dict:
     }
 
 
-def print_table(cells: dict) -> None:
-    print(f"\n{'cell':<40} {'gate':>7} {'refuse':>7} {'hit@4':>7} {'keywords':>9}  retrieved")
-    print("-" * 96)
-    totals = {"gate_pass": 0, "n_positive": 0, "refusal": 0, "n_negative": 0,
-              "hit_at_4": 0, "keywords_found": 0, "keywords_total": 0}
-    # Gate columns are summed separately, over gate_available cells only: a
+def print_positive_table(cells: dict) -> None:
+    """role/lang cells: gate-pass and retrieval health. No refusal column --
+    negatives no longer live here, see print_shared_table."""
+    print(f"\n{'positive cells':<40} {'gate':>7} {'hit@4':>7} {'keywords':>9}  retrieved")
+    print("-" * 88)
+    totals = {"gate_pass": 0, "n_positive": 0, "hit_at_4": 0,
+              "keywords_found": 0, "keywords_total": 0}
+    # Gate column is summed separately, over gate_available cells only: a
     # cjk_bypass decision always reports gate_passed=True, so blending it into
     # the total would silently pass off meaningless data as a real number.
-    gate_totals = {"gate_pass": 0, "n_positive": 0, "refusal": 0, "n_negative": 0}
+    gate_totals = {"gate_pass": 0, "n_positive": 0}
     n_available, n_excluded = 0, 0
     for name in sorted(cells):
         c = cells[name]
@@ -52,27 +62,50 @@ def print_table(cells: dict) -> None:
         else:
             n_excluded += 1
         gate = "n/a" if not c["gate_available"] else f"{c['gate_pass']}/{c['n_positive']}"
-        refuse = "n/a" if not c["gate_available"] else f"{c['refusal']}/{c['n_negative']}"
         hits = f"{c['hit_at_4']}/{c['n_positive']}"
         kw = f"{c['keywords_found']}/{c['keywords_total']}"
         langs = " ".join(f"{k}:{v}" for k, v in sorted(c["retrieved_langs"].items()))
-        print(f"{name:<40} {gate:>7} {refuse:>7} {hits:>7} {kw:>9}  {langs}")
-    print("-" * 96)
+        print(f"{name:<40} {gate:>7} {hits:>7} {kw:>9}  {langs}")
+    print("-" * 88)
     if n_available == 0:
-        gate_total = refuse_total = "n/a"
+        gate_total = "n/a"
     else:
         mark = "*" if n_excluded else ""
         gate_total = f"{gate_totals['gate_pass']}/{gate_totals['n_positive']}{mark}"
-        refuse_total = f"{gate_totals['refusal']}/{gate_totals['n_negative']}{mark}"
     hits_total = f"{totals['hit_at_4']}/{totals['n_positive']}"
     kw_total = f"{totals['keywords_found']}/{totals['keywords_total']}"
-    print(f"{'TOTAL':<40} {gate_total:>7} {refuse_total:>7} {hits_total:>7} {kw_total:>9}")
+    print(f"{'TOTAL':<40} {gate_total:>7} {hits_total:>7} {kw_total:>9}")
     if n_available and n_excluded:
         print(f"* gate totals exclude {n_excluded} cell(s) with no gate available "
               "(see n/a rows)")
-    print("\nMetrics are reported side by side on purpose -- a blended score cannot")
-    print("distinguish a gate problem from a retrieval problem, and hit@4 passing")
-    print("while keywords fail means the right PAGE came back with the wrong chunk.\n")
+
+
+def print_shared_table(cells: dict) -> None:
+    """shared/lang cells: refusal broken out by adjacency bucket. Never
+    blended with the positive table above, and the three buckets are never
+    blended with each other -- a gate that refuses easy off-topic but not
+    adjacent off-topic is broken in a completely different way than one that
+    refuses nothing."""
+    print(f"\n{'shared negatives':<16} {'off_topic/easy':>16} {'off_topic/adjacent':>20} "
+          f"{'injection':>12}")
+    print("-" * 68)
+    unaccounted = 0
+    for name in sorted(cells):
+        c = cells[name]
+        if c["gate_available"]:
+            easy = f"{c['refusal_easy']}/{c['n_easy']}"
+            adjacent = f"{c['refusal_adjacent']}/{c['n_adjacent']}"
+            injection = f"{c['refusal_injection']}/{c['n_injection']}"
+        else:
+            easy = adjacent = injection = "n/a"
+        print(f"{c['lang']:<16} {easy:>16} {adjacent:>20} {injection:>12}")
+        unaccounted += sum(v for k, v in c.items()
+                            if k.startswith("n_") and k not in _SHARED_N_KEYS)
+    print("-" * 68)
+    if unaccounted:
+        print(f"note: {unaccounted} negative case(s) have no valid adjacency (an off_topic "
+              "case without 'easy'/'adjacent') and are excluded from the buckets above -- "
+              "run with --json to see them.")
 
 
 def print_verbose(results: list) -> None:
@@ -114,9 +147,19 @@ def main() -> int:
         print("note: no zh gate (data/gate_vectors.json absent) -- Chinese gate "
               "metrics report n/a. Chinese hit@4 is unaffected.", file=sys.stderr)
 
+    if args.role:
+        # Negatives carry no role (SHARED_ROLE) -- --role filters positive
+        # cells only. Applying it to negatives too would show a "shared"
+        # block that is not actually the shared pool, just whatever fraction
+        # of it happens to still carry this role in the not-yet-migrated
+        # dataset, which is worse than not filtering at all.
+        print(f"note: --role={args.role} filters positive cells only; negatives have no "
+              "role and the shared block below always covers the full pool for the "
+              "selected language(s).", file=sys.stderr)
+
     cases = load_cases(GOLDEN_PATH)
     selected = [c for c in cases
-                if (not args.role or c.role == args.role)
+                if (not args.role or c.type != "positive" or c.role == args.role)
                 and (not args.lang or c.lang == args.lang)]
     if not selected:
         print("no cases matched the filter", file=sys.stderr)
@@ -124,13 +167,23 @@ def main() -> int:
 
     results = run_cases(rt, selected)
     cells = aggregate(results)
+    positive_cells = {k: v for k, v in cells.items() if v["role"] != SHARED_ROLE}
+    shared_cells = {k: v for k, v in cells.items() if v["role"] == SHARED_ROLE}
 
     if args.verbose:
         print_verbose(results)
     if args.json:
         print(json.dumps(cells, ensure_ascii=False, indent=2))
     else:
-        print_table(cells)
+        if positive_cells:
+            print_positive_table(positive_cells)
+        if shared_cells:
+            print_shared_table(shared_cells)
+        print("\nMetrics are reported side by side on purpose -- a blended score cannot")
+        print("distinguish a gate problem from a retrieval problem, and hit@4 passing")
+        print("while keywords fail means the right PAGE came back with the wrong chunk.")
+        print("The shared negatives block is never blended with positives, and its three")
+        print("adjacency buckets are never blended with each other -- see eval/README.md.\n")
 
     if args.update_baseline:
         if args.role or args.lang:
