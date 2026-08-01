@@ -139,19 +139,24 @@ are always compared strictly.
 
 ## Known limits
 
-- The **Chinese gate** is built from `../knowledge/about_zh.md`, which has 22
-  authored `##` sections — but `loader.py`'s 40-character floor is
-  language-blind, and Chinese encodes the same content in far fewer
-  characters, so only **19 of 22 authored sections** (three fall under the
-  40-character floor) ever reach the gate corpus. On the index built
-  2026-08-01 that thinned corpus failed to separate on/off-topic at all
-  (off-topic max 0.517 vs on-topic min 0.515, margin -0.4%), so
-  `build_index` correctly did **not** ship a zh gate — every CJK question
-  takes the name-blind `cjk_bypass` path instead. A prior corpus version did
-  calibrate, at threshold 0.4919 against an on-topic floor of 0.492 —
-  essentially zero margin — and held-out Chinese positives still failed it at
-  a real rate. Neither state is a defect in the golden cases; it is the
-  finding.
+- The **Chinese gate** is built from `../knowledge/about_zh.md`.
+  `loader.py`'s section floor used to be a raw character count, which is
+  language-blind — Chinese encodes the same content in far fewer characters —
+  and silently dropped some authored `##` sections (three of 22 at the time,
+  including an identity-question shape, "who is YC") before they ever reached
+  the gate corpus. The floor is now script-aware (a CJK character is weighted
+  for its higher information density instead of compared 1-for-1 with a
+  Latin one), so every currently-authored section clears it; this is a
+  property of the floor, not a fixed count, since Tasks 22-23 grow the corpus
+  further. On the index built 2026-08-01, *before* that floor fix, the
+  thinned corpus failed to separate on/off-topic at all (off-topic max 0.517
+  vs on-topic min 0.515, margin -0.4%), so `build_index` correctly did **not**
+  ship a zh gate — every CJK question takes the name-blind `cjk_bypass` path
+  instead. That measurement has not been re-taken since the floor fix (no
+  rebuild has run since). A prior corpus version did calibrate, at threshold
+  0.4919 against an on-topic floor of 0.492 — essentially zero margin — and
+  held-out Chinese positives still failed it at a real rate. Neither state is
+  a defect in the golden cases; it is the finding.
 - `data/gate_vectors.json` is gitignored, and even when present it may hold no
   `"zh"` key (see above) — either way a machine without a working zh gate
   reports the Chinese gate columns as `n/a`, never as `0%`. Chinese `hit@4`

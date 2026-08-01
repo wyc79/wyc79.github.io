@@ -100,6 +100,31 @@ def test_load_knowledge_parses_headings_links_and_text(tmp_path: Path) -> None:
     assert "CV highlights" in sec.text and "link:" not in sec.text
 
 
+def test_load_knowledge_short_cjk_section_survives_floor(tmp_path: Path) -> None:
+    """A CJK character carries far more information than a Latin one, so a
+    raw-character floor tuned for English silently drops short-but-complete
+    Chinese entries -- including exactly the identity-question shape
+    ("who is YC") a gate most needs to see. The floor must weigh CJK
+    characters heavier instead of comparing every script 1-for-1."""
+    from portfolio_rag.loader import load_knowledge
+
+    (tmp_path / "about_zh.md").write_text(
+        "# comment header, not indexed\n\n"
+        "## 王元辰是谁\n"
+        "link: index.html\n"
+        "王元辰是谁：一名游戏开发者，也是本作品集网站的作者。\n\n"
+        "## 太短了\n"
+        "link: x.html\n"
+        "占位内容\n",
+        encoding="utf-8",
+    )
+    sections = load_knowledge(tmp_path, "zh")
+    assert len(sections) == 1  # the 4-character stub is still (correctly) dropped
+    sec = sections[0]
+    assert sec.section_title == "王元辰是谁"
+    assert "游戏开发者" in sec.text
+
+
 def test_load_site_walks_index_and_pages(tmp_path: Path) -> None:
     _write(tmp_path, "index.html", LANDING)
     (tmp_path / "pages").mkdir()
