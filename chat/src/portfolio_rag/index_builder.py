@@ -63,8 +63,45 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
         "pooling": zh_preset.get("pooling", "mean"),
         "gate_stat": gate["stat"],
         "gate_threshold": gate["threshold"],
+        "gate_margin": gate["margin"],
         "vectors": vecs.tolist(),
     }
+
+
+def _check_en_gate_margin(gate: dict) -> None:
+    """Refuse to ship an en gate calibration that doesn't clear the floor.
+
+    compute_gate() already logs a WARNING and ships anyway when nothing
+    separates on-/off-topic — and unlike the zh gate (_build_zh_gate returns
+    None and the backend keeps the CJK bypass), the en gate was written
+    unconditionally: there's no "quietly disable" fallback for English the
+    way there is for zh. That asymmetry is how a live false-refusal bug
+    reached production silently. This raises instead of warning, so it
+    cannot be scrolled past in a build log.
+
+    Must be called immediately after compute_gate() returns and before ANY
+    of gate_vectors.json, fallback_vectors.json, roles.json or index.json
+    are written — a raise placed after even one of those writes leaves
+    data/ half-updated, which is worse than the silent-ship bug it replaces.
+
+    The floor is RAG_MIN_GATE_MARGIN (default 0.0), not a hardcoded sign
+    check: +0.5% margin isn't meaningfully healthier than -0.5%, and the
+    floor should move once there's evidence about what a healthy margin
+    looks like for this corpus. RAG_ALLOW_NEGATIVE_MARGIN=1 is the
+    deliberate-ship opt-out, mirroring RAG_ALLOW_PRESET_CHANGE above and
+    RAG_ZH_GATE_FORCE below.
+    """
+    floor = float(os.environ.get("RAG_MIN_GATE_MARGIN", "0.0"))
+    if gate["margin"] >= floor or os.environ.get("RAG_ALLOW_NEGATIVE_MARGIN"):
+        return
+    raise ValueError(
+        f"en gate calibration does not clear the margin floor: stat={gate['stat']} "
+        f"margin={gate['margin']:.4f} (off-topic max={gate['lo']:.4f}, "
+        f"on-topic min={gate['hi']:.4f}) < floor={floor:.4f}. Shipping this index "
+        "would write an en gate with no evidence it separates on-/off-topic "
+        "queries. Set RAG_ALLOW_NEGATIVE_MARGIN=1 to build anyway, or "
+        "RAG_MIN_GATE_MARGIN=<value> to change the floor."
+    )
 
 
 def build_index(site_root: Path | None = None) -> dict:
@@ -187,6 +224,9 @@ def build_index(site_root: Path | None = None) -> dict:
         gate_vecs = np.round(gate_vecs.astype(float), ndigits)
         gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
                             multilingual=gate_preset["multilingual"])
+        # Must run before ANY write below (gate_vectors.json is the very
+        # next thing written) -- see _check_en_gate_margin's docstring.
+        _check_en_gate_margin(gate)
         # Symmetric with the zh line below. The en gate is unconditional (e5
         # can't self-gate), so this always prints; a negative margin only warns
         # (compute_gate still picks a threshold just above the off-topic max).
@@ -200,6 +240,7 @@ def build_index(site_root: Path | None = None) -> dict:
                 "pooling": gate_preset.get("pooling", "mean"),
                 "gate_stat": gate["stat"],
                 "gate_threshold": gate["threshold"],
+                "gate_margin": gate["margin"],
                 "chunk_ids": [c["id"] for c in en_chunks],
                 "vectors": gate_vecs.tolist(),
             }
@@ -212,22 +253,36 @@ def build_index(site_root: Path | None = None) -> dict:
 
         # Published fallback for the widget's degraded mode (backend down):
         # MiniLM vectors of the English chunks, order-aligned with the English
-        # prefix of index.json (see en_chunks note above).
+        # prefix of index.json (see en_chunks note above). gate_margin rides
+        # along too: fallback_vectors.json (unlike gate_vectors.json) IS
+        # committed to git, so it's the only copy of the en margin most
+        # clones/CI ever see.
         fallback = {
             "model": gate_preset["name"],
             "query_prefix": gate_preset["query_prefix"],
             "gate_stat": gate["stat"],
             "gate_threshold": gate["threshold"],
+            "gate_margin": gate["margin"],
             "vectors": gate_vecs.tolist(),
         }
         settings.resolve_path(settings.fallback_vectors_path).write_text(
             json.dumps(fallback, ensure_ascii=False), encoding="utf-8"
         )
-        index_gate = {"gate_remote": True, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"]}
+        index_gate = {
+            "gate_remote": True, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"],
+            "gate_margin": gate["margin"],
+        }
     else:
         matrix = np.array([c["vector"] for c in chunks], dtype=np.float32)
         gate = compute_gate(embedder, matrix, multilingual=preset["multilingual"])
-        index_gate = {"gate_remote": False, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"]}
+        # Same guard, same "before any write" placement, for the branch
+        # where the retrieval model gates itself (no gate_vectors.json at
+        # all -- index.json's gate_stat/threshold ARE the gate).
+        _check_en_gate_margin(gate)
+        index_gate = {
+            "gate_remote": False, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"],
+            "gate_margin": gate["margin"],
+        }
 
     index = {
         "schema_version": SCHEMA_VERSION,
@@ -260,5 +315,6 @@ def build_index(site_root: Path | None = None) -> dict:
         "index_kb": round(index_path.stat().st_size / 1024, 1),
         "gate_stat": gate["stat"],
         "gate_threshold": gate["threshold"],
+        "gate_margin": gate["margin"],
         "elapsed_seconds": round(time.time() - t0, 3),
     }

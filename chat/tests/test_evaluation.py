@@ -2,7 +2,9 @@ from dataclasses import replace
 
 import pytest
 
-from portfolio_rag.evaluation import GoldenCase, aggregate, keyword_matches, run_cases, score_case
+from portfolio_rag.evaluation import (
+    GoldenCase, aggregate, build_baseline, format_margin, keyword_matches, run_cases, score_case,
+)
 from portfolio_rag.runtime import load_runtime
 
 
@@ -162,3 +164,57 @@ def test_aggregate_does_not_raise_on_off_topic_without_adjacency(rt) -> None:
     assert shared_cell["n_negative"] == 1
     assert shared_cell["n_easy"] == 0 and shared_cell["n_adjacent"] == 0
     assert shared_cell["n_unmigrated"] == 1
+
+
+# --- Task 20 amendment 3: the persisted gate calibration margin ------------
+
+
+def test_format_margin_renders_missing_as_na_not_a_fabricated_number() -> None:
+    """None means "no measurement on disk" (gate unavailable, or the artifact
+    predates gate_margin) and must never render as a number that could pass
+    for a real, healthy reading -- mirrors this project's existing rule for
+    an absent zh gate (see scripts/run_eval.py's per-cell "n/a" columns)."""
+    assert format_margin(None) == "n/a"
+    # A REAL zero margin is a genuine (if precarious) measurement, not an
+    # absence, and must stay visually distinct from "n/a".
+    assert format_margin(0.0) == "+0.0%"
+    assert format_margin(-0.118) == "-11.8%"
+    assert format_margin(0.0537) == "+5.4%"
+
+
+class _FakeRuntimeForBaseline:
+    """Minimal stand-in for Runtime -- build_baseline only reads these two
+    attributes, so a synthetic object keeps this test independent of the
+    real e5 model and the committed index, in the same "pure, no fixtures"
+    style as test_golden.py's test_gate_metric_skipped_unless_available_on_both_sides."""
+
+    def __init__(self, gate_meta: dict) -> None:
+        self.gate_meta = gate_meta
+        self.index_built_at = "2026-07-31T00:00:00+00:00"
+
+
+def test_build_baseline_persists_gate_margin_including_when_unavailable() -> None:
+    rt = _FakeRuntimeForBaseline({
+        "en": {"stat": "top", "threshold": 0.25, "margin": None},
+        "zh": {"stat": "top", "threshold": 0.53, "margin": 0.0421},
+    })
+    baseline = build_baseline(rt, cells={})
+
+    assert baseline["gate"]["en"]["margin"] is None, (
+        "an unavailable margin must persist as null, not 0 or a fabricated number"
+    )
+    assert baseline["gate"]["zh"]["margin"] == 0.0421
+
+
+def test_build_baseline_does_not_mix_gate_margin_into_cells() -> None:
+    """gate_margin is a top-level, per-language diagnostic, not a per-cell
+    metric -- it must never leak into the cells dict that test_golden.py's
+    test_no_metric_regressed compares against the baseline (see Finding L:
+    a gate-derived metric wired into that comparison without accounting for
+    gate availability is exactly the defect this project already fixed
+    once)."""
+    rt = _FakeRuntimeForBaseline({"en": {"stat": "top", "threshold": 0.25, "margin": 0.05}})
+    cells = {"combat_design_recruiter/en": {"gate_pass": 10, "n_positive": 12}}
+    baseline = build_baseline(rt, cells)
+    assert baseline["cells"] == cells
+    assert "margin" not in baseline["cells"]["combat_design_recruiter/en"]

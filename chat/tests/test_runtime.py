@@ -7,7 +7,9 @@ duplicate that used to live in test_gate.py.
 
 import pytest
 
-from portfolio_rag.runtime import GateDecision, Retrieval, gate_form, load_runtime, strip_name
+from portfolio_rag.runtime import (
+    GateDecision, Retrieval, _GateBundle, gate_form, load_runtime, strip_name,
+)
 
 
 @pytest.mark.parametrize(
@@ -110,6 +112,36 @@ def test_chinese_question_routes_to_the_zh_gate(rt) -> None:
         assert decision.reason == "cjk_bypass" and decision.passed
     else:
         assert decision.lang == "zh"
+
+
+def test_gate_meta_reports_margin_as_none_when_the_artifact_predates_it(rt) -> None:
+    """The committed chat/data/gate_vectors.json (or fallback_vectors.json)
+    on disk right now was built before task 20 added gate_margin, so it
+    carries no such key. _GateBundle.margin (and gate_meta's "margin") must
+    read as None -- an absent measurement, never a fabricated 0.0 that would
+    look like a real (and misleadingly healthy) 0% margin. This is a direct,
+    real-data proof of the exact "n/a" scenario the task report has to
+    demonstrate; see also evaluation.format_margin, which renders this None
+    as the literal string "n/a" for the printed table."""
+    meta = rt.gate_meta
+    assert "en" in meta, "the committed index ships an en gate"
+    assert meta["en"]["margin"] is None, (
+        "the real gate_vectors.json/fallback_vectors.json on disk predates "
+        "gate_margin -- this must read as None, not 0 or 0.0"
+    )
+
+
+def test_gate_bundle_reports_a_real_margin_when_the_artifact_has_one() -> None:
+    """Complement to the None case above: when a gate spec DOES carry
+    gate_margin (any future rebuild under task 20), it must come through as
+    the real float, not silently dropped by _GateBundle's None-default read."""
+    bundle = _GateBundle("minilm", {
+        "vectors": [[0.0] * 384],
+        "gate_stat": "top",
+        "gate_threshold": 0.25,
+        "gate_margin": 0.0537,
+    })
+    assert bundle.margin == 0.0537
 
 
 def test_retrieval_embedder_matches_the_index_that_was_built(rt) -> None:
