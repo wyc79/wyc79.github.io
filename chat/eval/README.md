@@ -3,6 +3,10 @@
 `golden.jsonl` is **measurement**, not corpus. It never enters `data/index.json`.
 Editing it changes only what the score says.
 
+For consolidated findings from running this harness against the current
+index — what's fixed, what's outstanding, and the full right-page/wrong-
+chunk catalog — see [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
+
 Contrast `../knowledge/*.md`, which IS corpus: `build_index` embeds those
 sections into the index, so editing them changes what the agent knows and how it
 answers. `about_zh.md` additionally *is* the Chinese gate matrix.
@@ -125,26 +129,38 @@ only one side of the comparison (because the schema changed since the
 baseline was generated) is treated as new, not a regression, and skipped;
 anything present on both sides is still compared strictly.
 
+Gate-derived metrics (`gate_pass`, `refusal_easy`, `refusal_adjacent`,
+`refusal_injection`) are additionally skipped whenever **either** the
+baseline or the current run reports `gate_available: false` for that cell —
+comparing a real refusal count against the 0 a bypassed gate always produces
+would report a regression that never happened. `hit_at_4` and
+`keyword_coverage` have no such exception; retrieval is gate-free, so they
+are always compared strictly.
+
 ## Known limits
 
-- The **Chinese gate** is calibrated on 19 hand-written headings with
-  essentially zero margin (threshold 0.4919 against an on-topic floor of 0.492).
-  Held-out Chinese positives are expected to fail it at a real rate. That is the
-  finding, not a defect in the cases.
-- `data/gate_vectors.json` is gitignored, so a machine without it has no zh gate
-  at all and the Chinese gate columns report `n/a`. Chinese `hit@4` still runs —
-  retrieval does not depend on the gate.
+- The **Chinese gate** is built from `../knowledge/about_zh.md`, which has 22
+  authored `##` sections — but `loader.py`'s 40-character floor is
+  language-blind, and Chinese encodes the same content in far fewer
+  characters, so only **19 of 22 authored sections** (three fall under the
+  40-character floor) ever reach the gate corpus. On the index built
+  2026-08-01 that thinned corpus failed to separate on/off-topic at all
+  (off-topic max 0.517 vs on-topic min 0.515, margin -0.4%), so
+  `build_index` correctly did **not** ship a zh gate — every CJK question
+  takes the name-blind `cjk_bypass` path instead. A prior corpus version did
+  calibrate, at threshold 0.4919 against an on-topic floor of 0.492 —
+  essentially zero margin — and held-out Chinese positives still failed it at
+  a real rate. Neither state is a defect in the golden cases; it is the
+  finding.
+- `data/gate_vectors.json` is gitignored, and even when present it may hold no
+  `"zh"` key (see above) — either way a machine without a working zh gate
+  reports the Chinese gate columns as `n/a`, never as `0%`. Chinese `hit@4`
+  still runs — retrieval does not depend on the gate.
 - Only the gate and retrieval are scored. Answer quality and role emphasis need
   the LLM and are deliberately out of scope; the `role` field is carried on
   every case so that tier can be added without re-authoring.
-- **`golden.jsonl`'s 48 legacy negatives are not yet migrated to this schema.**
-  They still carry a per-role `role` (from before negatives were pooled) and
-  no `adjacency`, so they load, and `cell` correctly routes them into the
-  shared pool for their language. But two `tests/test_golden.py` checks fail
-  against them (composition and adjacency validity, see that file) until they
-  are rewritten as 12 `easy` + 12 `adjacent` + 24 `injection` per language
-  with `adjacency` set (24 off-topic + 24 injection total). `load_cases` and
-  `aggregate` deliberately tolerate the unmigrated file — a case with no
-  `adjacency` still counts, under its own bucket, so
-  `scripts/run_eval.py --verbose` keeps working and can be used to harvest
-  real gate values for the rewrite.
+- **This harness is deterministic.** Repeated runs against the same
+  `data/index.json` + `data/gate_vectors.json` produce bit-identical results —
+  dot products of fixed vectors don't drift between runs. If numbers ever
+  appear to "shift" between two runs, suspect a mutated artifact (see
+  `tests/conftest.py`'s guard), not measurement noise.
