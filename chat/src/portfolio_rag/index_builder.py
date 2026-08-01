@@ -72,6 +72,27 @@ def build_index(site_root: Path | None = None) -> dict:
     site_root = site_root or settings.site_root
     preset = settings.preset
 
+    # Guard against silently rebuilding the index in a different embedding
+    # space. gate_vectors.json, fallback_vectors.json and the deployed
+    # Tencent function all depend on the model_preset the committed
+    # index.json was built with (see .env.example) — a mismatch here means
+    # settings.model_preset drifted from that (e.g. a fresh clone missing
+    # chat/.env fell back to the "minilm" default). Checked before any work
+    # is done, not after, so a refused build doesn't waste an embedding pass.
+    existing_index_path = settings.resolve_path(settings.index_path)
+    if existing_index_path.exists() and not os.environ.get("RAG_ALLOW_PRESET_CHANGE"):
+        existing_preset = json.loads(existing_index_path.read_text(encoding="utf-8")).get(
+            "model_preset"
+        )
+        if existing_preset is not None and existing_preset != settings.model_preset:
+            raise ValueError(
+                f"existing index at {existing_index_path} was built with "
+                f"model_preset={existing_preset!r}, but settings.model_preset is "
+                f"{settings.model_preset!r}. Rebuilding would desync "
+                "gate_vectors.json, fallback_vectors.json and the deployed "
+                "backend. Set RAG_ALLOW_PRESET_CHANGE=1 to rebuild anyway."
+            )
+
     # A multilingual retrieval model (e5) gets a DE-INTERLEAVED bilingual index:
     # clean English-only sections then clean Chinese-only sections (en first),
     # instead of the en+zh-interleaved chunks the bilingual pages would produce

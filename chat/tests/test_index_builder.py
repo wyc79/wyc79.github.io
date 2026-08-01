@@ -49,7 +49,13 @@ def test_tiny_site_fixture_confines_all_build_outputs_to_tmp_path(tiny_site: Pat
         )
 
 
-def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path) -> None:
+def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path, monkeypatch) -> None:
+    # dim 384 and an empty query_prefix are minilm's values specifically —
+    # pin the preset explicitly instead of inheriting whatever
+    # RAG_MODEL_PRESET the environment happens to set (the required config
+    # is now "e5"; see .env.example). This test is about the schema minilm
+    # produces, not about which preset is configured.
+    monkeypatch.setattr(settings, "model_preset", "minilm")
     stats = index_builder.build_index(site_root=tiny_site)
     index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
 
@@ -73,6 +79,52 @@ def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path) -> No
     vec = np.array(first["vector"])
     assert vec.shape == (384,)
     assert abs(np.linalg.norm(vec) - 1.0) < 1e-3
+
+
+def test_build_refuses_to_change_preset_of_existing_index(tiny_site: Path, monkeypatch) -> None:
+    # Rebuilding over an index built with a different model_preset would
+    # silently desync data/gate_vectors.json, data/fallback_vectors.json and
+    # the deployed Tencent backend (see .env.example) — the whole bug this
+    # guard exists to prevent. No opt-in env var set, so this must raise.
+    monkeypatch.delenv("RAG_ALLOW_PRESET_CHANGE", raising=False)
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    (tiny_site / "out" / "index.json").write_text(
+        json.dumps({"model_preset": "minilm"}), encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        index_builder.build_index(site_root=tiny_site)
+    message = str(excinfo.value)
+    assert "minilm" in message, "error must name the existing index's preset"
+    assert "e5" in message, "error must name the configured preset"
+
+
+def test_build_allows_preset_change_with_explicit_opt_in(tiny_site: Path, monkeypatch) -> None:
+    # RAG_ALLOW_PRESET_CHANGE=1 is the deliberate-switch escape hatch: a
+    # developer who really means to move the index to a new embedding space
+    # can still do it, just not by accident.
+    monkeypatch.setenv("RAG_ALLOW_PRESET_CHANGE", "1")
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    (tiny_site / "out" / "index.json").write_text(
+        json.dumps({"model_preset": "minilm"}), encoding="utf-8"
+    )
+
+    index_builder.build_index(site_root=tiny_site)  # must not raise
+
+    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
+    assert index["model_preset"] == "e5"
+
+
+def test_build_with_no_existing_index_does_not_require_opt_in(
+    tiny_site: Path, monkeypatch
+) -> None:
+    # A fresh clone / first build has no index.json to compare against — the
+    # guard must not block that case even without RAG_ALLOW_PRESET_CHANGE.
+    monkeypatch.delenv("RAG_ALLOW_PRESET_CHANGE", raising=False)
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    assert not (tiny_site / "out" / "index.json").exists()
+
+    index_builder.build_index(site_root=tiny_site)  # must not raise
 
 
 def test_writes_roles_json_for_widget_and_worker(tiny_site: Path) -> None:
