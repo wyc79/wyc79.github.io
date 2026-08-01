@@ -23,11 +23,11 @@ _BOILERPLATE_TAGS = (
 _LANGS = ("en", "zh")
 
 # load_knowledge()'s "skip decorative/empty content" check compares a
-# section's text against this floor. A raw len() is language-blind: a CJK
-# ideograph carries roughly 2-3x the information of a Latin character (no
-# word-boundary spaces, far larger glyph inventory), so a fixed character
-# count silently discards short-but-complete Chinese content while admitting
-# equally short English stubs. Measured on knowledge/about_zh.md: 3 of 22
+# section's text against this floor. A raw len() is language-blind: Chinese
+# has no word-boundary spaces and packs more content per character than
+# Latin text does, so a fixed character count silently discards
+# short-but-complete Chinese content while admitting equally short English
+# stubs. Measured on knowledge/about_zh.md (22-section corpus): 3 of 22
 # curated sections were dropped at 26-38 raw characters, including
 # "王元辰是谁" ("who is YC") -- an identity-question shape a gate corpus
 # cannot afford to lose. load_page() has the same len()>=40 pattern for HTML
@@ -35,7 +35,18 @@ _LANGS = ("en", "zh")
 # the real site (verified separately) and touching it is out of this fix's
 # scope, but _effective_length is written generically enough to reuse there.
 _MIN_SECTION_LENGTH = 40
-_CJK_WEIGHT = 2.5  # midpoint of the ~2-3x information-density range above
+# 2.5 is a chosen heuristic with headroom, not a cited information-density
+# ratio -- an earlier version of this comment attributed it to CJK
+# characters carrying "2-3x the information" of a Latin one; that framing
+# came from an internal planning prompt, not a source, and has been dropped.
+# What's actually measured: the minimum weight that would have admitted all
+# three sections above is ~1.61 (worst case "王元辰是谁": 23 CJK + 3 other
+# chars need (40 - 3) / 23 >= 1.61 to clear 40; re-verified against the
+# current, larger about_zh.md, where the same three sections are still the
+# shortest). 2.5 was chosen for headroom above that minimum, nothing more.
+# Pure-English text is scored identically to plain len() regardless of this
+# constant's value, so English gate/retrieval behaviour is unaffected either way.
+_CJK_WEIGHT = 2.5
 _CJK_RE = re.compile(r"[㐀-䶿一-鿿]")  # CJK Unified Ideographs + Ext-A
 
 
@@ -46,8 +57,8 @@ def _effective_length(text: str) -> float:
     (Latin text, digits, spaces, and punctuation -- including CJK punctuation,
     which carries little content of its own) counts as 1. Pure-English text
     scores identically to plain len(), so English behaviour is unchanged.
-    Pure-Chinese text clears the same 40-point floor at ~16 ideographs instead
-    of 40 -- comfortably below the 23-45-ideograph range of the three
+    Pure-Chinese text clears the same 40-point floor at 16 ideographs instead
+    of 40 -- comfortably below the 23-36-ideograph range of the three
     previously-dropped about_zh.md sections, while still rejecting a genuine
     one-clause stub (e.g. a 4-character placeholder scores 10, well under the
     floor).
