@@ -56,6 +56,25 @@ def test_skips_nav_footer_and_tiny_sections(tmp_path: Path) -> None:
     assert all(s.anchor != "empty" for s in sections)
 
 
+TEXTAREA_PAGE = """<!doctype html>
+<html><head><title>Toolbox — Yuanchen Wang</title></head>
+<body>
+  <main>
+    <section id="wc">
+      <h2>Word Cloud</h2>
+      <p>Generate a word cloud from any text you paste in below.</p>
+      <textarea id="wc-input" placeholder="Paste or type text here...">DISTINCTIVE_TEXTAREA_DEMO_FILLER_MUST_NOT_BE_INDEXED</textarea>
+    </section>
+  </main>
+</body></html>"""
+
+
+def test_strips_textarea_demo_filler(tmp_path: Path) -> None:
+    sections = load_page(_write(tmp_path, "toolbox.html", TEXTAREA_PAGE), "pages/toolbox.html")
+    joined = " ".join(s.text for s in sections)
+    assert "DISTINCTIVE_TEXTAREA_DEMO_FILLER_MUST_NOT_BE_INDEXED" not in joined
+
+
 def test_falls_back_to_whole_page_without_main(tmp_path: Path) -> None:
     sections = load_page(_write(tmp_path, "index.html", LANDING), "index.html")
     assert len(sections) == 1

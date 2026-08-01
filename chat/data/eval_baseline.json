@@ -1,7 +1,7 @@
 {
   "k": 4,
-  "generated_at": "2026-08-01T02:58:03+00:00",
-  "index_built_at": "2026-08-01T00:48:45+00:00",
+  "generated_at": "2026-08-01T04:03:33+00:00",
+  "index_built_at": "2026-08-01T04:02:06+00:00",
   "gate": {
     "en": {
       "stat": "top",
@@ -20,8 +20,7 @@
       "keywords_total": 20,
       "gate_available": true,
       "retrieved_langs": {
-        "en": 47,
-        "zh": 1
+        "en": 48
       }
     },
     "combat_design_recruiter/zh": {
@@ -49,8 +48,7 @@
       "keywords_total": 24,
       "gate_available": true,
       "retrieved_langs": {
-        "en": 47,
-        "zh": 1
+        "en": 48
       }
     },
     "client_dev_recruiter/zh": {
@@ -102,12 +100,11 @@
       "n_negative": 0,
       "gate_pass": 12,
       "hit_at_4": 8,
-      "keywords_found": 11,
+      "keywords_found": 12,
       "keywords_total": 24,
       "gate_available": true,
       "retrieved_langs": {
-        "en": 46,
-        "zh": 2
+        "en": 48
       }
     },
     "visitor/zh": {

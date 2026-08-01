@@ -27,19 +27,27 @@ site *.html                             question + role
 ## Why it's built this way
 
 **Retrieval is client-side.** GitHub Pages can only serve static files, but retrieval
-doesn't need a server: 123 chunks × 384 dims is a ~570 KB JSON file and a brute-force
-dot product runs in well under a millisecond. No vector DB to host, nothing to pay for,
-and the retrieval layer stays inspectable (open DevTools, watch the scores).
+doesn't need a server: the committed index (`data/index.json`, currently 226 chunks ×
+384 dims across 16 pages / 132 sections) is a ~1.05 MB JSON file and a brute-force dot
+product over it runs in well under a millisecond in the browser. No vector DB to host,
+nothing to pay for, and the retrieval layer stays inspectable (open DevTools, watch the
+scores).
 
-**One embedding space, one model file.** The build pipeline (Python/onnxruntime) and
-the widget (transformers.js/WASM) run the *same* quantized ONNX file, self-hosted at
-`models/Xenova/all-MiniLM-L6-v2/` — mean pooling + L2 normalize on both sides.
-Self-hosting (~23 MB, cached by the browser after first load) means no third-party
-model CDN at runtime and identical behavior everywhere.
-Measured cross-runtime parity: cosine(browser vector, python vector) ≈ 0.99 — native
-vs WASM int8 kernels round differently — with top-4 retrieval overlap of 3–4/4 on test
-queries. Documents are embedded one at a time, unpadded, because padded batches shift
-the dynamic-quantization scales and would break this parity.
+**One retrieval model, one gate model, both self-hosted quantized ONNX.** Document
+vectors are precomputed at build time by `multilingual-e5-small` (e5, 384-dim, bilingual
+en+zh — `RAG_MODEL_PRESET=e5`, see `.env.example`); the deployed Tencent function embeds
+each query with the *same* model at `/embed`, so both sides of the retrieval dot product
+stay in one embedding space. e5 is too large to self-host in the browser (~130 MB on
+disk), so a second, much smaller model — `all-MiniLM-L6-v2` (~23 MB, self-hosted at
+`models/Xenova/all-MiniLM-L6-v2/`, cached by the browser after first load) — runs
+entirely client-side via transformers.js/WASM and does two jobs: the local off-topic
+gate (below) and the degraded-mode retrieval fallback (`data/fallback_vectors.json`)
+used when the Worker/function is unreachable. Both models run the same mean-pooling +
+L2-normalize recipe on the Python (onnxruntime) and JS (transformers.js) sides. Measured
+cross-runtime parity for the MiniLM path: cosine(browser vector, python vector) ≈ 0.99 —
+native vs WASM int8 kernels round differently — with top-4 retrieval overlap of 3–4/4 on
+test queries. Documents are embedded one at a time, unpadded, because padded batches
+shift the dynamic-quantization scales and would break this parity.
 
 **The only secret lives in the Worker.** Anything shipped to a static site is public,
 so the Anthropic key sits in a Cloudflare Worker secret. The client sends a role *id*,
@@ -52,8 +60,19 @@ binding) rate-limits per IP.
 (1) the widget gates on retrieval score — if the best chunk scores below the
 threshold, it refuses locally and re-suggests role-specific questions without any
 LLM call. The threshold is not hardcoded: build_index calibrates it per embedding
-model from canonical on-/off-topic query sets (src/portfolio_rag/gate_calibration.py)
-and ships it in index.json (`gate_threshold`; ≈0.23 for MiniLM). The gate is name-blind: mentioning "Yuanchen Wang" inflates similarity (a
+model from canonical on-/off-topic query sets (src/portfolio_rag/gate_calibration.py).
+Because e5 compresses cosines and can't separate on-/off-topic itself, gating is
+delegated to a MiniLM copy of the chunk vectors (`data/gate_vectors.json`, mirrored
+into `index.json`'s `gate_threshold` for reference); the current build's English gate
+calibrates to `0.2536` with a small **negative** margin (off-topic max sits *above*
+on-topic min by 1.3%), so build_index ships it anyway with a warning rather than
+silently disabling it — expect an occasional on-topic question to score just below
+threshold and get refused. A second gate, `bge-small-zh-v1.5` over the hand-written
+`knowledge/about_zh.md` corpus, is calibrated on every build but only shipped if it
+actually separates the distributions; on the current build it doesn't (margin -0.4%),
+so no Chinese gate ships and Chinese questions bypass the local gate entirely
+(name-blind `cjk_bypass`), relying on the system prompt's off-topic instruction alone.
+The gate is name-blind: mentioning "Yuanchen Wang" inflates similarity (a
 name-dropped joke request scores 0.61), so name-bearing questions are gated on the
 question with the name stripped out, unless the remainder is a bio-intent stub
 ("who is", "tell me about", empty) — those are genuinely about YC and pass; (2) the Worker independently refuses empty-context requests, so bypassing the
@@ -203,8 +222,27 @@ Watch live logs with `npx wrangler tail`. Model and origin allowlist are plain v
 
 ## Model provenance
 
-`models/Xenova/all-MiniLM-L6-v2/` is the standard transformers.js export of
-[`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2)
-(Apache-2.0), 384-dim, dynamically quantized. `scripts/vendor/` holds transformers.js
-2.17.2 and its ONNX Runtime WASM, so the demo has zero runtime dependencies outside
-this repository and the (optional) Worker.
+Three self-hosted, quantized ONNX models, each with a distinct job (see "Why it's built
+this way" above for how they fit together):
+
+- **Retrieval** — `models/Xenova/multilingual-e5-small/`, the standard transformers.js
+  export of [`Xenova/multilingual-e5-small`](https://huggingface.co/Xenova/multilingual-e5-small)
+  (an ONNX/quantized port of `intfloat/multilingual-e5-small`), 384-dim, mean pooling,
+  asymmetric `query: `/`passage: ` prefixes, ~130 MB on disk. Document vectors are
+  embedded once at build time (`data/index.json`); query vectors are embedded
+  server-side by the deployed Tencent function's `/embed` endpoint, since e5 is too
+  large to self-host in the browser.
+- **English gate + degraded-mode fallback** — `models/Xenova/all-MiniLM-L6-v2/`, the
+  standard transformers.js export of
+  [`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2)
+  (Apache-2.0), 384-dim, dynamically quantized, ~23 MB — small enough to self-host and
+  run client-side via transformers.js/WASM. `scripts/vendor/` holds transformers.js
+  2.17.2 and its ONNX Runtime WASM, so this path has zero runtime dependencies outside
+  this repository and the (optional) Worker.
+- **Chinese gate** — `models/Xenova/bge-small-zh-v1.5/`, the standard transformers.js
+  export of [`Xenova/bge-small-zh-v1.5`](https://huggingface.co/Xenova/bge-small-zh-v1.5)
+  (an ONNX/quantized port of `BAAI/bge-small-zh-v1.5`), 512-dim, CLS pooling, ~24 MB.
+  Calibrated against `knowledge/about_zh.md` on every build but only shipped when
+  calibration actually separates on-/off-topic scores — not currently the case (see
+  "Off-topic use is refused three times over" above), so this model isn't in the
+  current deployment's request path.
