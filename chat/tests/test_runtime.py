@@ -114,26 +114,30 @@ def test_chinese_question_routes_to_the_zh_gate(rt) -> None:
         assert decision.lang == "zh"
 
 
-def test_gate_meta_reports_margin_as_none_when_the_artifact_predates_it(rt) -> None:
+def test_gate_meta_reports_the_real_margin_from_the_rebuilt_artifact(rt) -> None:
     """The committed chat/data/gate_vectors.json (or fallback_vectors.json)
-    on disk right now was built before task 20 added gate_margin, so it
-    carries no such key. _GateBundle.margin (and gate_meta's "margin") must
-    read as None -- an absent measurement, never a fabricated 0.0 that would
-    look like a real (and misleadingly healthy) 0% margin. This is a direct,
-    real-data proof of the exact "n/a" scenario the task report has to
-    demonstrate; see also evaluation.format_margin, which renders this None
-    as the literal string "n/a" for the printed table."""
+    on disk used to predate task 20's gate_margin field, so this test used to
+    assert the "n/a" (None) case directly off real data. Task 24 rebuilt the
+    en gate against the curated knowledge/about_en.md corpus (55 sections,
+    not the ~144 indexed English chunks), and that rebuild carries
+    gate_margin like every build has since task 20 -- the artifact on disk no
+    longer predates it, so the real-data "n/a" case this test used to
+    demonstrate no longer exists. See
+    test_gate_bundle_reports_none_when_the_spec_has_no_margin_key below for
+    that case, now covered synthetically instead. _GateBundle.margin (and
+    gate_meta's "margin") must read as the real measured float here -- an
+    artifact that HAS the measurement must not report it as absent."""
     meta = rt.gate_meta
     assert "en" in meta, "the committed index ships an en gate"
-    assert meta["en"]["margin"] is None, (
-        "the real gate_vectors.json/fallback_vectors.json on disk predates "
-        "gate_margin -- this must read as None, not 0 or 0.0"
+    assert isinstance(meta["en"]["margin"], float), (
+        "the rebuilt gate_vectors.json/fallback_vectors.json on disk carries "
+        "gate_margin -- this must read as the real float, not None"
     )
 
 
 def test_gate_bundle_reports_a_real_margin_when_the_artifact_has_one() -> None:
-    """Complement to the None case above: when a gate spec DOES carry
-    gate_margin (any future rebuild under task 20), it must come through as
+    """Complement to the None case below: when a gate spec DOES carry
+    gate_margin (any build under task 20), it must come through as
     the real float, not silently dropped by _GateBundle's None-default read."""
     bundle = _GateBundle("minilm", {
         "vectors": [[0.0] * 384],
@@ -142,6 +146,21 @@ def test_gate_bundle_reports_a_real_margin_when_the_artifact_has_one() -> None:
         "gate_margin": 0.0537,
     })
     assert bundle.margin == 0.0537
+
+
+def test_gate_bundle_reports_none_when_the_spec_has_no_margin_key() -> None:
+    """Complement to the real-margin case above, and to the rebuilt-artifact
+    case in test_gate_meta_reports_the_real_margin_from_the_rebuilt_artifact:
+    a spec written before task 20 (no gate_margin key at all -- this was
+    real, on-disk behaviour until the task 24 rebuild) must read as None, an
+    absent measurement, never a fabricated 0.0 that would look like a real
+    (and misleadingly healthy) 0% margin."""
+    bundle = _GateBundle("minilm", {
+        "vectors": [[0.0] * 384],
+        "gate_stat": "top",
+        "gate_threshold": 0.25,
+    })
+    assert bundle.margin is None
 
 
 def test_retrieval_embedder_matches_the_index_that_was_built(rt) -> None:

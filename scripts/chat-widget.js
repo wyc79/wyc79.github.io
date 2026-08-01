@@ -421,10 +421,22 @@
   }
 
   // ── Degraded mode: backend down + e5 index ────────────────────────────
-  // The published fallback_vectors.json holds MiniLM copies of the chunk
-  // vectors (chunk-order aligned with index.json), so the local MiniLM model
-  // can still recommend relevant pages even when server-side embedding and
-  // LLM answers are unreachable.
+  // The published fallback_vectors.json holds MiniLM copies of the en gate's
+  // vectors, so the local MiniLM model can still answer the gate question
+  // (on-/off-topic?) when server-side embedding and LLM answers are
+  // unreachable — that gate check is the one thing every caller of
+  // retrieveFallback needs and always gets right.
+  //
+  // As of the curated-gate-corpus change (chat/src/portfolio_rag/
+  // index_builder.py, task 24), fb.vectors is knowledge/about_en.md's ~55
+  // curated sections, NOT a chunk-order-aligned prefix of index.json's
+  // chunks anymore. The chunkAt(i) below still indexes state.index.chunks[i]
+  // positionally — that mapping is now coincidental, not meaningful, so the
+  // *source links* this produces (as opposed to its gate score) may name an
+  // unrelated chunk. Known, not yet fixed: see the index_builder.py comment
+  // above the fallback_vectors.json write for the reasoning and the options
+  // for a proper follow-up (a second, retrieval-shaped fallback corpus, or
+  // chunk_ids the widget looks up by id instead of by position).
   function loadFallbackVectors() {
     if (state.fallback) return Promise.resolve(state.fallback);
     return fetch(PREFIX + 'chat/data/fallback_vectors.json', { cache: 'no-cache' }).then(function (r) {
