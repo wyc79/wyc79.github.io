@@ -51,7 +51,14 @@ def test_ids_are_unique(cases) -> None:
 
 
 def test_roles_and_types_are_valid(cases) -> None:
-    assert {c.role for c in cases} <= set(ROLES), "case names a role absent from roles.json"
+    """Positives name a real role.json role; negatives belong to no role and
+    must carry the literal SHARED_ROLE marker instead (see evaluation.cell) --
+    a legacy per-role name here would silently re-create the per-role negative
+    pools the shared-pool migration collapsed."""
+    positive_roles = {c.role for c in cases if c.type == "positive"}
+    assert positive_roles <= set(ROLES), "positive case names a role absent from roles.json"
+    negative_roles = {c.role for c in cases if c.type != "positive"}
+    assert negative_roles <= {SHARED_ROLE}, f"negative case(s) with a non-shared role: {negative_roles}"
     assert {c.type for c in cases} <= set(CASE_TYPES)
     assert {c.lang for c in cases} <= {"en", "zh"}
 
