@@ -27,7 +27,26 @@ def tiny_site(tmp_path: Path, monkeypatch) -> Path:
     out.mkdir()
     monkeypatch.setattr(settings, "index_path", str(out / "index.json"))
     monkeypatch.setattr(settings, "roles_path", str(out / "roles.json"))
+    monkeypatch.setattr(settings, "gate_vectors_path", str(out / "gate_vectors.json"))
+    monkeypatch.setattr(settings, "fallback_vectors_path", str(out / "fallback_vectors.json"))
     return tmp_path
+
+
+def test_tiny_site_fixture_confines_all_build_outputs_to_tmp_path(tiny_site: Path) -> None:
+    # build_index() can write to four settings-driven paths. If any of them
+    # isn't patched onto tmp_path, a build under this fixture writes through
+    # to the real, gitignored, hand-calibrated files under chat/data/ and
+    # destroys them irrecoverably. Check this WITHOUT calling build_index —
+    # a test that runs the unfixed build and diffs the real files before/after
+    # would destroy the data on every failure, which is exactly the bug this
+    # guards against.
+    for field in ("index_path", "roles_path", "gate_vectors_path", "fallback_vectors_path"):
+        resolved = settings.resolve_path(getattr(settings, field))
+        assert resolved.is_relative_to(tiny_site), (
+            f"settings.{field} resolves to {resolved}, outside the tiny_site "
+            f"fixture's tmp_path ({tiny_site}); build_index() would write "
+            f"through to the real committed/gitignored file"
+        )
 
 
 def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path) -> None:
