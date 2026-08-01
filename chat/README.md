@@ -98,10 +98,16 @@ Run after editing any site page:
 cd chat
 pip install -e ".[dev]"
 python scripts/build_index.py
-#  pages  sections  chunks  index_kb  seconds
-#     15        56     123     569.1     1.60
-pytest -q   # 20 tests: chunker contract, loader, embedder parity, index schema
+pytest -q   # chunker contract, loader, embedder parity, index schema, gate, eval harness
 ```
+
+`build_index.py` prints a one-line summary (page/section/chunk counts, index
+size, gate threshold, elapsed seconds) — the numbers depend on current site
+content and the active `model_preset`, so a captured transcript would go
+stale the next time either changes and isn't reproduced here. The committed
+`data/index.json` records its own `built_at`/`model_preset`/chunk count for
+whatever was last built; `eval/KNOWN_ISSUES.md` has the current build's
+actual stats and a case study in what happens when this file is left stale.
 
 Commit the regenerated `data/index.json`. Chunk ids are deterministic
 (`{url}#{anchor}:{i}`), so diffs stay readable.
