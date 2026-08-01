@@ -24,9 +24,87 @@ overwriting the real gate calibration between runs. There is no noise in
 this harness — any apparent drift is a corrupted artifact, not measurement
 variance.
 
-Measured against: index built `2026-08-01T00:48:45Z`, e5 preset, 230 chunks
-(146 en + 84 zh), `golden.jsonl` at 120 cases (96 positives + 24 shared
-negatives), `data/eval_baseline.json` generated `2026-08-01T02:58:03Z`.
+Measured against: index built `2026-08-01T20:45:15Z`, e5 preset, 308 chunks
+(192 en + 116 zh), `golden.jsonl` at 120 cases (96 positives + 24 shared
+negatives), `data/eval_baseline.json` generated `2026-08-01T20:46:05Z`. This
+is the Task 24 build described in the section immediately below — the
+230-chunk/146+84 figures this line used to carry were the PRE-task-24 build
+and are superseded throughout this document exactly as flagged inline below.
+
+---
+
+## CRITICAL — everything this file measures is the LOCAL artifact, not what's deployed
+
+**Status: open. Documented here and in `../README.md`; not fixed by this
+branch, because fixing it means redeploying, which this branch deliberately
+does not do.**
+
+Every gate number in this document — English threshold `0.2006`, margin
+`+2.5%`, `48/48*` gate-pass, `easy 4/4`/`adjacent 1/4`/`injection 1/4`, "no
+Chinese gate on this machine" — describes `chat/data/gate_vectors.json` on
+disk in this repo. It does **not** describe the backend visitors actually
+hit. `chat/functions/tencent/index.py` never reads
+`chat/data/gate_vectors.json`; it reads its own copy, bundled at
+`functions/tencent/tencent-function-e5.zip` by
+`functions/tencent/build_package.py`, and that zip is untouched by this
+branch (confirmed: `git diff --stat main...feat/golden-eval -- chat/functions/`
+is empty).
+
+Opened programmatically (read-only, zip left untouched) as of this writing,
+the deployed zip carries:
+
+```
+build_info.json:  build_id e5-20260721-3de2a80, built_at 2026-07-21T22:35:16Z
+gate_vectors.json:
+  en: 149 vectors (raw page chunks, NOT about_en.md's curated corpus),
+      threshold 0.2312, model_preset minilm
+  zh: 19 vectors, threshold 0.4919, model_preset bge_zh   <- LIVE IN PRODUCTION
+```
+
+Consequences:
+- Production's English gate still scores against the pre-Task-24 corpus
+  (149 raw page chunks) at threshold `0.2312`, not the curated 55-section
+  `about_en.md` corpus at `0.2006`/+2.5% this document reports.
+- **Production runs a live Chinese gate at threshold `0.4919`.** This is not
+  a theoretical risk: `chat-widget.js` sets `state.index.gate_remote = true`
+  for an e5 index and always defers to the server's `/embed` gate decision
+  when reachable, so this threshold is what Chinese-speaking visitors hit
+  today. A prior measurement of essentially this same threshold (on-topic
+  floor 0.492, threshold 0.4919 — a near-zero margin) found held-out Chinese
+  positives failing it at a real rate (see `eval/README.md`'s Known Limits).
+  This document's own `n/a` for every Chinese gate metric reflects **this
+  machine having no `"zh"` key in `data/gate_vectors.json`** — it says
+  nothing about production, which has never been gate-free for Chinese.
+- Retrieval itself is fine: the deployed zip's embedding model (e5) matches
+  the current index's embedding space, so answers are grounded correctly;
+  only the gate is stale.
+
+**Compatibility check (so whoever redeploys knows it's safe): verified this
+session, read-only.** `functions/tencent/index.py`'s `_load_embedder()`
+(lines ~132-156) reads exactly `spec["vectors"]`, `spec["gate_stat"]`,
+`spec["gate_threshold"]`, `spec.get("query_prefix", "")`,
+`spec.get("pooling", "mean")` from each language's entry in
+`gate_vectors.json`; it never reads `chunk_ids` (present in the OLD deployed
+`en` entry, absent from the new one — irrelevant either way) and silently
+ignores the new `gate_margin` key (present in the new entry, absent from the
+old one — also harmless, nothing reads it). `gate_decision()` (lines
+~181-210) does `gate = _gates["zh"]; if gate is None: return
+{"pass": True, ..., "reason": "cjk_bypass"}` — and the current
+`chat/data/gate_vectors.json` has no `"zh"` key at all (confirmed
+programmatically: `json.load(...).keys() == ['en']`), so `payload.get("zh")`
+in `_load_embedder()` returns `None` and `_gates["zh"]` stays `None`,
+correctly falling through to `cjk_bypass` rather than erroring. **A repackage
+(`python functions/tencent/build_package.py`) and redeploy is therefore a
+pure win with no code change required** — it would bring production's
+English gate to `0.2006`/+2.5% and remove the live, false-refusing Chinese
+gate, replacing it with the same `cjk_bypass` this document already reports
+as the local state.
+
+**Not done here, on purpose:** this task's instructions were to document,
+not to repackage or redeploy. The action item — rebuild the SCF zip, verify
+`build_info.json`'s new `build_id`, redeploy, confirm `/` health check
+reports it — is the actual next step and belongs to whoever owns production
+access; see `../README.md`'s "Deploying a backend" section.
 
 ---
 
@@ -89,6 +167,18 @@ reported diagnostic, not a pass/fail metric — deliberately not compared by
 `tests/test_golden.py::test_no_metric_regressed`, the same treatment already
 given to `gate_margin` (see `build_baseline`'s docstring).
 
+**Follow-up (final whole-branch review):** `knowledge_chunk_ids` only stays
+correct against the exact build its chunks came from — the chunks are frozen
+at build time, but the heading set they're matched against is re-read from
+`about_<lang>.md` on every call. Renaming a heading with no rebuild desyncs
+the two and silently moves `hit_at_4_page_only` (demonstrated: renaming 5
+`about_en.md` headings dropped it from 59/96 to 56/96 with no rebuild).
+`Runtime.stale_knowledge_headings` now catches this — it reports current
+`about_<lang>.md` headings with no matching chunk in the index — and
+`scripts/run_eval.py` prints a note when it's non-empty. It is, like
+`hit_at_4_page_only` itself, a reported diagnostic, not wired into
+`test_no_metric_regressed`.
+
 **What this does and does not mean:** the *product* genuinely improved — a
 visitor asking these 96 questions now gets a better answer more often,
 because the curated sections are real, grounded, and freely blend with page
@@ -149,31 +239,46 @@ No test-artifact corruption occurred during this measurement:
 `git status --short chat/data/` is clean after the full suite run, and
 `tests/conftest.py`'s content-hash guard (Task 18) did not fire.
 
+**Superseded (final whole-branch review):** the 75/3/1 count above and the 3
+named failures are historical, from 2026-07-31, before Task 17 landed the
+`RAG_MODEL_PRESET` build guard and pinned the 3 MiniLM-assumption tests to an
+explicit preset. Current test suite, run the same way, from `chat/`:
+**105 passed, 1 skipped** (the 1 skip is intentional — see the Minor findings
+in the final review; it is not one of the 3 failures below, which no longer
+exist). Verified this session; `git status --short chat/data/` stayed clean
+and the conftest guard did not fire.
+
 ---
 
 ## What to do first
 
-Ordered by leverage, cheapest/highest-value first:
+Everything this section originally recommended is done — see "Fixed" below
+for what actually happened to each (in several cases, not the specific fix
+recommended here, but a broader change that achieved the same goal or more).
+What's genuinely still open, ordered by leverage:
 
-1. **Rule on the en gate threshold (Finding M).** Lowering it from 0.2536 to
-   ~0.235 recovers the one live false refusal at zero cost — adjacent
-   leakage is already 0/4 and cannot get worse. This is a one-line config
-   change with measured, bounded impact. **Not implemented here — this
-   report recommends it; the user rules on it.**
-2. **Finish Task 17** (`RAG_MODEL_PRESET` build guard + pin the 3 MiniLM-
-   assumption tests). Turns "works if you remember to `cd chat`" into "fails
-   loudly if misconfigured." Also clears the only 3 failing tests.
-3. **Task 19** (strip `<textarea>`, rebuild, remeasure). Finding C is a
-   one-line fix (`loader._BOILERPLATE_TAGS`) with a concrete, already-sighted
-   payoff: at least 2 of 96 positives currently lose their top rank to junk
-   content.
-4. **Task 21** (curated question-shaped gate corpus, both languages). This is
-   the real fix for Findings D/E/F — a bigger effort, correctly sequenced
-   last so it isn't built on top of a corpus still being polluted by Finding
-   C.
-5. **Widen `about_zh.md` toward combat-design phrasings** (Finding F) as part
-   of the Task 21 rewrite — `combat_design_recruiter/zh` is the one cell that
-   has not moved across two index builds.
+1. **Redeploy the production backend (see the CRITICAL section above).** The
+   single highest-leverage action item left: none of this branch's gate work
+   (English threshold `0.2006`, the curated-corpus gate, the CJK-weighted
+   floor) reaches visitors until `functions/tencent/build_package.py` is
+   re-run and the result redeployed. Verified safe (no code change needed) —
+   see the compatibility check above. **Not implemented here** — this task's
+   scope is documentation, not deployment; ruling on / performing the
+   redeploy belongs to whoever owns production access.
+2. **Judge whether page-only retrieval quality itself needs work (Finding
+   N / the Task 24 update above).** `hit@4` is now 90/96, but `hit@4(pg)` —
+   what the site's own pages retrieve with zero curated-corpus assist — is
+   59/96 and did not move. `combat_design_recruiter/zh` and `visitor/zh` are
+   the weakest page-only cells (5/12 each on the current build) despite
+   scoring well (12/12) on the full, assisted metric. This is explicitly
+   *not* classified as a defect to fix by shrinking the corpus — the curated
+   sections are real and grounded — but a future task should decide whether
+   the site's own page content/chunking needs improving for these cells, now
+   that the gap is visible instead of blended away.
+3. Everything else flagged in the final whole-branch review's Minor section
+   and "follow-up" triage rows (conftest guard hardening, `retrieveFallback`'s
+   positional mapping, `get_embedder()`'s cache key) is real but not urgent;
+   see that review for the full list rather than duplicating it here.
 
 ---
 
@@ -214,6 +319,88 @@ never happened. **Fixed** in Task 14 (commit `9e73a03`, merged `ac09b80`):
 gate-derived metrics are now skipped when *either* side lacks a gate;
 `hit_at_4`/`keyword_coverage` are unaffected (retrieval is gate-free) and
 stay strictly compared in all four availability combinations.
+
+### B / Task 17 — `RAG_MODEL_PRESET` footgun — **FIXED**
+`chat/.env` sets `RAG_MODEL_PRESET="e5"` and `.env.example` now carries the
+same line (verified present, this session) — a fresh clone will get the
+correct default. **The build-time guard now exists** (`index_builder.py`,
+~lines 119-131): if an existing `data/index.json` records a
+`model_preset` that disagrees with `settings.model_preset`, `build_index()`
+raises before writing anything, naming both presets and pointing at
+`RAG_ALLOW_PRESET_CHANGE=1` as the deliberate opt-out. Verified present and
+reads correctly this session (not verified by triggering an actual raise,
+which would require running `build_index.py` — prohibited by this task's
+constraints — but the guard clause was read directly and its condition and
+message confirmed). Finding K (pin the 3 MiniLM-assumption test failures to
+an explicit preset) is also done — see the test-suite note above: 105
+passed, 1 skipped, none of the 3 named failures remain.
+
+Also worth noting, not a defect: `RAG_MODEL_PRESET` selects only the
+*retrieval* model. The gate models (`gate_model: "minilm"`,
+`gate_model_zh: "bge_zh"`) are declared inside the `e5` preset itself — so
+setting `e5` is what *enables* the MiniLM English gate and the bge-zh
+Chinese gate; setting `minilm` disables both and writes no
+`gate_vectors.json` at all.
+
+### C — `<textarea>` demo text is indexed as real content — **FIXED (Task 19)**
+`"textarea"` is now in `loader._BOILERPLATE_TAGS` (verified this session:
+the tuple reads `("script", "style", "nav", "header", "footer", "noscript",
+"canvas", "textarea")`), so the Word Cloud Generator page's placeholder text
+is stripped before indexing rather than becoming a junk chunk. The
+description below is kept for its diagnostic value (how the bug manifested,
+which cases it broke) but no longer describes the current index. Original
+report:
+
+`loader._BOILERPLATE_TAGS` strips `script, style, nav, header, footer,
+noscript, canvas` but not `textarea`. The Word Cloud Generator page's
+`<textarea>` placeholder text ("Nothing Can Go Wrong is a...", train tracks,
+whirlpools, spring pads) is indexed as page content. It pollutes 4 chunks in
+both languages; `pages/toolbox.html#sec0:zh:0` opens
+"词云 二维码生成器 … Nothing Can Go Wrong is a…".
+
+Verified live, this session, against the current e5 index: `toolbox.html`
+takes **rank 1**, displacing the expected page, in at least 2 of the 96
+positive cases:
+
+| case | wants | toolbox.html score |
+|---|---|---|
+| `combat-en-06` ("How does he validate that a system actually plays well?") | `pages/game-design-workshop.html` | 0.8424 |
+| `client-en-05` ("Has he shipped anything that actually runs live in an engine...") | `pages/3d-rendering.html` | 0.8455 |
+
+Both are also `genuine_miss` cases in the right-page/wrong-chunk catalog
+below, i.e. Finding C is a direct, demonstrated contributor to two of this
+run's 28 pure retrieval misses. The ledger records earlier sightings on a
+prior index build (4 combat-en cases in Task 9, `client-en-05` again in
+Task 11) — the count fluctuates across rebuilds because embeddings change,
+but the mechanism (junk chunk with a high-magnitude, topic-incoherent
+vector) has been live across at least three separate index builds and is
+not fixed. Fix: add `"textarea"` to `_BOILERPLATE_TAGS`, rebuild (Task 19).
+
+### D — The 40-character floor silently discards Chinese gate corpus — **FIXED (Task 21)**
+`loader.py` now weights CJK characters instead of counting raw `len()`
+(`_effective_length`, `_CJK_WEIGHT = 2.5`) — verified this session: all 53
+currently-authored `about_zh.md` sections clear the floor, including the
+three below. `_CJK_WEIGHT` is a chosen heuristic with headroom, not a cited
+information-density ratio — see `loader.py`'s comment for the empirical
+number (the minimum weight that would admit these three sections is ~1.61).
+Original report, kept for the evidence:
+
+`loader.py:131` (`load_knowledge`) drops any knowledge section whose body is
+under 40 characters. The floor is language-blind, but Chinese encodes the
+same content in far fewer characters, so it disproportionately discards
+short Chinese sections. Verified directly against the current, already-
+rewritten `chat/knowledge/about_zh.md` this session (reproducing
+`load_knowledge`'s exact split/strip logic): **22 authored `##` sections,
+19 survive the floor, 3 are silently dropped:**
+
+- `王元辰是谁` ("who is YC") — 26 characters — an identity-question shape
+- `自动微分工具项目` — 38 characters
+- `科研背景` — 32 characters
+
+These question shapes never enter the zh gate's decision boundary purely
+because they were phrased concisely. Directly implicated in the Chinese
+gate's calibration failures across multiple corpus versions (Finding M's
+mirror on the zh side).
 
 ---
 
@@ -278,6 +465,31 @@ already 0/4 and cannot get worse. 0.2536 is strictly dominated by ~0.235 on
 the evidence in this dataset. This is a recommendation for the user to rule
 on — not implemented here, and no threshold was changed in this task.
 
+**Status update (final whole-branch review): the specific false refusal is
+fixed; the underlying separation problem this finding diagnoses is still
+real, just less severe.** Task 24 did not implement the manual threshold
+edit recommended above — it rewired the gate to a curated corpus instead
+(`about_en.md`'s 55 sections replacing all raw English chunks), which moved
+the threshold to `0.2006` (positive margin, `+2.5%`) as a side effect. All 4
+English positive cells now gate `12/12` — every genuine positive passes, so
+`client-en-12`'s specific false refusal (or its equivalent — golden.jsonl's
+negative cases were also reauthored since, so the exact case wording has
+changed) no longer exists. Re-verified this session, read-only, against the
+current gate corpus: fit-on-data bounds are off-topic max `0.1934`
+("best restaurants nearby") and on-topic min `0.2078` ("resume highlights").
+Against golden.jsonl's current English negatives: `easy` still refuses
+cleanly (4/4, scores `0.0752`-`0.1517`, well under the on-topic floor —
+unchanged in kind), but `adjacent` still mostly leaks (1/4 refused, the other
+3 score `0.3393`-`0.3853` — comfortably *above* on-topic min `0.2078`) and
+`injection` likewise (1/4 refused, 3 leak at `0.3163`-`0.4457`). **The
+ordering easy < on-topic < adjacent still holds** — this finding's core claim
+(no single threshold can admit on-topic while rejecting adjacent probes,
+because adjacent probes score higher than genuine on-topic ones) is
+unresolved and is not something a threshold or corpus change can fix; it
+would need the gate to consider more than top-1 similarity against a fixed
+corpus. Not a defect introduced by this branch — a pre-existing, now more
+precisely measured limitation.
+
 ### E — Neither gate separates "about the domain" from "about YC" (subsumed/quantified by M)
 Originally measured via ad-hoc probing (Task 9, prior index): 16 easy
 off-domain probes refused 13/16 (81%), but 4 generic domain-adjacent probes
@@ -287,74 +499,7 @@ at 0.3411 against a 0.2312 threshold. Finding M is this same shape, now
 measured systematically through the golden set's `adjacency` field instead
 of one-off probes.
 
-### B / Task 17 — `RAG_MODEL_PRESET` footgun (partly fixed)
-`chat/.env` sets `RAG_MODEL_PRESET="e5"` and `.env.example` now carries the
-same line (verified present, this session) — a fresh clone will get the
-correct default. **Still outstanding, owned by Task 17:** no build-time
-guard exists yet that raises when `settings.model_preset` disagrees with an
-existing `index.json`'s recorded `model_preset`. Without it, running
-`python scripts/build_index.py` from the wrong working directory (silently
-falling back to the `minilm` default) would rebuild the whole index in a
-different embedding space and desync `gate_vectors.json`, `fallback_vectors.json`,
-and the deployed Tencent package — with no error, just wrong numbers
-downstream. Also owned by Task 17 (Finding K): pin the 3 MiniLM-assumption
-test failures listed above to an explicit preset instead of the ambient
-environment.
-
-Also worth noting, not a defect: `RAG_MODEL_PRESET` selects only the
-*retrieval* model. The gate models (`gate_model: "minilm"`,
-`gate_model_zh: "bge_zh"`) are declared inside the `e5` preset itself — so
-setting `e5` is what *enables* the MiniLM English gate and the bge-zh
-Chinese gate; setting `minilm` disables both and writes no
-`gate_vectors.json` at all.
-
-### C — `<textarea>` demo text is indexed as real content (Task 19 fixes)
-`loader._BOILERPLATE_TAGS` strips `script, style, nav, header, footer,
-noscript, canvas` but not `textarea`. The Word Cloud Generator page's
-`<textarea>` placeholder text ("Nothing Can Go Wrong is a...", train tracks,
-whirlpools, spring pads) is indexed as page content. It pollutes 4 chunks in
-both languages; `pages/toolbox.html#sec0:zh:0` opens
-"词云 二维码生成器 … Nothing Can Go Wrong is a…".
-
-Verified live, this session, against the current e5 index: `toolbox.html`
-takes **rank 1**, displacing the expected page, in at least 2 of the 96
-positive cases:
-
-| case | wants | toolbox.html score |
-|---|---|---|
-| `combat-en-06` ("How does he validate that a system actually plays well?") | `pages/game-design-workshop.html` | 0.8424 |
-| `client-en-05` ("Has he shipped anything that actually runs live in an engine...") | `pages/3d-rendering.html` | 0.8455 |
-
-Both are also `genuine_miss` cases in the right-page/wrong-chunk catalog
-below, i.e. Finding C is a direct, demonstrated contributor to two of this
-run's 28 pure retrieval misses. The ledger records earlier sightings on a
-prior index build (4 combat-en cases in Task 9, `client-en-05` again in
-Task 11) — the count fluctuates across rebuilds because embeddings change,
-but the mechanism (junk chunk with a high-magnitude, topic-incoherent
-vector) has been live across at least three separate index builds and is
-not fixed. Fix: add `"textarea"` to `_BOILERPLATE_TAGS`, rebuild (Task 19).
-
-### D — The 40-character floor silently discards Chinese gate corpus
-`loader.py:131` (`load_knowledge`) drops any knowledge section whose body is
-under 40 characters. The floor is language-blind, but Chinese encodes the
-same content in far fewer characters, so it disproportionately discards
-short Chinese sections. Verified directly against the current, already-
-rewritten `chat/knowledge/about_zh.md` this session (reproducing
-`load_knowledge`'s exact split/strip logic): **22 authored `##` sections,
-19 survive the floor, 3 are silently dropped:**
-
-- `王元辰是谁` ("who is YC") — 26 characters — an identity-question shape
-- `自动微分工具项目` — 38 characters
-- `科研背景` — 32 characters
-
-These question shapes never enter the zh gate's decision boundary purely
-because they were phrased concisely. Directly implicated in the Chinese
-gate's calibration failures across multiple corpus versions (Finding M's
-mirror on the zh side). Not fixed — recommended fix is a language-aware
-floor (e.g. count CJK characters differently) or lengthening these three
-sections, folded into the Task 21 corpus rewrite.
-
-### F — Per-role retrieval gaps are real and diagnosable
+### F — Per-role retrieval gaps are real and diagnosable — **improved at the full metric, gap persists at page-only**
 `combat_design_recruiter/zh` is the weakest cell at hit@4 **4/12**, and it
 has not moved across two index builds (7/12 pre-rebuild with a live zh gate,
 4/12 post-rebuild with retrieval-only scoring — the underlying retrieval
@@ -366,7 +511,18 @@ poorly — this is a corpus-coverage gap, not a global gate or retrieval
 defect. Actionable: widen `about_zh.md` toward combat-design phrasings
 (folded into Task 21).
 
-### G — `visitor` is the hardest cell for retrieval, and it is the default role
+**Update (final whole-branch review):** the widening happened (Task 22/23
+grew `about_zh.md` to 53 sections) and the full `hit@4` for this cell is now
+**12/12** — a complete turnaround from 4/12. But `hit@4(pg)` (page-only, the
+Task 24 diagnostic — see above) for the same cell is **5/12**, essentially
+unchanged from the pre-widening 4/12. Read together with Finding N: the
+widened `about_zh.md` corpus itself now answers most of these questions
+directly (via its curated text, which is grounded and real), but the site's
+own combat-design pages still aren't what's being retrieved for them. The
+underlying retrieval gap this finding describes is not fixed, only masked by
+a (legitimate, but distinct) corpus improvement.
+
+### G — `visitor` is the hardest cell for retrieval, and it is the default role — **same pattern as F**
 hit@4 8/12 (en) and 10/12 (zh) on broad-bio and point-me-somewhere questions
 — lower than the specialist roles' typical range. `visitor` is
 `default_role`, so this is the retrieval quality most actual site visitors
@@ -374,6 +530,15 @@ experience. The `<meta name="description">` summary chunks and
 `knowledge/about_*.md` exist precisely to serve this traffic, which is the
 strongest argument for prioritizing the Task 21 corpus widening over
 role-specific tuning.
+
+**Update (final whole-branch review):** full hit@4 for `visitor` is now
+10/12 (en) and 12/12 (zh) — improved, as intended. `hit@4(pg)`, however, is
+7/12 (en) and 5/12 (zh) — still the weakest page-only range across all
+8 cells. Same reading as Finding F: the knowledge corpus is doing real work
+for the `visitor` role specifically (matching its own framing above, that
+`about_*.md` "exist[s] precisely to serve this traffic"), but that is a
+description of the corpus compensating for weaker page-level retrieval, not
+evidence the page-level gap closed.
 
 ### H — Fit-on-data proximity inflates scores, measured
 Task 13 review caught `visitor-en-01`/`visitor-zh-01` paraphrasing

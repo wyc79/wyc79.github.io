@@ -1,29 +1,41 @@
-# knowledge/about_en.md — gate-calibration corpus (feeds retrieval today; the planned en gate)
+# knowledge/about_en.md — gate-calibration corpus (feeds retrieval AND the en gate)
 
-**Treat this as gate-calibration data, not just supplementary retrieval
-text.** Today it feeds the retrieval index only — the English gate has no
-curated corpus yet and instead scores against all ~144 raw English page
-chunks. This file is slated to become the en gate's on-topic corpus next,
-mirroring about_zh.md, which already plays both roles. Edit accordingly now:
-a section reworded for retrieval phrasing can silently move or erase a
-gate's separation margin once wired in, with no test to catch it.
+**This IS gate-calibration data, not just supplementary retrieval text.** The
+English gate is wired to this file: it scores against this file's curated
+`## Heading` sections (currently 55), not against raw page chunks the way an
+earlier version of this project did. Edit accordingly: a section reworded for
+retrieval phrasing can move or erase the gate's separation margin. Unlike the
+Chinese gate (below), there is no silent-disable fallback for English —
+`index_builder.py`'s `_check_en_gate_margin` **raises and aborts the build**
+if a rebuild's calibrated margin goes negative, so a bad edit is caught at
+build time, not discovered later as a live false-refusal bug. Still rebuild
+and read the build log's gate line after every edit; an aborted build means
+this file needs another look before the index can be regenerated at all.
 
-**The lesson from the Chinese file:** commit 10be374 reworded about_zh.md by
-a single line, with no sections added or removed, and dropped its
-calibration margin from healthy to near zero. The zh gate has been disabled
-ever since — undetected by any test, because the corpus still read fine;
-only the calibration number showed the damage.
+**The lesson from the Chinese file, and why the English gate's build now
+raises instead of warning:** commit 10be374 reworded about_zh.md by a single
+line, with no sections added or removed, and dropped its calibration margin
+from healthy to near zero. The zh gate has been disabled ever since (still
+the case today) — undetected by any test at the time, because the corpus
+still read fine; only the calibration number showed the damage. That failure
+mode is exactly what the English gate's build-time guard exists to prevent
+for this file: silent margin decay is no longer possible for English, because
+the build itself refuses to ship one.
 
 Sections exist because visitors ask in hiring vocabulary the pages
 themselves never use — resume, CV, background, qualifications. Keep every
 fact consistent with the actual site pages. **Rebuild after editing**
-(`python scripts/build_index.py`) and check the build log's gate line — its
-margin must stay positive or that gate is disabled automatically.
+(`python scripts/build_index.py`) and check the build log's gate line for the
+current threshold/margin — don't trust a number quoted here or elsewhere, it
+moves on every rebuild of this file.
 
 Naming: both languages live in this one folder split by suffix — about_en.md
-(this file, English) and about_zh.md (Chinese, the live zh-gate corpus).
-load_knowledge(dir, lang) reads only *_<lang>.md, so the en gate (once wired)
-will never ingest zh chunks and vice-versa.
+(this file, English, the en-gate corpus) and about_zh.md (Chinese; ALSO a gate
+corpus by design, but its calibration currently doesn't separate on-/off-topic,
+so no Chinese gate ships from this repo's own artifacts today — Chinese
+questions bypass the local gate via `cjk_bypass` instead; see
+`eval/README.md`'s Known Limits). `load_knowledge(dir, lang)` reads only
+`*_<lang>.md`, so the en gate never ingests zh chunks and vice-versa.
 
 ## Who this portfolio site is about
 link: index.html

@@ -9,7 +9,11 @@ chunk catalog — see [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
 
 Contrast `../knowledge/*.md`, which IS corpus: `build_index` embeds those
 sections into the index, so editing them changes what the agent knows and how it
-answers. `about_zh.md` additionally *is* the Chinese gate matrix.
+answers. Both `about_en.md` and `about_zh.md` additionally *are* their
+language's gate matrix — `about_en.md`'s 55 sections are the English gate's
+on-topic corpus (wired since Task 24), and `about_zh.md`'s sections are
+calibrated the same way on every build, though no Chinese gate currently ships
+from this repo's own artifacts (see Known Limits below).
 
 ## Format
 
@@ -82,8 +86,12 @@ edge is ASCII alphanumeric, so `AI` will not match inside "available" while
    gate threshold or are already asserted — scoring against them measures
    nothing. `test_golden.py` enforces this.
 2. **Chinese cases are authored natively**, never translated, and never lifted
-   from an `about_zh.md` heading. Those 19 headings are the zh gate matrix; a
-   question copied from one scores ~1.0 by construction.
+   from an `about_zh.md` heading. `about_zh.md` currently holds 53 sections
+   and is the zh gate's calibration corpus regardless of whether a zh gate is
+   actually shipping on a given machine (see Known Limits) — a question
+   copied from one of its headings scores ~1.0 by construction. The count
+   changes as the corpus is authored further; read it from the file, not
+   from a number quoted here.
 3. **Visitor vocabulary, not site vocabulary.** "What's his shipped title count"
    beats "tell me about Cemented Dreams" — the latter is retrieval on easy mode.
 4. **Keywords are proper nouns and technical terms, not prose.** `Blueprint`,
@@ -141,22 +149,34 @@ are always compared strictly.
 
 - The **Chinese gate** is built from `../knowledge/about_zh.md`.
   `loader.py`'s section floor used to be a raw character count, which is
-  language-blind — Chinese encodes the same content in far fewer characters —
-  and silently dropped some authored `##` sections (three of 22 at the time,
-  including an identity-question shape, "who is YC") before they ever reached
-  the gate corpus. The floor is now script-aware (a CJK character is weighted
-  for its higher information density instead of compared 1-for-1 with a
-  Latin one), so every currently-authored section clears it; this is a
-  property of the floor, not a fixed count, since Tasks 22-23 grow the corpus
-  further. On the index built 2026-08-01, *before* that floor fix, the
-  thinned corpus failed to separate on/off-topic at all (off-topic max 0.517
-  vs on-topic min 0.515, margin -0.4%), so `build_index` correctly did **not**
-  ship a zh gate — every CJK question takes the name-blind `cjk_bypass` path
-  instead. That measurement has not been re-taken since the floor fix (no
-  rebuild has run since). A prior corpus version did calibrate, at threshold
-  0.4919 against an on-topic floor of 0.492 — essentially zero margin — and
-  held-out Chinese positives still failed it at a real rate. Neither state is
-  a defect in the golden cases; it is the finding.
+  language-blind — Chinese has no word-boundary spaces and packs more content
+  per character than Latin text — and silently dropped some authored `##`
+  sections (three of 22 at the time, including an identity-question shape,
+  "who is YC") before they ever reached the gate corpus. The floor is now
+  script-aware (a CJK character counts for more than a Latin one instead of
+  1-for-1; the weight is a chosen heuristic with headroom above the ~1.6
+  minimum that would admit those three sections, not a cited ratio — see
+  `loader.py`'s `_CJK_WEIGHT` comment), so every currently-authored section
+  clears it; this is a property of the floor, not a fixed count, since Tasks
+  22-23 grew the corpus (to 53 sections as of this writing — read the current
+  count from the file, it keeps growing). **Two rebuilds have run since the
+  floor fix** (Tasks 19 and 24), so the margin has been re-measured, not left
+  at its pre-fix value: recomputed against the current 53-section corpus
+  (read-only, matching `_build_zh_gate`'s own calibration call), stat `top`,
+  threshold `0.5273`, off-topic max `0.5169` vs on-topic min `0.5153` — margin
+  **-0.49%**, still not separating, so `build_index` correctly does **not**
+  ship a zh gate today — every CJK question takes the name-blind `cjk_bypass`
+  path instead. The pre-floor-fix figure this section used to report
+  (22-section corpus, off-topic max 0.517 vs on-topic min 0.515, margin
+  -0.4%) is superseded by the above, not the current state. An even earlier
+  corpus version did calibrate, at threshold 0.4919 against an on-topic floor
+  of 0.492 — essentially zero margin — and held-out Chinese positives still
+  failed it at a real rate; that same 0.4919 threshold is, as of this
+  writing, what the currently *deployed* backend still runs live (it bundles
+  its own, older `gate_vectors.json` — see `../README.md`'s "Deploying a
+  backend" section). Neither local state (no gate) nor the deployed state
+  (a live, marginal gate) is a defect in the golden cases; both are the
+  finding.
 - `data/gate_vectors.json` is gitignored, and even when present it may hold no
   `"zh"` key (see above) — either way a machine without a working zh gate
   reports the Chinese gate columns as `n/a`, never as `0%`. Chinese `hit@4`

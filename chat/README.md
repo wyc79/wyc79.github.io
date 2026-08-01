@@ -27,11 +27,15 @@ site *.html                             question + role
 ## Why it's built this way
 
 **Retrieval is client-side.** GitHub Pages can only serve static files, but retrieval
-doesn't need a server: the committed index (`data/index.json`, currently 226 chunks ×
-384 dims across 16 pages / 132 sections) is a ~1.05 MB JSON file and a brute-force dot
-product over it runs in well under a millisecond in the browser. No vector DB to host,
-nothing to pay for, and the retrieval layer stays inspectable (open DevTools, watch the
-scores).
+doesn't need a server: the committed index (`data/index.json`, one JSON file of
+384-dim chunk vectors across the site's pages plus `knowledge/*.md`'s curated
+sections) is small enough that a brute-force dot product over it runs in well under a
+millisecond in the browser. No vector DB to host, nothing to pay for, and the
+retrieval layer stays inspectable (open DevTools, watch the scores). Exact
+chunk/page/section counts and file size move on every rebuild as site content and the
+curated corpus change — read them straight from `index.json` (`chunks`, `built_at`)
+or `build_index.py`'s own summary line rather than trusting a number quoted here;
+`eval/KNOWN_ISSUES.md` records the counts as of its most recent measurement.
 
 **One retrieval model, one gate model, both self-hosted quantized ONNX.** Document
 vectors are precomputed at build time by `multilingual-e5-small` (e5, 384-dim, bilingual
@@ -62,16 +66,23 @@ threshold, it refuses locally and re-suggests role-specific questions without an
 LLM call. The threshold is not hardcoded: build_index calibrates it per embedding
 model from canonical on-/off-topic query sets (src/portfolio_rag/gate_calibration.py).
 Because e5 compresses cosines and can't separate on-/off-topic itself, gating is
-delegated to a MiniLM copy of the chunk vectors (`data/gate_vectors.json`, mirrored
-into `index.json`'s `gate_threshold` for reference); the current build's English gate
-calibrates to `0.2536` with a small **negative** margin (off-topic max sits *above*
-on-topic min by 1.3%), so build_index ships it anyway with a warning rather than
-silently disabling it — expect an occasional on-topic question to score just below
-threshold and get refused. A second gate, `bge-small-zh-v1.5` over the hand-written
+delegated to a MiniLM copy of **`knowledge/about_en.md`'s curated on-topic sections**
+(`data/gate_vectors.json`, mirrored into `data/fallback_vectors.json` for degraded-mode
+retrieval and into `index.json`'s `gate_threshold`/`gate_margin` for reference) — not a
+copy of the full page-chunk index, which is what earlier builds used. `_check_en_gate_margin`
+(`index_builder.py`) **aborts the build** (raises, writes nothing) if calibration doesn't
+clear a configurable margin floor (default: any non-negative margin; see
+`RAG_MIN_GATE_MARGIN`/`RAG_ALLOW_NEGATIVE_MARGIN`) — a negative-margin English gate can
+no longer ship silently the way it once did. Read the calibrated stat/threshold/margin
+straight from `data/gate_vectors.json`'s `en` entry (or the build log's `gate calibration`
+line) rather than trusting a number quoted here, since recalibration moves it on every
+rebuild of `about_en.md`. A second gate, `bge-small-zh-v1.5` over the hand-written
 `knowledge/about_zh.md` corpus, is calibrated on every build but only shipped if it
-actually separates the distributions; on the current build it doesn't (margin -0.4%),
-so no Chinese gate ships and Chinese questions bypass the local gate entirely
-(name-blind `cjk_bypass`), relying on the system prompt's off-topic instruction alone.
+actually separates the distributions; as of this repo's own committed artifacts it
+doesn't, so no Chinese gate ships here and Chinese questions bypass the local gate
+entirely (name-blind `cjk_bypass`), relying on the system prompt's off-topic instruction
+alone. **This does not describe the currently deployed backend** — see "Deploying a
+backend" below.
 The gate is name-blind: mentioning "Yuanchen Wang" inflates similarity (a
 name-dropped joke request scores 0.61), so name-bearing questions are gated on the
 question with the name stripped out, unless the remainder is a bio-intent stub
@@ -85,12 +96,18 @@ questions ("who is YC") clear the gate comfortably.
 to `console.debug`, to Google Analytics as a `chat_turn` event when available, and
 server-side via the Worker (`wrangler tail` live; 30-day KV persistence when bound).
 
-**Curated chunks bridge vocabulary gaps.** Visitors ask in hiring vocabulary the
-pages never use ("resume highlights", "CV", "qualifications") — without help those
-queries score below the off-topic gate. `knowledge/*.md` holds short authored
-summaries (each `## Heading` block is one chunk, `link:` sets its source card)
-indexed alongside the scraped pages. Keep facts consistent with the site and
-rebuild after editing.
+**Curated chunks bridge vocabulary gaps — and are now the English gate's corpus
+too.** Visitors ask in hiring vocabulary the pages never use ("resume highlights",
+"CV", "qualifications") — without help those queries score below the off-topic gate.
+`knowledge/*.md` holds short authored summaries (each `## Heading` block is one chunk,
+`link:` sets its source card) indexed alongside the scraped pages. `about_en.md` is no
+longer retrieval-only: it is also the corpus the English gate calibrates against (see
+above), so a wording change there can move the live gate's margin as directly as a
+threshold edit would — read `about_en.md`'s own header before editing it. Keep facts
+consistent with the site and **rebuild after editing** — an edit that isn't rebuilt
+desyncs `Runtime.knowledge_chunk_ids` from the index and can silently corrupt the
+`hit@4(pg)` diagnostic (`src/portfolio_rag/runtime.py`'s `stale_knowledge_headings`
+reports this when it happens; `scripts/run_eval.py` prints a note if so).
 
 ## Layout
 
@@ -196,6 +213,28 @@ The site works without this step — the widget stays in retrieval-only mode unt
   `functions/tencent/`; the step-by-step console guide is kept locally in
   `.claude/DEPLOY.md` (gitignored, not published).
 - **Cloudflare Worker (Anthropic API):** below.
+
+> **The deployed Tencent SCF package must be rebuilt and redeployed before any
+> gate change in this repo reaches production.** `functions/tencent/index.py`
+> never reads `chat/data/gate_vectors.json` — it reads its own bundled copy,
+> zipped into `functions/tencent/tencent-function-e5.zip` by
+> `functions/tencent/build_package.py`. That zip is untouched by this branch
+> (or any branch that only edits `chat/knowledge/`, `chat/src/`, `chat/data/`)
+> and still contains whatever gate was packaged at its last build. Concretely,
+> as of this writing the deployed zip carries `build_id e5-20260721-3de2a80`
+> (2026-07-21): an English gate of 149 raw page-chunk vectors at threshold
+> `0.2312` (the pre-Task-24 corpus this repo's own `data/gate_vectors.json` no
+> longer matches), **and a live Chinese gate at threshold `0.4919`** —
+> `chat-widget.js` trusts `state.index.gate_remote === true` for an e5 index
+> and always defers to this server-side decision, so that Chinese gate is what
+> actually runs for visitors today, not the "no zh gate" state this repo's own
+> `eval/` harness reports. Until someone re-runs `build_package.py` and
+> redeploys, **production runs the old gate, on both languages** — this
+> repo's gate numbers (English `0.2006`/+2.5%, no Chinese gate) describe
+> `chat/data/`, not what visitors hit. See `eval/KNOWN_ISSUES.md`'s "Critical"
+> section for the full writeup, including a compatibility check confirming
+> `index.py` needs no code change to consume the new `gate_vectors.json` shape
+> — a repackage-and-redeploy is a pure win, not a risky one.
 
 ```bash
 cd chat/worker
