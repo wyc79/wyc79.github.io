@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 
 from portfolio_rag import index_builder
-from portfolio_rag.config import settings
+from portfolio_rag.config import MODEL_PRESETS, settings
+from portfolio_rag.embedder import OnnxEmbedder
 
 SITE_PAGE = """<!doctype html>
 <html><head><title>Projects — Yuanchen Wang</title></head>
@@ -79,6 +80,32 @@ def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path, monke
     vec = np.array(first["vector"])
     assert vec.shape == (384,)
     assert abs(np.linalg.norm(vec) - 1.0) < 1e-3
+
+    # dim==384 alone doesn't prove build_index actually embedded with minilm
+    # (e5 is also 384-dim) — it only proves the metadata build_index copies
+    # from settings.model_preset, which is exactly what would keep lying if
+    # the retrieval embedder came from somewhere else. Tie the assertion to
+    # the vector's actual content: independently re-embed this chunk's own
+    # text (read back from the index, not reconstructed) with a dedicated,
+    # freshly-built minilm embedder and require the two to match. If
+    # build_index ever again resolved its embedder from a process-wide
+    # cache that another test/module could have already primed under a
+    # different preset (this happened — see index_builder.py's comment on
+    # why it builds a dedicated OnnxEmbedder instead of calling
+    # get_embedder()), this would embed with the wrong model while the
+    # metadata above kept claiming "minilm", and only this assertion would
+    # catch it.
+    reference = OnnxEmbedder.from_preset(
+        MODEL_PRESETS["minilm"],
+        settings.resolve_path(MODEL_PRESETS["minilm"]["dir"]),
+        settings.embedding_max_tokens,
+    )
+    expected_vec = reference.embed_documents([first["text"]])[0]
+    assert np.allclose(vec, expected_vec, atol=1e-4), (
+        "index vector for the first chunk does not match a freshly-built "
+        "minilm embedder's output for that chunk's own text — build_index "
+        "did not actually embed with the pinned minilm preset"
+    )
 
 
 def test_build_refuses_to_change_preset_of_existing_index(tiny_site: Path, monkeypatch) -> None:

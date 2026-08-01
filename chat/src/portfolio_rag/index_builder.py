@@ -18,7 +18,7 @@ import numpy as np
 
 from portfolio_rag.chunker import chunk_text
 from portfolio_rag.config import MODEL_PRESETS, settings
-from portfolio_rag.embedder import OnnxEmbedder, get_embedder
+from portfolio_rag.embedder import OnnxEmbedder
 from portfolio_rag.gate_calibration import OFF_TOPIC_ZH, ON_TOPIC_ZH, compute_gate
 from portfolio_rag.loader import load_knowledge, load_site
 from portfolio_rag.roles import roles_payload
@@ -145,7 +145,19 @@ def build_index(site_root: Path | None = None) -> dict:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise ValueError(f"duplicate chunk ids: {dupes[:5]}")
 
-    embedder = get_embedder()
+    # A dedicated instance built from the local `preset`, not the process-wide
+    # get_embedder() cache: that cache is keyed on whichever preset first
+    # requested it and is shared across test modules (and any other caller
+    # in-process), so a build running after something else already resolved
+    # the cache under a different preset would silently embed with the wrong
+    # model while still labeling the index with settings.model_preset. This
+    # is the same failure mode runtime.py's index-declares-its-own-model fix
+    # exists to avoid (see the comment above Runtime's embedder resolution) —
+    # apply the same fix here, where it matters even more: this is what
+    # produces the vectors actually written to the committed index.json.
+    embedder = OnnxEmbedder.from_preset(
+        preset, settings.resolve_path(preset["dir"]), settings.embedding_max_tokens
+    )
     vectors = embedder.embed_documents([c["text"] for c in chunks])
     ndigits = settings.vector_round_decimals
     for chunk, vector in zip(chunks, vectors):
