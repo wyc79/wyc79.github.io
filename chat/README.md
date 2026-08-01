@@ -80,7 +80,9 @@ chat/
 ├── src/portfolio_rag/     # the pipeline: config, loader, chunker, embedder, roles, index_builder
 ├── knowledge/             # curated .md chunks (resume/CV vocabulary the pages lack)
 ├── scripts/build_index.py # CLI: rebuild data/ after editing site content
-├── tests/                 # pytest suite (20 tests)
+├── scripts/run_eval.py    # CLI: score the golden set against data/eval_baseline.json
+├── eval/                  # golden.jsonl (held-out cases) + README.md (authoring guide)
+├── tests/                 # pytest suite
 ├── data/                  # generated: index.json (vectors), roles.json (personas)
 ├── models/                # self-hosted MiniLM ONNX (weights + tokenizer)
 └── worker/                # Cloudflare Worker (LLM proxy + logging) + wrangler.toml
@@ -96,13 +98,65 @@ Run after editing any site page:
 cd chat
 pip install -e ".[dev]"
 python scripts/build_index.py
-#  pages  sections  chunks  index_kb  seconds
-#     15        56     123     569.1     1.60
-pytest -q   # 20 tests: chunker contract, loader, embedder parity, index schema
+pytest -q   # chunker contract, loader, embedder parity, index schema, gate, eval harness
 ```
+
+`build_index.py` prints a one-line summary (page/section/chunk counts, index
+size, gate threshold, elapsed seconds) — the numbers depend on current site
+content and the active `model_preset`, so a captured transcript would go
+stale the next time either changes and isn't reproduced here. The committed
+`data/index.json` records its own `built_at`/`model_preset`/chunk count for
+whatever was last built; `eval/KNOWN_ISSUES.md` has the current build's
+actual stats and a case study in what happens when this file is left stale.
 
 Commit the regenerated `data/index.json`. Chunk ids are deterministic
 (`{url}#{anchor}:{i}`), so diffs stay readable.
+
+## Evaluating retrieval and the gate (golden set)
+
+`eval/golden.jsonl` is a held-out measurement set, separate from both the
+site content (`../pages/*.html`) and the gate's own fit-on calibration data
+(`gate_calibration.py`) — see `eval/README.md` for the full authoring guide.
+It holds 120 cases:
+
+- **96 positives** — 12 per `(role, lang)` cell, one cell for each of the 4
+  roles in `data/roles.json` crossed with `en`/`zh`. Scored for gate-pass,
+  `hit@4` (did the expected page land in the top 4?) and keyword coverage
+  (did the answer-bearing text actually make it into the retrieved chunks?).
+- **24 shared negatives** — one pool per language (not per role: the gate
+  never sees the role), 12 cases each split 4 `off_topic`/`"easy"`,
+  4 `off_topic`/`"adjacent"`, 4 `injection`.
+  - **`easy`** off-topic probes are obviously unrelated to the site (weather,
+    recipes, tax law) — a refusal failure here means the gate itself is
+    broken.
+  - **`adjacent`** off-topic probes are plausibly related but still
+    off-domain (game-industry news, a different studio's postmortem) — a
+    refusal failure here means the gate can't separate *this* domain from
+    things that merely resemble it. Reporting the two separately is the
+    point: a single blended refusal number can't tell these apart.
+
+```bash
+python scripts/run_eval.py                          # positive table + shared negatives block
+python scripts/run_eval.py --role visitor --lang zh --verbose
+python scripts/run_eval.py --update-baseline         # after a deliberate, reviewed change
+pytest tests/test_golden.py                          # fails on any regression vs data/eval_baseline.json
+```
+
+Run everything from `chat/`, with the interpreter that has `portfolio_rag`
+installed editable — `env_file=".env"` in `config.py` resolves relative to
+the working directory, so running from the repo root silently drops
+`RAG_MODEL_PRESET` back to its `minilm` default and every score becomes
+meaningless. This harness is deterministic: the same index and gate vectors
+produce bit-identical numbers on every run.
+
+A gate that isn't available on the machine (`data/gate_vectors.json` missing
+a language, e.g. no Chinese gate today — see Known Limits in
+`eval/README.md`) reports that cell's gate metrics as `n/a`, never as `0%`.
+`hit@4` and keyword coverage are gate-free and always report a real number.
+
+For the consolidated findings from the most recent run — what's fixed, what's
+outstanding, and every right-page/wrong-chunk case — see
+[`eval/KNOWN_ISSUES.md`](eval/KNOWN_ISSUES.md).
 
 ## Previewing locally
 
