@@ -168,39 +168,44 @@ def test_off_topic_adjacency_is_valid(cases) -> None:
     assert not bad, f"invalid adjacency: {bad}"
 
 
-def test_no_metric_regressed(cases, rt) -> None:
-    if not BASELINE_PATH.exists():
-        pytest.skip("no baseline yet — run scripts/run_eval.py --update-baseline")
-    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
-    current = aggregate(run_cases(rt, cases))
+# Task 14 replaced the single per-role "refusal" metric with a shared pool
+# split into refusal_easy / refusal_adjacent / refusal_injection, and the
+# baseline on disk predates that split entirely (it has no shared/lang cells
+# at all -- see eval/README.md and .superpowers/sdd/EVAL_PLAN/task-14-report.md
+# for why it was left stale). A metric or cell present on only ONE side is a
+# SCHEMA change, not a regression, so it is skipped rather than compared; a
+# metric present on BOTH sides (gate_pass/hit_at_4 on a positive cell whose
+# role/lang key hasn't moved) is still compared strictly.
+_GATE_METRICS = {"gate_pass", "refusal_easy", "refusal_adjacent", "refusal_injection"}
+_REGRESSION_METRICS = (
+    "gate_pass", "hit_at_4", "refusal_easy", "refusal_adjacent", "refusal_injection",
+)
 
-    if baseline.get("index_built_at") != rt.index_built_at:
-        print(f"\nNOTE: baseline measured against index built "
-              f"{baseline.get('index_built_at')}, current index is "
-              f"{rt.index_built_at} — comparison is cross-build.")
 
-    # Task 14 replaced the single per-role "refusal" metric with a shared
-    # pool split into refusal_easy / refusal_adjacent / refusal_injection,
-    # and the baseline on disk predates that split entirely (it has no
-    # shared/lang cells at all -- see eval/README.md and
-    # .superpowers/sdd/EVAL_PLAN/task-14-report.md for why it was left
-    # stale). A metric or cell present on only ONE side is a SCHEMA change,
-    # not a regression, so it is skipped rather than compared; a metric
-    # present on BOTH sides (gate_pass/hit_at_4 on a positive cell whose
-    # role/lang key hasn't moved) is still compared strictly.
-    gate_metrics = {"gate_pass", "refusal_easy", "refusal_adjacent", "refusal_injection"}
-    metrics = ("gate_pass", "hit_at_4", "refusal_easy", "refusal_adjacent", "refusal_injection")
-
+def _find_regressions(baseline_cells: dict, current_cells: dict) -> list[str]:
+    """Pure comparison, no fixtures: kept separate from test_no_metric_regressed
+    so the gate-availability logic can be exercised directly with synthetic
+    cells (see test_gate_metric_skipped_unless_available_on_both_sides)
+    instead of only indirectly through a real baseline + a real runtime."""
     drops = []
-    for cell, want in baseline["cells"].items():
-        got = current.get(cell)
+    for cell, want in baseline_cells.items():
+        got = current_cells.get(cell)
         if got is None:
             drops.append(f"{cell}: missing from the dataset entirely")
             continue
-        for metric in metrics:
+        # A cjk_bypass decision means the gate is unmeasured, not perfect --
+        # on a cell where EITHER side has no gate, gate_pass reads as an
+        # inflated (always-True) pass rate and refusal_* reads as a deflated
+        # (always-zero) refusal rate. Either direction is a false regression
+        # waiting to happen, not a real one, so a gate-derived metric is only
+        # ever compared when BOTH sides measured it for real. Non-gate
+        # metrics (hit_at_4, keyword coverage below) are retrieval-only and
+        # never skipped.
+        gate_available_both = want.get("gate_available", True) and got.get("gate_available", True)
+        for metric in _REGRESSION_METRICS:
             if metric not in want or metric not in got:
                 continue  # metric renamed/restructured since the baseline; not comparable
-            if metric in gate_metrics and not want.get("gate_available", True):
+            if metric in _GATE_METRICS and not gate_available_both:
                 continue
             if got[metric] < want[metric]:
                 drops.append(f"{cell}.{metric}: {want[metric]} -> {got[metric]}")
@@ -212,4 +217,70 @@ def test_no_metric_regressed(cases, rt) -> None:
             got_cov = got["keywords_found"] / max(got["keywords_total"], 1)
             if got_cov < want_cov - 1e-9:
                 drops.append(f"{cell}.keyword_coverage: {want_cov:.1%} -> {got_cov:.1%}")
+    return drops
+
+
+def test_no_metric_regressed(cases, rt) -> None:
+    if not BASELINE_PATH.exists():
+        pytest.skip("no baseline yet — run scripts/run_eval.py --update-baseline")
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    current = aggregate(run_cases(rt, cases))
+
+    if baseline.get("index_built_at") != rt.index_built_at:
+        print(f"\nNOTE: baseline measured against index built "
+              f"{baseline.get('index_built_at')}, current index is "
+              f"{rt.index_built_at} — comparison is cross-build.")
+
+    drops = _find_regressions(baseline["cells"], current)
     assert not drops, "metrics regressed against the baseline:\n  " + "\n  ".join(drops)
+
+
+def test_gate_metric_skipped_unless_available_on_both_sides() -> None:
+    """Direct coverage of _find_regressions's gate-availability rule, with no
+    dependency on a real baseline or runtime.
+
+    A cjk_bypass decision reports gate_passed=True unconditionally, which
+    inflates gate_pass and deflates refusal_* to 0. Comparing either of those
+    against a real (gate-available) measurement on the OTHER side is a false
+    regression waiting to happen, in both directions:
+      - want gate-available, got bypass: refusal_* reads 0 on the got side ->
+        looks like a regression against a real want>0, even though nothing
+        regressed -- just measured differently (this is the case the
+        reviewer caught: a baseline built with a real zh gate, compared on a
+        machine with none).
+      - want bypass, got gate-available: gate_pass reads inflated (=n) on the
+        want side -> a real drop on the got side could beat a fabricated
+        ceiling and hide a genuine regression.
+    So a gate-derived metric must be skipped whenever EITHER side lacks a
+    real gate, and compared strictly only when BOTH have one. hit_at_4 is
+    gate-free and must never be skipped, in any combination.
+    """
+    def cell(gate_available: bool, **metrics) -> dict:
+        return {"gate_available": gate_available, "hit_at_4": 7, **metrics}
+
+    # (want gate_available, got gate_available) -> expect gate metric skipped?
+    for want_available, got_available, gate_metric_skipped in [
+        (True, True, False),    # both real -> compare strictly
+        (True, False, True),    # got bypassed -> skip (the reviewer's case)
+        (False, True, True),    # want was bypassed -> skip
+        (False, False, True),   # neither real -> skip
+    ]:
+        baseline_cells = {
+            "shared/zh": cell(want_available, refusal_easy=3, gate_pass=7),
+        }
+        current_cells = {
+            # gate_pass/refusal_easy deliberately "worse" than the baseline
+            # so a real strict comparison WOULD flag them; hit_at_4 also
+            # "worse" so it must be flagged regardless of gate availability.
+            "shared/zh": cell(got_available, refusal_easy=0, gate_pass=6, hit_at_4=5),
+        }
+        drops = _find_regressions(baseline_cells, current_cells)
+        gate_drops = [d for d in drops if "refusal_easy" in d or "gate_pass" in d]
+        hit_drops = [d for d in drops if "hit_at_4" in d]
+
+        case = f"want_available={want_available} got_available={got_available}"
+        if gate_metric_skipped:
+            assert not gate_drops, f"{case}: gate metric should be skipped, got {gate_drops}"
+        else:
+            assert gate_drops, f"{case}: gate metric should be compared strictly, got none"
+        assert hit_drops, f"{case}: hit_at_4 (gate-free) must never be skipped"
