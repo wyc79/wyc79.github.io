@@ -170,6 +170,13 @@ class CaseResult:
     keywords_missing: tuple[str, ...] = ()
     retrieved_langs: dict[str, int] = field(default_factory=dict)
     dropped_by_floor: int = 0
+    # Task 24 review, Critical 1: hit computed with the curated
+    # chat/knowledge/about_<lang>.md sections excluded from the candidate
+    # pool -- "would the site's OWN pages have surfaced this, with no
+    # curated-corpus assist." A diagnostic, not a second pass/fail metric:
+    # see aggregate()'s hit_at_4_page_only and _find_regressions in
+    # tests/test_golden.py, which deliberately does not compare it.
+    hit_page_only: bool | None = None
 
     @property
     def ok(self) -> bool:
@@ -186,10 +193,19 @@ def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
     decision = rt.gate(case.q)
     urls = tuple(h.url for h in retrieval.hits)
     hit = None
+    hit_page_only = None
     found: tuple[str, ...] = ()
     missing: tuple[str, ...] = ()
     if case.type == "positive":
         hit = bool(set(urls) & set(case.expected_urls))
+        # Page-only diagnostic (task 24 review, Critical 1): re-rank with the
+        # curated knowledge/about_<lang>.md sections excluded from the
+        # candidate pool BEFORE top-k is taken (see Runtime.retrieve's
+        # exclude_ids), not a post-hoc filter of the already-computed `hits`
+        # above -- a page chunk ranked 5th overall but 4th once the curated
+        # corpus is out of the running still deserves credit here.
+        page_retrieval = rt.retrieve(case.q, k=TOP_K, exclude_ids=rt.knowledge_chunk_ids)
+        hit_page_only = bool(set(h.url for h in page_retrieval.hits) & set(case.expected_urls))
         # Matched against the concatenated post-floor top-4 — exactly the text
         # that becomes `contexts`. This is "was the fact available to the model?"
         blob = " ".join(rt.chunk_text(h.chunk_id) for h in retrieval.hits)
@@ -206,6 +222,7 @@ def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
         keywords_missing=missing,
         retrieved_langs=dict(Counter(h.lang for h in retrieval.hits)),
         dropped_by_floor=retrieval.dropped_by_floor,
+        hit_page_only=hit_page_only,
     )
 
 
@@ -232,6 +249,10 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
                     "role": c.role, "lang": c.lang,
                     "n_positive": 0, "n_negative": 0,
                     "gate_pass": 0, "hit_at_4": 0,
+                    # Diagnostic, not a pass/fail metric -- deliberately absent
+                    # from tests/test_golden.py's _REGRESSION_METRICS. See
+                    # CaseResult.hit_page_only and Runtime.knowledge_chunk_ids.
+                    "hit_at_4_page_only": 0,
                     "keywords_found": 0, "keywords_total": 0,
                     "gate_available": True,
                     "retrieved_langs": {},
@@ -240,6 +261,7 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             cell["n_positive"] += 1
             cell["gate_pass"] += int(r.gate_passed)
             cell["hit_at_4"] += int(bool(r.hit))
+            cell["hit_at_4_page_only"] += int(bool(r.hit_page_only))
             # Coverage, not all-or-nothing: 1/4 and 3/4 must stay distinguishable.
             cell["keywords_found"] += len(r.keywords_found)
             cell["keywords_total"] += len(r.keywords_found) + len(r.keywords_missing)

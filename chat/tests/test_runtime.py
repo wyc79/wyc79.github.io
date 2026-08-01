@@ -7,8 +7,10 @@ duplicate that used to live in test_gate.py.
 
 import pytest
 
+from portfolio_rag.config import settings
+from portfolio_rag.loader import load_knowledge
 from portfolio_rag.runtime import (
-    GateDecision, Retrieval, _GateBundle, gate_form, load_runtime, strip_name,
+    TOP_K, GateDecision, Retrieval, _GateBundle, gate_form, load_runtime, strip_name,
 )
 
 
@@ -161,6 +163,56 @@ def test_gate_bundle_reports_none_when_the_spec_has_no_margin_key() -> None:
         "gate_threshold": 0.25,
     })
     assert bundle.margin is None
+
+
+# --- Task 24 review, Critical 1: page-only retrieval diagnostic -----------
+
+
+def test_knowledge_chunk_ids_matches_the_curated_corpus_exactly(rt) -> None:
+    """Independent proof of the structural signature (page_title ==
+    section_title, matching a real chat/knowledge/about_<lang>.md heading)
+    Runtime.knowledge_chunk_ids uses: its count must equal load_knowledge's
+    own section count for en + zh, cross-checked with the same parser
+    index_builder.py uses, not by trusting Runtime's own implementation."""
+    knowledge_dir = settings.chat_root / "knowledge"
+    expected = len(load_knowledge(knowledge_dir, "en")) + len(load_knowledge(knowledge_dir, "zh"))
+    assert len(rt.knowledge_chunk_ids) == expected
+    # Cached, not recomputed (and re-parsed off disk) on every access.
+    assert rt.knowledge_chunk_ids is rt.knowledge_chunk_ids
+
+
+def test_retrieve_exclude_ids_removes_a_chunk_entirely(rt) -> None:
+    q = "grapple traversal and combat design"
+    baseline = rt.retrieve(q, k=TOP_K)
+    assert baseline.hits, "fixture assumption: this on-topic query retrieves something"
+    top_id = baseline.hits[0].chunk_id
+
+    excluded = rt.retrieve(q, k=TOP_K, exclude_ids=frozenset({top_id}))
+    assert top_id not in {h.chunk_id for h in excluded.hits}
+
+
+def test_retrieve_exclude_ids_reranks_before_truncating_to_k(rt) -> None:
+    """exclude_ids removes candidates from the ranking BEFORE top-k is taken
+    -- not a post-hoc filter of an already-truncated top-k. Proof: widen to
+    k+1, exclude the top k (highest-ranked) ids, and confirm the (k+1)-th
+    ranked chunk surfaces in a new top-k call -- a post-hoc filter could
+    never do this, since it never looks past rank k in the first place. This
+    is exactly the property evaluation.score_case's page-only diagnostic
+    (task 24 review, Critical 1) depends on: "what would the site's pages
+    retrieve with zero curated-corpus assist," not "how many of the normal
+    top-4 happen not to be curated.\""""
+    q = "grapple traversal and combat design"
+    wide = rt.retrieve(q, k=TOP_K + 1)
+    assert len(wide.hits) == TOP_K + 1, "fixture assumption: 5 chunks clear the floor here"
+    lowest_ranked = wide.hits[TOP_K]
+    ahead_of_it = frozenset(h.chunk_id for h in wide.hits[:TOP_K])
+
+    reranked = rt.retrieve(q, k=TOP_K, exclude_ids=ahead_of_it)
+    assert lowest_ranked.chunk_id in {h.chunk_id for h in reranked.hits}, (
+        "the 5th-ranked chunk did not surface once its 4 higher-ranked rivals "
+        "were excluded -- exclude_ids is filtering an already-truncated top-k "
+        "instead of re-ranking before truncation"
+    )
 
 
 def test_retrieval_embedder_matches_the_index_that_was_built(rt) -> None:

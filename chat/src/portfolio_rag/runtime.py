@@ -17,6 +17,7 @@ import numpy as np
 
 from portfolio_rag.config import MODEL_PRESETS, settings
 from portfolio_rag.embedder import OnnxEmbedder
+from portfolio_rag.loader import load_knowledge
 
 # Mirrors chat-widget.js TOP_K / MIN_SCORE / OFFTOPIC_GATE.
 TOP_K = 4
@@ -173,6 +174,8 @@ class Runtime:
             if index["chunks"]
             else np.empty((0, 0), dtype=np.float32)
         )
+        self._id_to_row = {c["id"]: i for i, c in enumerate(index["chunks"])}
+        self._knowledge_chunk_ids: frozenset[str] | None = None  # lazy, see property
 
     @property
     def retrieval_available(self) -> bool:
@@ -206,7 +209,58 @@ class Runtime:
             self._by_id = {c["id"]: c["text"] for c in self._index["chunks"]}
         return self._by_id.get(chunk_id, "")
 
-    def retrieve(self, question: str, k: int = TOP_K) -> Retrieval:
+    @property
+    def knowledge_chunk_ids(self) -> frozenset[str]:
+        """Ids of index chunks sourced from chat/knowledge/about_<lang>.md's
+        curated sections, as opposed to the site's own pages.
+
+        Task 24 review, Critical 1: the headline hit@4 gain from that task's
+        rebuild (66/96 -> 90/96) is largely the corpus retrieving curated text
+        that was authored by reading the very pages golden.jsonl names in
+        expected_urls -- an answer key partly scoring against itself. This is
+        the "means that survives re-chunking" the review asked for, used by
+        evaluation.score_case to report a page-only hit@4 alongside the full
+        number (see Runtime.retrieve's exclude_ids).
+
+        Structural signature, not position or a hardcoded count:
+        load_knowledge() (loader.py) sets a curated section's page_title AND
+        section_title to the exact `## heading` text, verbatim, which real
+        page sections essentially never do by coincidence (a real page's own
+        title/heading pair matching one of these long, distinctive authored
+        headings character-for-character is not a realistic collision this
+        project has hit). chunk_text may split one curated section into
+        several chunk dicts; every piece keeps that same page_title/
+        section_title pair, so each piece is still correctly identified after
+        re-chunking, and the heading set is read from the CURRENT
+        about_<lang>.md files on every call (via load_knowledge, the same
+        parser index_builder.py uses), not a snapshot frozen at some past
+        build -- a future corpus edit is picked up automatically, no index
+        rebuild required to keep this check correct.
+        """
+        if self._knowledge_chunk_ids is None:
+            knowledge_dir = settings.chat_root / "knowledge"
+            headings: dict[str, set[str]] = {"en": set(), "zh": set()}
+            if knowledge_dir.is_dir():
+                for lang in headings:
+                    headings[lang] = {s.section_title for s in load_knowledge(knowledge_dir, lang)}
+            ids = {
+                c["id"] for c in self._index["chunks"]
+                if c.get("page_title") == c.get("section_title")
+                and c["page_title"] in headings.get(c.get("lang", "en"), ())
+            }
+            self._knowledge_chunk_ids = frozenset(ids)
+        return self._knowledge_chunk_ids
+
+    def retrieve(
+        self, question: str, k: int = TOP_K, exclude_ids: frozenset[str] | None = None
+    ) -> Retrieval:
+        """exclude_ids removes candidates from the ranking BEFORE top-k is
+        taken (not a post-hoc filter of an already-truncated top-k) -- so a
+        chunk that would have ranked 5th among all candidates but 4th once
+        excluded ids are removed still gets its place. Used by
+        evaluation.score_case with knowledge_chunk_ids to answer "what would
+        the site's own pages retrieve without any curated-corpus assist,"
+        which a post-hoc filter of the normal top-4 cannot answer."""
         if self._embedder is None:
             raise RuntimeError(
                 f"retrieval unavailable: the model directory {self._model_dir} "
@@ -215,6 +269,11 @@ class Runtime:
                 "gitignored, so a fresh clone must download it before evaluating"
             )
         scores = self._matrix @ self._embedder.embed_query(question)
+        if exclude_ids:
+            rows = [self._id_to_row[i] for i in exclude_ids if i in self._id_to_row]
+            if rows:
+                scores = scores.copy()
+                scores[rows] = -np.inf
         order = np.argsort(-scores)[:k]
         chunks = self._index["chunks"]
         top = [
@@ -225,6 +284,7 @@ class Runtime:
                 score=round(float(scores[i]), 4),
             )
             for i in order
+            if np.isfinite(scores[i])
         ]
         kept = [h for h in top if h.score >= MIN_SCORE]
         return Retrieval(

@@ -5,7 +5,7 @@ import pytest
 from portfolio_rag.evaluation import (
     GoldenCase, aggregate, build_baseline, format_margin, keyword_matches, run_cases, score_case,
 )
-from portfolio_rag.runtime import load_runtime
+from portfolio_rag.runtime import TOP_K, GateDecision, Hit, Retrieval, load_runtime
 
 
 @pytest.fixture(scope="module")
@@ -117,6 +117,102 @@ def test_hit_is_independent_of_the_gate(rt) -> None:
     assert result.gate_passed is False, "the stub did not take effect"
     assert result.hit is True, "a gate refusal masked the retrieval hit"
     assert result.keywords_found, "a gate refusal masked keyword coverage"
+
+
+# --- Task 24 review, Critical 1: page-only retrieval diagnostic -----------
+
+
+class _FakeRuntimeForPageOnly:
+    """Minimal Runtime stand-in isolating score_case's page-only wiring from
+    the real e5 model and the committed corpus: `full` is returned for the
+    normal (no exclude_ids) call, `page_only` for the call WITH exclude_ids,
+    so the test can assert score_case makes BOTH calls, in order, the second
+    one excluding exactly knowledge_chunk_ids -- without depending on which
+    real chunks about_en.md happens to contain today (that would make the
+    test's own pass/fail track corpus edits, which is not what this test is
+    about)."""
+
+    def __init__(self, full: Retrieval, page_only: Retrieval, knowledge_ids: frozenset) -> None:
+        self._full = full
+        self._page_only = page_only
+        self.knowledge_chunk_ids = knowledge_ids
+        self.exclude_ids_seen: list = []
+
+    def retrieve(self, question, k=TOP_K, exclude_ids=None):
+        self.exclude_ids_seen.append(exclude_ids)
+        return self._page_only if exclude_ids else self._full
+
+    def gate(self, question):
+        return GateDecision(True, True, 0.5, "en", 0.25)
+
+    def chunk_text(self, chunk_id):
+        return ""
+
+
+def test_score_case_computes_hit_page_only_by_re_retrieving_with_knowledge_excluded() -> None:
+    full = Retrieval(
+        hits=(Hit("k1", "pages/gyrotris.html", "en", 0.9),), dropped_by_floor=0, top_score=0.9
+    )
+    page_only = Retrieval(
+        hits=(Hit("p1", "pages/other.html", "en", 0.5),), dropped_by_floor=0, top_score=0.5
+    )
+    knowledge_ids = frozenset({"k1"})
+    fake = _FakeRuntimeForPageOnly(full, page_only, knowledge_ids)
+    case = GoldenCase(
+        id="t-en-05", role="visitor", lang="en", type="positive",
+        q="does he have a solo project", expected_urls=("pages/gyrotris.html",),
+    )
+
+    result = score_case(fake, case)
+
+    assert result.hit is True, "the full retrieval contains the expected url"
+    assert result.hit_page_only is False, (
+        "the page-only retrieval (knowledge excluded) does not contain the "
+        "expected url and must not silently copy `hit`"
+    )
+    assert fake.exclude_ids_seen == [None, knowledge_ids], (
+        "score_case must call retrieve() twice for a positive case: once "
+        "normally, once with exclude_ids=knowledge_chunk_ids -- exactly this "
+        "order, so a page-only re-rank actually happened rather than being "
+        "derived from the first call's already-truncated top-k"
+    )
+
+
+def test_hit_page_only_is_none_for_negatives_like_hit() -> None:
+    """Negatives have no expected_urls, so neither hit nor hit_page_only is
+    meaningful for them -- mirrors test_negative_is_gate_only's assertion on
+    `hit` itself."""
+    full = Retrieval(hits=(), dropped_by_floor=0, top_score=0.0)
+    fake = _FakeRuntimeForPageOnly(full, full, frozenset())
+    case = GoldenCase(id="t-en-06", role="visitor", lang="en", type="off_topic",
+                       q="what's the weather", adjacency="easy")
+    result = score_case(fake, case)
+    assert result.hit is None and result.hit_page_only is None
+    assert fake.exclude_ids_seen == [None], (
+        "a negative case has no expected_urls to re-rank against -- the "
+        "second, exclude_ids retrieve() call must not happen at all"
+    )
+
+
+def test_aggregate_tracks_hit_at_4_page_only_separately_from_hit_at_4() -> None:
+    full = Retrieval(
+        hits=(Hit("k1", "pages/gyrotris.html", "en", 0.9),), dropped_by_floor=0, top_score=0.9
+    )
+    page_only = Retrieval(
+        hits=(Hit("p1", "pages/other.html", "en", 0.5),), dropped_by_floor=0, top_score=0.5
+    )
+    fake = _FakeRuntimeForPageOnly(full, page_only, frozenset({"k1"}))
+    case = GoldenCase(
+        id="t-en-07", role="visitor", lang="en", type="positive",
+        q="does he have a solo project", expected_urls=("pages/gyrotris.html",),
+    )
+    cells = aggregate(run_cases(fake, [case]))
+    cell = cells["visitor/en"]
+    assert cell["hit_at_4"] == 1, "full retrieval hit the expected url"
+    assert cell["hit_at_4_page_only"] == 0, (
+        "page-only retrieval did not, and this must be a SEPARATE counter, "
+        "not folded into hit_at_4"
+    )
 
 
 def test_aggregate_keys_positives_by_role_and_negatives_by_shared_pool(rt) -> None:

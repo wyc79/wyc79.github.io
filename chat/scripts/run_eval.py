@@ -50,10 +50,21 @@ def print_gate_summary(gate_meta: dict) -> None:
 
 def print_positive_table(cells: dict) -> None:
     """role/lang cells: gate-pass and retrieval health. No refusal column --
-    negatives no longer live here, see print_shared_table."""
-    print(f"\n{'positive cells':<40} {'gate':>7} {'hit@4':>7} {'keywords':>9}  retrieved")
-    print("-" * 88)
-    totals = {"gate_pass": 0, "n_positive": 0, "hit_at_4": 0,
+    negatives no longer live here, see print_shared_table.
+
+    hit@4(pg) is the task-24-review page-only diagnostic: hit@4 re-ranked
+    with chat/knowledge/about_<lang>.md's curated sections excluded from the
+    candidate pool (see Runtime.knowledge_chunk_ids), i.e. "what the site's
+    OWN pages would retrieve with zero curated-corpus assist." Printed next
+    to hit@4 so a corpus change that inflates the full number by retrieving
+    its own authored content cannot pass unnoticed -- it is a reported
+    diagnostic, never folded into hit@4, and not compared by
+    tests/test_golden.py's regression check (see aggregate()'s comment).
+    """
+    print(f"\n{'positive cells':<40} {'gate':>7} {'hit@4':>7} {'hit@4(pg)':>9} "
+          f"{'keywords':>9}  retrieved")
+    print("-" * 100)
+    totals = {"gate_pass": 0, "n_positive": 0, "hit_at_4": 0, "hit_at_4_page_only": 0,
               "keywords_found": 0, "keywords_total": 0}
     # Gate column is summed separately, over gate_available cells only: a
     # cjk_bypass decision always reports gate_passed=True, so blending it into
@@ -72,18 +83,20 @@ def print_positive_table(cells: dict) -> None:
             n_excluded += 1
         gate = "n/a" if not c["gate_available"] else f"{c['gate_pass']}/{c['n_positive']}"
         hits = f"{c['hit_at_4']}/{c['n_positive']}"
+        hits_pg = f"{c['hit_at_4_page_only']}/{c['n_positive']}"
         kw = f"{c['keywords_found']}/{c['keywords_total']}"
         langs = " ".join(f"{k}:{v}" for k, v in sorted(c["retrieved_langs"].items()))
-        print(f"{name:<40} {gate:>7} {hits:>7} {kw:>9}  {langs}")
-    print("-" * 88)
+        print(f"{name:<40} {gate:>7} {hits:>7} {hits_pg:>9} {kw:>9}  {langs}")
+    print("-" * 100)
     if n_available == 0:
         gate_total = "n/a"
     else:
         mark = "*" if n_excluded else ""
         gate_total = f"{gate_totals['gate_pass']}/{gate_totals['n_positive']}{mark}"
     hits_total = f"{totals['hit_at_4']}/{totals['n_positive']}"
+    hits_pg_total = f"{totals['hit_at_4_page_only']}/{totals['n_positive']}"
     kw_total = f"{totals['keywords_found']}/{totals['keywords_total']}"
-    print(f"{'TOTAL':<40} {gate_total:>7} {hits_total:>7} {kw_total:>9}")
+    print(f"{'TOTAL':<40} {gate_total:>7} {hits_total:>7} {hits_pg_total:>9} {kw_total:>9}")
     if n_available and n_excluded:
         print(f"* gate totals exclude {n_excluded} cell(s) with no gate available "
               "(see n/a rows)")
@@ -193,7 +206,10 @@ def main() -> int:
         print("distinguish a gate problem from a retrieval problem, and hit@4 passing")
         print("while keywords fail means the right PAGE came back with the wrong chunk.")
         print("The shared negatives block is never blended with positives, and its three")
-        print("adjacency buckets are never blended with each other -- see eval/README.md.\n")
+        print("adjacency buckets are never blended with each other -- see eval/README.md.")
+        print("hit@4(pg) excludes chat/knowledge/*.md's curated sections from retrieval --")
+        print("a gap between hit@4 and hit@4(pg) means the corpus, not the site's own")
+        print("pages, is answering the question (task 24 review, Critical 1).\n")
 
     if args.update_baseline:
         if args.role or args.lang:

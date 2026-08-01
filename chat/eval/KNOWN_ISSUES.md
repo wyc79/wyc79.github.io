@@ -30,7 +30,77 @@ negatives), `data/eval_baseline.json` generated `2026-08-01T02:58:03Z`.
 
 ---
 
-## Current measured state
+## Task 24 update (2026-08-01): full hit@4 rose, page-only hit@4 did not
+
+**Read this before trusting the `66/96` hit@4 number in the section below —
+a newer build supersedes it, and the honest story has two numbers, not one.**
+
+Task 24 pointed the en off-topic gate at the curated
+`chat/knowledge/about_en.md` corpus (55 sections) instead of all indexed
+English chunks, and rebuilt. That rebuild was the first since Tasks 22/23
+grew `about_en.md`/`about_zh.md` from 5/22 to 55/53 sections each — so it
+also, incidentally, folded 108 new curated chunks (55 en + 53 zh) into the
+retrieval index for the first time. **The reported hit@4 gain (66/96 →
+90/96) is mostly that fold-in, not anything task 24's own code change
+touched** (that change only reshapes the gate-corpus branch of
+`index_builder.py`; retrieval/chunk construction is untouched).
+
+Because several curated sections carry an explicit `link:` line pointing at
+a real page (e.g. a Gyrotris-focused `about_en.md` section links
+`pages/gyrotris.html`), a curated chunk can satisfy `expected_urls` for a
+golden case **without the real page's own text ever entering the top-4** —
+the corpus, authored in part by reading those same pages, answers on the
+page's behalf. This is scoring an answer key partly against itself, not a
+genuine retrieval improvement on the site's own content.
+
+**Both numbers, measured on the same build, reconcile plainly:**
+
+```
+hit@4 FULL   (as shipped, all 308 chunks):        90/96
+hit@4 PAGE-ONLY (chat/knowledge/*.md excluded):    59/96
+pre-task-24 baseline (66/96, itself already
+  assisted by the smaller 5+19-section corpus):    66/96
+```
+
+`combat_design_recruiter/zh` — the one cell flagged in Finding F below as
+never moving across multiple builds — is the clearest symptom: full hit@4
+went 4/12 → 12/12, but page-only hit@4 for that same cell is **5/12**,
+essentially the same as the pre-rebuild 4/12. 45 of its 48 full-mode top-4
+slots trace to knowledge chunks, not page chunks.
+
+**A second, independent check clarifies what actually changed and what
+didn't:** re-deriving the OLD build's OWN page-only number (excluding its
+own, smaller 26-chunk knowledge assist) gives **59/96 — identical, per cell,
+to the new build's page-only number.** The real site pages' own
+retrievability did not change at all between builds (same HTML, same
+chunking, same embedding model, deterministic per the note above) — what
+changed is only how large a lift the knowledge-corpus assist provides
+(26 chunks → 66/96 full; 108 chunks → 90/96 full). The true, zero-assist
+page-retrieval baseline has been sitting at 59/96 all along; it was simply
+never reported as a separate number before this build.
+
+**Fix, not just a caveat:** `scripts/run_eval.py`'s positive-cells table (and
+`--json` output, and `data/eval_baseline.json`) now carries a `hit@4(pg)` /
+`hit_at_4_page_only` column alongside `hit@4`, computed by excluding
+`Runtime.knowledge_chunk_ids` from the retrieval candidate pool before
+top-k is taken (`Runtime.retrieve(..., exclude_ids=...)`), so this gap is
+visible on every future run without needing a manual re-derivation. It is a
+reported diagnostic, not a pass/fail metric — deliberately not compared by
+`tests/test_golden.py::test_no_metric_regressed`, the same treatment already
+given to `gate_margin` (see `build_baseline`'s docstring).
+
+**What this does and does not mean:** the *product* genuinely improved — a
+visitor asking these 96 questions now gets a better answer more often,
+because the curated sections are real, grounded, and freely blend with page
+content in front of the LLM. But the specific claim "site-page retrieval
+improved" is false; site-page retrieval is unchanged, and the growing
+knowledge corpus increasingly does the retrieving on the pages' behalf. Full
+detail, the code, and the independent re-verification:
+`.superpowers/sdd/EVAL_PLAN/task-24-report.md`.
+
+---
+
+## Current measured state (pre-task-24; numbers below are superseded, see above)
 
 ```
 positive cells                gate   hit@4  keywords  retrieved
@@ -149,7 +219,33 @@ stay strictly compared in all four availability combinations.
 
 ## Outstanding
 
-### M — The adjacency axis quantifies the gate's headline failure mode (leads this section)
+### N — Curated knowledge sections can satisfy `expected_urls` without the real page ever retrieving (leads this section; see the Task 24 update above)
+
+`chat/knowledge/about_en.md`/`about_zh.md` sections may carry a `link:` line
+pointing at a real page (`loader.load_knowledge`); when one does, a chunk
+built entirely from curated prose can match a golden case's `expected_urls`
+even though the actual page's own text never lands in the top-4. As the two
+corpora grew (5→55 en, 22→53 zh sections, Tasks 22/23) this stopped being a
+rounding error: 108 of 308 indexed chunks are now knowledge-derived, and the
+task-24 rebuild's full hit@4 (90/96) is inflated by this relative to the
+page-only number (59/96) — see the Task 24 update above for the full
+measurement and reconciliation.
+
+**Not classified as a defect to "fix" by removing `link:` or shrinking the
+corpus** — the curated sections are grounded, real, and genuinely help the
+LLM answer well; the issue is purely that `hit@4` alone can no longer be
+read as "the site's own pages are retrievable," and a reader must check
+`hit@4(pg)` (below) for that claim specifically. **Mitigated**, not fixed:
+`scripts/run_eval.py`, `--json`, and `data/eval_baseline.json` now carry a
+`hit_at_4_page_only` diagnostic (`Runtime.knowledge_chunk_ids` /
+`Runtime.retrieve(..., exclude_ids=...)`) reporting hit@4 with knowledge
+chunks excluded from the candidate pool, printed as `hit@4(pg)` next to the
+normal column. It is not wired into `test_no_metric_regressed` (a reported
+diagnostic, not a pass/fail gate, mirroring how `gate_margin` is already
+treated) — a future task should judge whether page-only retrieval quality
+itself needs work, now that it is visible rather than blended away.
+
+### M — The adjacency axis quantifies the gate's headline failure mode
 
 Measured en gate values against the live threshold 0.2536 (reviewer-verified
 against real score buckets that sit well clear of the threshold on both

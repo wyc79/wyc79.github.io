@@ -291,3 +291,41 @@ def test_gate_metric_skipped_unless_available_on_both_sides() -> None:
         else:
             assert gate_drops, f"{case}: gate metric should be compared strictly, got none"
         assert hit_drops, f"{case}: hit_at_4 (gate-free) must never be skipped"
+
+
+# --- Task 24 review, Critical 1: hit_at_4_page_only is a diagnostic, -------
+# --- never a pass/fail regression metric ------------------------------------
+
+
+def test_hit_at_4_page_only_is_not_a_regression_metric() -> None:
+    """The task-24 review explicitly warned against wiring the new page-only
+    hit@4 diagnostic (evaluation.aggregate's hit_at_4_page_only) into this
+    regression gate without first thinking through the gate-availability
+    interaction that test_gate_metric_skipped_unless_available_on_both_sides
+    (above) exists to cover. It was deliberately left out -- this is a
+    guardrail against a future edit accidentally adding it to
+    _REGRESSION_METRICS without that consideration, mirroring how
+    build_baseline's docstring protects gate_margin the same way."""
+    assert "hit_at_4_page_only" not in _REGRESSION_METRICS
+
+
+def test_a_page_only_drop_alone_does_not_fail_the_regression_check() -> None:
+    """Direct behavioural proof, not just absence from the tuple: a cell
+    whose hit_at_4_page_only got WORSE, with every _REGRESSION_METRICS field
+    unchanged or better, must report zero drops. If a future edit ever wires
+    this diagnostic into the comparison by mistake, this test starts
+    failing immediately instead of the regression silently going live."""
+    baseline_cells = {
+        "visitor/en": {
+            "gate_available": True, "gate_pass": 12, "hit_at_4": 8,
+            "hit_at_4_page_only": 7, "keywords_found": 10, "keywords_total": 20,
+        },
+    }
+    current_cells = {
+        "visitor/en": {
+            "gate_available": True, "gate_pass": 12, "hit_at_4": 8,
+            "hit_at_4_page_only": 3,  # dropped hard; every other metric held
+            "keywords_found": 10, "keywords_total": 20,
+        },
+    }
+    assert _find_regressions(baseline_cells, current_cells) == []
