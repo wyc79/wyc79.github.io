@@ -16,7 +16,9 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-_BOILERPLATE_TAGS = ("script", "style", "nav", "header", "footer", "noscript", "canvas")
+_BOILERPLATE_TAGS = (
+    "script", "style", "nav", "header", "footer", "noscript", "canvas", "textarea"
+)
 _LANGS = ("en", "zh")
 
 

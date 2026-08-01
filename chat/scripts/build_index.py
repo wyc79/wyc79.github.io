@@ -30,11 +30,13 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     from portfolio_rag.config import settings  # noqa: E402 (after env is set)
-    from portfolio_rag.embedder import get_embedder  # noqa: E402
     from portfolio_rag.index_builder import build_index  # noqa: E402
 
     print(f"model preset: {settings.model_preset} ({settings.preset['name']})")
-    get_embedder()  # load the model up front so timing reflects the build only
+    # No warm-up call here: build_index() constructs its own dedicated embedder
+    # (not the get_embedder() process-wide cache) so a warm-up through that
+    # cache would load the model a second time for nothing. elapsed_seconds
+    # below therefore includes model load time, not build work alone.
     stats = build_index()
     print(HEADER)
     print("-" * len(HEADER))
