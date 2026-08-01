@@ -71,9 +71,10 @@ scaling, and a QR code generator with adjustable output size.
 
 ## Degrees completed versus degrees in progress
 link: pages/education.html
-He holds a completed bachelor's degree from the University of Rochester and
-a completed master's degree from Harvard Medical School, and is currently
-partway through a second, ongoing master's degree at USC.
+He holds two completed bachelor's degrees from the University of
+Rochester — a B.S. in Brain & Cognitive Science and a B.A. in Psychology —
+plus a completed master's degree from Harvard Medical School, and is
+currently partway through a second, ongoing master's degree at USC.
 
 ## Languages he speaks
 link: pages/skills.html
@@ -86,7 +87,7 @@ Before working in games he was involved in neuroscience, psychology, and
 biomedical informatics research, contributing to peer-reviewed studies on
 brain function.
 
-## What he is studying right now
+## His current program at USC
 link: pages/education.html
 He is enrolled in USC's Master of Science in Computer Science, Game
 Development track, running from August 2025 through May 2027, with
@@ -99,7 +100,7 @@ Python Developer and QA Lead on the automatic differentiation toolbox, and
 Producer on a studio game prototype, alongside his design and engineering
 roles.
 
-## His most design-and-combat-heavy project
+## The project where he holds the broadest design role
 link: pages/cemented-dreams.html
 Cemented Dreams is where he holds the most design responsibility at once:
 he is credited as Combat Designer, Gameplay Engineer, and Level Designer on
@@ -125,7 +126,7 @@ The chat assistant embedded on this site was designed and built by him end
 to end, so it doubles as a working sample of his applied AI and full-stack
 engineering rather than only a feature for visitors.
 
-## Combat, gameplay, and level design on one project
+## Combined design and engineering responsibilities on one project
 link: pages/cemented-dreams.html
 On Cemented Dreams he simultaneously held the Combat Designer, Gameplay
 Engineer, and Level Designer roles, building the core systems for the
@@ -175,9 +176,10 @@ in-class presentation.
 
 ## Serving as producer on a studio team
 link: pages/game-design-workshop.html
-On the CTIN 488 final project he served as Producer, helping lock the core
-loop, driving rulebook cleanup, and preparing the slide deck and
-presentation video.
+His listed role on the CTIN 488 final project was Producer; the team
+credits him with helping lock the core loop, driving rulebook cleanup,
+running the simulation-backed balance checks, and supporting the final
+slide-deck and presentation-video prep, alongside his teammates.
 
 ## Combat systems engineering on Code Breaker
 link: pages/codebreaker.html
@@ -253,9 +255,10 @@ include Python, R, C, MATLAB, Java, and SQL, in addition to C++ and C#.
 
 ## Formal algorithms coursework at Rochester
 link: pages/education.html
-His University of Rochester coursework included Discrete Mathematics and
-Data Structures & Algorithms, alongside Computation & Formal Systems,
-forming a theory foundation underneath his later hands-on engine work.
+His University of Rochester degrees (Aug 2017 – May 2021) carried a minor
+in computer science, with coursework spanning Discrete Mathematics, Data
+Structures & Algorithms, and Computation & Formal Systems — a theory
+foundation underneath his later hands-on engine work.
 
 ## Courses touching AI and statistics
 link: pages/education.html
@@ -319,11 +322,12 @@ Beyond his game projects, he co-authored a published paper applying a
 machine-learning preprocessing method, ps-KDE, to semantic segmentation of
 chest X-ray images.
 
-## Breadth of his publication record
+## Six credited academic publications
 link: pages/publications.html
-His publications page lists six peer-reviewed papers, conference
-abstracts, and preprints, appearing in venues including NeuroImage,
-Cerebral Cortex, Physiology, and PLOS ONE.
+The publications page credits him on six separate entries: journal
+articles in NeuroImage, Cerebral Cortex, and PLOS ONE, a conference
+abstract in Physiology, a PsyArXiv preprint, and conference proceedings
+from FBB 2020.
 
 ## Core-engine work on the AD toolbox team
 link: pages/automatic-differentiation.html
@@ -333,9 +337,9 @@ correctness testing as QA lead.
 
 ## Applied Bayesian coursework at Harvard
 link: pages/education.html
-His Harvard Medical School biomedical informatics master's included
-coursework in Applied Bayesian Analysis alongside Machine Learning, beyond
-purely programming-focused classes.
+His Harvard Medical School biomedical informatics master's (Aug 2021 –
+Dec 2022) included coursework in Applied Bayesian Analysis alongside
+Machine Learning, beyond purely programming-focused classes.
 
 ## Hands-on brain-imaging research methodology
 link: pages/publications.html
