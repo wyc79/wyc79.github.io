@@ -112,6 +112,14 @@
       degradedCJK: 'The AI answer service is unreachable right now, and offline search only covers English. Here are some pages you can browse in the meantime:',
       degradedLoading: function (pct) { return 'Backend unreachable — loading offline search (' + pct + '%)…'; },
       degradedSources: 'The AI answer service is unreachable right now, but these pages look most relevant to your question:',
+      // Task 24 review, Important: fb.vectors is now the curated en gate
+      // corpus (~55 sections), no longer chunk-order-aligned with
+      // state.index.chunks (see the fallback_vectors.json comment in
+      // index_builder.py) -- so degradedSources' specific "these pages look
+      // most relevant" claim would be naming an unrelated chunk by accident
+      // of position. This string is honest about what local search actually
+      // confirmed (on-topic) vs. what it can't do (point to a specific page).
+      degradedNoSources: 'The AI answer service is unreachable right now. Offline search confirms this is something I can help with, but can\'t reliably point to a specific page yet — here are some pages you can browse:',
       backendDown: 'The chat backend is unreachable right now — please try again in a minute.',
       retrievalOnly: 'Demo is in retrieval-only mode (no LLM connected yet), but here\'s what the semantic index surfaces for that — sources below:',
       somethingWrong: function (msg) { return 'Something went wrong (' + msg + '). Please try again.'; },
@@ -143,6 +151,7 @@
       degradedCJK: 'AI 回答服务暂时无法连接，而离线检索目前只支持英文。你可以先浏览这些页面：',
       degradedLoading: function (pct) { return '后端暂时无法连接 —— 正在加载离线检索（' + pct + '%）…'; },
       degradedSources: 'AI 回答服务暂时无法连接，不过这些页面看起来和你的问题最相关：',
+      degradedNoSources: 'AI 回答服务暂时无法连接。离线检索确认这是我能回答的话题，但目前还不能可靠地指向具体某个页面 —— 你可以先看看这些页面：',
       backendDown: '聊天后端暂时无法连接 —— 请过一会儿再试。',
       retrievalOnly: '演示目前处于「仅检索」模式（还没接入 LLM），不过这是语义索引为该问题找到的内容 —— 来源见下方：',
       somethingWrong: function (msg) { return '出错了（' + msg + '）。请再试一次。'; },
@@ -421,10 +430,22 @@
   }
 
   // ── Degraded mode: backend down + e5 index ────────────────────────────
-  // The published fallback_vectors.json holds MiniLM copies of the chunk
-  // vectors (chunk-order aligned with index.json), so the local MiniLM model
-  // can still recommend relevant pages even when server-side embedding and
-  // LLM answers are unreachable.
+  // The published fallback_vectors.json holds MiniLM copies of the en gate's
+  // vectors, so the local MiniLM model can still answer the gate question
+  // (on-/off-topic?) when server-side embedding and LLM answers are
+  // unreachable — that gate check is the one thing every caller of
+  // retrieveFallback needs and always gets right.
+  //
+  // As of the curated-gate-corpus change (chat/src/portfolio_rag/
+  // index_builder.py, task 24), fb.vectors is knowledge/about_en.md's ~55
+  // curated sections, NOT a chunk-order-aligned prefix of index.json's
+  // chunks anymore. The chunkAt(i) below still indexes state.index.chunks[i]
+  // positionally — that mapping is now coincidental, not meaningful, so the
+  // *source links* this produces (as opposed to its gate score) may name an
+  // unrelated chunk. Known, not yet fixed: see the index_builder.py comment
+  // above the fallback_vectors.json write for the reasoning and the options
+  // for a proper follow-up (a second, retrieval-shaped fallback corpus, or
+  // chunk_ids the widget looks up by id instead of by position).
   function loadFallbackVectors() {
     if (state.fallback) return Promise.resolve(state.fallback);
     return fetch(PREFIX + 'chat/data/fallback_vectors.json', { cache: 'no-cache' }).then(function (r) {
@@ -520,11 +541,23 @@
         pushLog({ type: 'bot', text: thinking.textContent });
         pushLog({ type: 'starters' });
       } else {
-        thinking.textContent = t('degradedSources');
-        addSources(retrieved.results);
+        // Task 24 review, Important: retrieved.results' chunkAt(i) mapping is
+        // no longer trustworthy (see retrieveFallback's comment above) -- it
+        // would confidently name a chunk that has nothing to do with the
+        // query. Showing wrong sources is worse than showing none, so this
+        // shows the same static, curated page-link list degradedCJK and
+        // offlineDeclined already use elsewhere, not addSources(retrieved.
+        // results). The gate decision itself (gateScore above) is unaffected
+        // and still gates on the real fb vectors.
+        thinking.textContent = t('degradedNoSources');
+        addPageLinks();
         pushLog({ type: 'bot', text: thinking.textContent });
-        if (retrieved.results.length) pushLog({ type: 'sources', results: sourcesForLog(retrieved.results) });
+        pushLog({ type: 'pagelinks' });
       }
+      // Internal audit log only (console.debug / analytics /log, never
+      // re-rendered to the visitor -- contrast pushLog above) -- kept as the
+      // raw fb-based scores/ids for the site owner's own debugging even
+      // though the chunkAt(i) mapping is unreliable for display purposes.
       record.retrieved = retrieved.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
       record.answer = thinking.textContent;
       logTurn(record);

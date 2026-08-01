@@ -212,15 +212,34 @@ def build_index(site_root: Path | None = None) -> dict:
             settings.resolve_path(gate_preset["dir"]),
             settings.embedding_max_tokens,
         )
-        # The MiniLM en gate (and the degraded fallback) cover ONLY the English
-        # chunks: MiniLM can't embed Chinese, so including zh chunks re-adds the
-        # off-topic hubness the gate exists to avoid. In the bilingual build the
-        # en chunks are the index PREFIX (built first), so fallback.vectors[i]
-        # still lines up with index.chunks[i] and the widget's English-only
-        # degraded loop naturally stops before the zh chunks. For a monolingual
-        # build every chunk is "en" here, so this is a no-op.
-        en_chunks = [c for c in chunks if c.get("lang") != "zh"]
-        gate_vecs = gate_embedder.embed_documents([c["text"] for c in en_chunks])
+        # First-pass gate corpus: the curated knowledge/about_en.md sections —
+        # NOT every indexed English chunk — symmetric with _build_zh_gate
+        # below (task 24; see task 21's diagnosis). With stat="top" the gate
+        # statistic is a max over its corpus: a corpus that grows with the
+        # SITE (every page/section added) hands off-topic queries an ever
+        # growing number of chances at a spurious match, while on-topic
+        # queries already sit near their ceiling. Measured before this
+        # change: retrieval improved on a rebuild (hit@4 64/96 -> 66/96)
+        # while the en gate margin fell -- gate quality and site growth were
+        # coupled in the wrong direction. A small, curated, question-shaped
+        # corpus decouples them, the same way the zh gate already does.
+        # Whole sections are embedded (like _build_zh_gate's `s.text for s in
+        # sections`), not chunk_text pieces: these are short, single-topic
+        # entries by construction and don't need splitting.
+        corpus_dir = settings.chat_root / "knowledge"
+        en_sections = load_knowledge(corpus_dir, "en")
+        if not en_sections:
+            # The en gate has no quiet-disable fallback (see
+            # _check_en_gate_margin's docstring) -- an empty corpus must fail
+            # the build loudly, not silently revert to gating against every
+            # indexed chunk (the exact bug this change fixes).
+            raise ValueError(
+                f"en gate: no usable sections in {corpus_dir}/about_en.md — "
+                "cannot build an en gate corpus. Not falling back to indexed "
+                "chunks: that would silently reintroduce the site-growth "
+                "coupling this corpus exists to remove."
+            )
+        gate_vecs = gate_embedder.embed_documents([s.text for s in en_sections])
         gate_vecs = np.round(gate_vecs.astype(float), ndigits)
         gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
                             multilingual=gate_preset["multilingual"])
@@ -230,8 +249,8 @@ def build_index(site_root: Path | None = None) -> dict:
         # Symmetric with the zh line below. The en gate is unconditional (e5
         # can't self-gate), so this always prints; a negative margin only warns
         # (compute_gate still picks a threshold just above the off-topic max).
-        logger.info("en gate: enabled (%s >= %s, margin %.1f%%, %d chunks)",
-                    gate["stat"], gate["threshold"], gate["margin"] * 100, len(en_chunks))
+        logger.info("en gate: enabled (%s >= %s, margin %.1f%%, %d sections)",
+                    gate["stat"], gate["threshold"], gate["margin"] * 100, len(en_sections))
         gate_payload = {
             "en": {
                 "model": gate_preset["name"],
@@ -241,7 +260,10 @@ def build_index(site_root: Path | None = None) -> dict:
                 "gate_stat": gate["stat"],
                 "gate_threshold": gate["threshold"],
                 "gate_margin": gate["margin"],
-                "chunk_ids": [c["id"] for c in en_chunks],
+                # No chunk_ids: the corpus is no longer index.chunks (or a
+                # slice of it), so there is nothing in index.json for these
+                # vectors to positionally align with. Symmetric with
+                # _build_zh_gate's payload, which never had this field either.
                 "vectors": gate_vecs.tolist(),
             }
         }
@@ -252,11 +274,44 @@ def build_index(site_root: Path | None = None) -> dict:
         gate_path.write_text(json.dumps(gate_payload, ensure_ascii=False), encoding="utf-8")
 
         # Published fallback for the widget's degraded mode (backend down):
-        # MiniLM vectors of the English chunks, order-aligned with the English
-        # prefix of index.json (see en_chunks note above). gate_margin rides
-        # along too: fallback_vectors.json (unlike gate_vectors.json) IS
-        # committed to git, so it's the only copy of the en margin most
-        # clones/CI ever see.
+        # a MiniLM copy of the SAME en gate corpus vectors written to
+        # gate_vectors.json above (gate_vecs, not a fresh embedding pass) —
+        # gate_margin rides along too, and fallback_vectors.json (unlike
+        # gate_vectors.json) IS committed to git, so it's the only copy of
+        # the en margin most clones/CI ever see.
+        #
+        # Task 24 decision: before this change, en gate corpus == the index's
+        # English chunk prefix, so these vectors were coincidentally order-
+        # aligned with index.chunks — the widget's degraded-mode retrieval
+        # (scripts/chat-widget.js:retrieveFallback) piggybacked on that
+        # alignment to map fb.vectors[i] to state.index.chunks[i] and show
+        # source links, not just to gate. Now that the gate corpus is the
+        # curated ~55-section knowledge/about_en.md (not a slice of
+        # index.chunks), that positional mapping is meaningless — vector i is
+        # a curated section, chunk i is whatever the i-th chunk of the full
+        # rebuilt index happens to be, and the two have no relationship.
+        #
+        # Chosen anyway: fallback_vectors.json mirrors gate_vectors.json's en
+        # entry (this is literally what the code already did — gate_vecs is
+        # reused as-is) because its primary, tested, documented role is the
+        # GATE (the widget computes gateScore from it before ever using it
+        # for retrieval; runtime.py's load_runtime() only ever reads it as a
+        # gate bundle). That keeps the gate DECISION consistent between
+        # normal mode (gate_vectors.json) and degraded mode (this file) —
+        # a question that would be refused with the backend up is refused
+        # the same way with it down, which is the property that actually
+        # matters for the off-topic gate's job.
+        #
+        # Consequence, not silently absorbed: chat-widget.js's degraded-mode
+        # "addSources"/source-link recommendation (the retrieval half of
+        # retrieveFallback, distinct from its gate-score half) now maps each
+        # curated-corpus vector to an unrelated chunk by accident of index
+        # position. There is no committed test coverage for that JS path, and
+        # fixing it well needs either a second, retrieval-shaped fallback
+        # corpus or chunk_ids that let the widget look up real chunks instead
+        # of trusting position — both bigger than this task's scope (rebuild
+        # the gate, not redesign degraded-mode retrieval). Flagged for a
+        # follow-up task rather than fixed here.
         fallback = {
             "model": gate_preset["name"],
             "query_prefix": gate_preset["query_prefix"],
