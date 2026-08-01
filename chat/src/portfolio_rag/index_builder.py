@@ -18,7 +18,7 @@ import numpy as np
 
 from portfolio_rag.chunker import chunk_text
 from portfolio_rag.config import MODEL_PRESETS, settings
-from portfolio_rag.embedder import OnnxEmbedder, get_embedder
+from portfolio_rag.embedder import OnnxEmbedder
 from portfolio_rag.gate_calibration import OFF_TOPIC_ZH, ON_TOPIC_ZH, compute_gate
 from portfolio_rag.loader import load_knowledge, load_site
 from portfolio_rag.roles import roles_payload
@@ -72,6 +72,27 @@ def build_index(site_root: Path | None = None) -> dict:
     site_root = site_root or settings.site_root
     preset = settings.preset
 
+    # Guard against silently rebuilding the index in a different embedding
+    # space. gate_vectors.json, fallback_vectors.json and the deployed
+    # Tencent function all depend on the model_preset the committed
+    # index.json was built with (see .env.example) — a mismatch here means
+    # settings.model_preset drifted from that (e.g. a fresh clone missing
+    # chat/.env fell back to the "minilm" default). Checked before any work
+    # is done, not after, so a refused build doesn't waste an embedding pass.
+    existing_index_path = settings.resolve_path(settings.index_path)
+    if existing_index_path.exists() and not os.environ.get("RAG_ALLOW_PRESET_CHANGE"):
+        existing_preset = json.loads(existing_index_path.read_text(encoding="utf-8")).get(
+            "model_preset"
+        )
+        if existing_preset is not None and existing_preset != settings.model_preset:
+            raise ValueError(
+                f"existing index at {existing_index_path} was built with "
+                f"model_preset={existing_preset!r}, but settings.model_preset is "
+                f"{settings.model_preset!r}. Rebuilding would desync "
+                "gate_vectors.json, fallback_vectors.json and the deployed "
+                "backend. Set RAG_ALLOW_PRESET_CHANGE=1 to rebuild anyway."
+            )
+
     # A multilingual retrieval model (e5) gets a DE-INTERLEAVED bilingual index:
     # clean English-only sections then clean Chinese-only sections (en first),
     # instead of the en+zh-interleaved chunks the bilingual pages would produce
@@ -124,7 +145,19 @@ def build_index(site_root: Path | None = None) -> dict:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise ValueError(f"duplicate chunk ids: {dupes[:5]}")
 
-    embedder = get_embedder()
+    # A dedicated instance built from the local `preset`, not the process-wide
+    # get_embedder() cache: that cache is keyed on whichever preset first
+    # requested it and is shared across test modules (and any other caller
+    # in-process), so a build running after something else already resolved
+    # the cache under a different preset would silently embed with the wrong
+    # model while still labeling the index with settings.model_preset. This
+    # is the same failure mode runtime.py's index-declares-its-own-model fix
+    # exists to avoid (see the comment above Runtime's embedder resolution) —
+    # apply the same fix here, where it matters even more: this is what
+    # produces the vectors actually written to the committed index.json.
+    embedder = OnnxEmbedder.from_preset(
+        preset, settings.resolve_path(preset["dir"]), settings.embedding_max_tokens
+    )
     vectors = embedder.embed_documents([c["text"] for c in chunks])
     ndigits = settings.vector_round_decimals
     for chunk, vector in zip(chunks, vectors):
