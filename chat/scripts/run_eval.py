@@ -168,6 +168,17 @@ def main() -> int:
     if not rt.zh_gate_available:
         print("note: no zh gate (data/gate_vectors.json absent) -- Chinese gate "
               "metrics report n/a. Chinese hit@4 is unaffected.", file=sys.stderr)
+    stale_headings = rt.stale_knowledge_headings
+    if stale_headings:
+        shown = ", ".join(sorted(stale_headings)[:5])
+        more = f" (+{len(stale_headings) - 5} more)" if len(stale_headings) > 5 else ""
+        print(
+            f"note: {len(stale_headings)} knowledge-corpus heading(s) baked into "
+            "data/index.json no longer match chat/knowledge/about_*.md on disk -- "
+            "hit@4(pg) may be understating the real page-only number (see "
+            f"Runtime.stale_knowledge_headings). Rebuild the index. Stale: {shown}{more}",
+            file=sys.stderr,
+        )
 
     if args.role:
         # Negatives carry no role (SHARED_ROLE) -- --role filters positive

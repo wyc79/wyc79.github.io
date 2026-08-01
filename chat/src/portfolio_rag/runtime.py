@@ -176,6 +176,7 @@ class Runtime:
         )
         self._id_to_row = {c["id"]: i for i, c in enumerate(index["chunks"])}
         self._knowledge_chunk_ids: frozenset[str] | None = None  # lazy, see property
+        self._stale_knowledge_headings: frozenset[str] | None = None  # lazy, see property
 
     @property
     def retrieval_available(self) -> bool:
@@ -231,25 +232,97 @@ class Runtime:
         project has hit). chunk_text may split one curated section into
         several chunk dicts; every piece keeps that same page_title/
         section_title pair, so each piece is still correctly identified after
-        re-chunking, and the heading set is read from the CURRENT
-        about_<lang>.md files on every call (via load_knowledge, the same
-        parser index_builder.py uses), not a snapshot frozen at some past
-        build -- a future corpus edit is picked up automatically, no index
-        rebuild required to keep this check correct.
+        re-chunking -- PROVIDED the index chunks and the on-disk
+        about_<lang>.md files still agree on heading text.
+
+        They do not always. The CHUNKS are frozen at build time: page_title/
+        section_title is whatever heading text was on disk when index.json
+        was last written. The heading SET this is compared against, by
+        contrast, is read from the CURRENT about_<lang>.md files on every
+        call (via load_knowledge, the same parser index_builder.py uses) --
+        not a snapshot from that same build. A heading rename or removal with
+        no rebuild desyncs the two: the stale chunk still carries the OLD
+        heading text, which is no longer in the live set, so it silently
+        drops out of this frozenset and leaks into
+        hit_at_4_page_only's "page-only" candidate pool as if it were real
+        page content. Demonstrated directly (final whole-branch review,
+        follow-up to Critical 1): renaming 5 about_en.md headings with no
+        rebuild moved knowledge_chunk_ids from 108 to 103 and
+        hit_at_4_page_only from 59/96 to 56/96 -- a 3-case, unpredictable-
+        direction move baked straight into data/eval_baseline.json if a run
+        happens to update it in that state.
+
+        So: this check is correct only against the SAME build the index
+        chunks came from. A rebuild is required after any about_<lang>.md
+        heading edit to keep it accurate -- it is not merely nice-to-have.
+        `stale_knowledge_headings` (below) is a best-effort, non-blocking
+        diagnostic for exactly this desync.
         """
-        if self._knowledge_chunk_ids is None:
-            knowledge_dir = settings.chat_root / "knowledge"
-            headings: dict[str, set[str]] = {"en": set(), "zh": set()}
-            if knowledge_dir.is_dir():
-                for lang in headings:
-                    headings[lang] = {s.section_title for s in load_knowledge(knowledge_dir, lang)}
-            ids = {
-                c["id"] for c in self._index["chunks"]
-                if c.get("page_title") == c.get("section_title")
-                and c["page_title"] in headings.get(c.get("lang", "en"), ())
-            }
-            self._knowledge_chunk_ids = frozenset(ids)
+        self._compute_knowledge_signature()
         return self._knowledge_chunk_ids
+
+    @property
+    def stale_knowledge_headings(self) -> frozenset[str]:
+        """Headings present in the CURRENT chat/knowledge/about_<lang>.md
+        files that have no matching chunk in the index (no index chunk with
+        page_title == section_title == that exact heading text, in that
+        heading's language).
+
+        Deliberately checked in this direction -- from the live corpus
+        outward, not by scanning the index for orphaned chunks -- because
+        page_title == section_title is NOT itself a rare coincidence for
+        real page chunks (many single-section project pages have a page
+        title that equals their only section's heading, e.g. "Skills",
+        "Prime Engine" -- verified against the current index: 141 chunks
+        satisfy that alone). What IS reliably rare is one of these long,
+        sentence-shaped, hand-authored headings (e.g. "Who this portfolio
+        site is about") coincidentally matching a real page's short title
+        character-for-character -- the same assumption knowledge_chunk_ids's
+        matching already leans on. Scanning from the known heading text
+        keeps that assumption intact and avoids false positives from the
+        page-title coincidence above.
+
+        A non-empty result means the index and the live corpus have
+        desynchronized -- either a heading was renamed or removed in
+        about_<lang>.md with no rebuild since (the stale chunk keeps the OLD
+        text, which is no longer on disk, while the NEW text has no chunk
+        yet -- both look identical from here: "this current heading isn't in
+        the index"), or a heading was added and no rebuild has happened yet.
+        Either way the fix is the same: rebuild. See knowledge_chunk_ids's
+        docstring for why leaving it stale silently moves
+        hit_at_4_page_only.
+
+        This is a REPORTED diagnostic only: scripts/run_eval.py prints a
+        note when it is non-empty, and it is deliberately NOT raised as an
+        error and NOT compared by tests/test_golden.py::test_no_metric_regressed
+        -- a stale corpus should never block a run, only stop being silent
+        about it.
+        """
+        self._compute_knowledge_signature()
+        return self._stale_knowledge_headings
+
+    def _compute_knowledge_signature(self) -> None:
+        if self._knowledge_chunk_ids is not None:
+            return
+        knowledge_dir = settings.chat_root / "knowledge"
+        headings: dict[str, set[str]] = {"en": set(), "zh": set()}
+        if knowledge_dir.is_dir():
+            for lang in headings:
+                headings[lang] = {s.section_title for s in load_knowledge(knowledge_dir, lang)}
+        ids: set[str] = set()
+        built_headings: dict[str, set[str]] = {"en": set(), "zh": set()}
+        for c in self._index["chunks"]:
+            if c.get("page_title") != c.get("section_title"):
+                continue
+            lang = c.get("lang", "en")
+            if c["page_title"] in headings.get(lang, ()):
+                ids.add(c["id"])
+                built_headings.setdefault(lang, set()).add(c["page_title"])
+        stale: set[str] = set()
+        for lang, current in headings.items():
+            stale |= current - built_headings.get(lang, set())
+        self._knowledge_chunk_ids = frozenset(ids)
+        self._stale_knowledge_headings = frozenset(stale)
 
     def retrieve(
         self, question: str, k: int = TOP_K, exclude_ids: frozenset[str] | None = None

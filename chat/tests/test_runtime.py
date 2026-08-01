@@ -10,7 +10,7 @@ import pytest
 from portfolio_rag.config import settings
 from portfolio_rag.loader import load_knowledge
 from portfolio_rag.runtime import (
-    TOP_K, GateDecision, Retrieval, _GateBundle, gate_form, load_runtime, strip_name,
+    TOP_K, GateDecision, Retrieval, Runtime, _GateBundle, gate_form, load_runtime, strip_name,
 )
 
 
@@ -179,6 +179,69 @@ def test_knowledge_chunk_ids_matches_the_curated_corpus_exactly(rt) -> None:
     assert len(rt.knowledge_chunk_ids) == expected
     # Cached, not recomputed (and re-parsed off disk) on every access.
     assert rt.knowledge_chunk_ids is rt.knowledge_chunk_ids
+
+
+def test_stale_knowledge_headings_is_empty_against_the_current_build(rt) -> None:
+    """The committed data/index.json and the current chat/knowledge/*.md files
+    agree (nothing renamed since the last rebuild), so the desync diagnostic
+    must report nothing. If this ever fails on the committed artifacts, a
+    heading was edited without a rebuild -- see knowledge_chunk_ids's
+    docstring for why that silently corrupts hit_at_4_page_only."""
+    assert rt.stale_knowledge_headings == frozenset()
+    # Cached like knowledge_chunk_ids, not recomputed on every access.
+    assert rt.stale_knowledge_headings is rt.stale_knowledge_headings
+
+
+def test_stale_knowledge_headings_flags_a_renamed_heading() -> None:
+    """Isolated proof of the desync diagnostic, independent of the committed
+    index/corpus ever actually going stale.
+
+    Build a synthetic index that reproduces EVERY current about_en.md /
+    about_zh.md heading as a matching chunk (page_title == section_title ==
+    that heading) except one -- deliberately held back to stand in for a
+    heading that was renamed (or added) with no rebuild since. Also add an
+    ordinary page-shaped chunk with page_title == section_title (a real,
+    common coincidence for single-section pages -- see the property's own
+    docstring) to prove it does NOT get flagged just for that shape; only a
+    KNOWN current heading missing from the index should surface.
+    """
+    knowledge_dir = settings.chat_root / "knowledge"
+    en_sections = load_knowledge(knowledge_dir, "en")
+    zh_sections = load_knowledge(knowledge_dir, "zh")
+    assert len(en_sections) >= 2, "fixture assumption: about_en.md has room to hold one heading back"
+    held_back, rest = en_sections[0], en_sections[1:]
+
+    chunks = [
+        {
+            "id": f"en-knowledge-{i}",
+            "page_title": s.section_title,
+            "section_title": s.section_title,
+            "lang": "en",
+            "vector": [0.0],
+        }
+        for i, s in enumerate(rest)
+    ] + [
+        {
+            "id": f"zh-knowledge-{i}",
+            "page_title": s.section_title,
+            "section_title": s.section_title,
+            "lang": "zh",
+            "vector": [0.0],
+        }
+        for i, s in enumerate(zh_sections)
+    ] + [
+        {
+            "id": "ordinary-single-section-page",
+            "page_title": "Some Page",
+            "section_title": "Some Page",  # real, common coincidence -- not knowledge
+            "lang": "en",
+            "vector": [0.0],
+        },
+    ]
+    synthetic = Runtime({"chunks": chunks}, gates={}, embedder=None)
+
+    assert synthetic.knowledge_chunk_ids == {c["id"] for c in chunks[:-1]}
+    assert synthetic.stale_knowledge_headings == frozenset({held_back.section_title})
 
 
 def test_retrieve_exclude_ids_removes_a_chunk_entirely(rt) -> None:
