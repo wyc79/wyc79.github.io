@@ -26,16 +26,22 @@ site *.html                             question + role
 
 ## Why it's built this way
 
-**Retrieval is client-side.** GitHub Pages can only serve static files, but retrieval
-doesn't need a server: the committed index (`data/index.json`, one JSON file of
-384-dim chunk vectors across the site's pages plus `knowledge/*.md`'s curated
-sections) is small enough that a brute-force dot product over it runs in well under a
-millisecond in the browser. No vector DB to host, nothing to pay for, and the
-retrieval layer stays inspectable (open DevTools, watch the scores). Exact
-chunk/page/section counts and file size move on every rebuild as site content and the
-curated corpus change — read them straight from `index.json` (`chunks`, `built_at`)
-or `build_index.py`'s own summary line rather than trusting a number quoted here;
-`eval/KNOWN_ISSUES.md` records the counts as of its most recent measurement.
+**Retrieval is client-side when there's no backend, server-side when there is
+(Task 29).** GitHub Pages can only serve static files, so with no backend configured
+(or the vendored MiniLM model matching the index) the widget does retrieval itself: the
+committed index (`data/index.json`, one JSON file of 384-dim chunk vectors across the
+site's pages plus `knowledge/*.md`'s curated sections) is small enough that a
+brute-force dot product over it runs in well under a millisecond in the browser. That's
+still true for light mode (`--model minilm`, no backend) and degraded mode (backend
+unreachable) — see "Deploying a backend" below. The Tencent function bundles the same
+`index.json` and retrieves for the widget in normal mode instead: the browser fetches
+only `data/meta.json` (~1 KB) on load, not the multi-MB index, and gets chunk text/URLs
+back in `/chat`'s response. Either way the retrieval layer stays inspectable (open
+DevTools, watch the scores, or read the function's logs). Exact chunk/page/section
+counts and file size move on every rebuild as site content and the curated corpus
+change — read them straight from `index.json`/`meta.json` (`chunks`/`chunk_count`,
+`built_at`) or `build_index.py`'s own summary line rather than trusting a number quoted
+here; `eval/KNOWN_ISSUES.md` records the counts as of its most recent measurement.
 
 **One retrieval model, one gate model, both self-hosted quantized ONNX.** Document
 vectors are precomputed at build time by `multilingual-e5-small` (e5, 384-dim, bilingual
@@ -119,7 +125,8 @@ chat/
 ├── scripts/run_eval.py    # CLI: score the golden set against data/eval_baseline.json
 ├── eval/                  # golden.jsonl (held-out cases) + README.md (authoring guide)
 ├── tests/                 # pytest suite
-├── data/                  # generated: index.json (vectors), roles.json (personas)
+├── data/                  # generated: index.json (vectors), meta.json (index metadata
+│                          #   sidecar the widget fetches instead), roles.json (personas)
 ├── models/                # self-hosted MiniLM ONNX (weights + tokenizer)
 └── worker/                # Cloudflare Worker (LLM proxy + logging) + wrangler.toml
 ../scripts/chat-widget.js  # the site-side widget (self-contained, no framework)
@@ -145,7 +152,10 @@ stale the next time either changes and isn't reproduced here. The committed
 whatever was last built; `eval/KNOWN_ISSUES.md` has the current build's
 actual stats and a case study in what happens when this file is left stale.
 
-Commit the regenerated `data/index.json`. Chunk ids are deterministic
+Commit the regenerated `data/index.json` and `data/meta.json` (the small metadata
+sidecar — `gate_threshold`/`gate_stat`/`gate_remote`/`model`/`query_prefix`/etc. — the
+widget fetches on every load instead of the full index; see "Retrieval is client-side
+when there's no backend, server-side when there is" above). Chunk ids are deterministic
 (`{url}#{anchor}:{i}`), so diffs stay readable.
 
 ## Evaluating retrieval and the gate (golden set)
@@ -207,12 +217,29 @@ python -m http.server 8000   # then open http://localhost:8000
 ## Deploying a backend (enables LLM answers)
 
 The site works without this step — the widget stays in retrieval-only mode until
-`WORKER_URL` is set. Two interchangeable backends exist:
+`WORKER_URL` is set. Two backends exist, but as of Task 29 they are **not**
+interchangeable — see the callout below:
 
 - **Tencent SCF (chosen for China reachability + DeepSeek):** sources in
   `functions/tencent/`; the step-by-step console guide is kept locally in
-  `.claude/DEPLOY.md` (gitignored, not published).
-- **Cloudflare Worker (Anthropic API):** below.
+  `.claude/DEPLOY.md` (gitignored, not published). Speaks the current `/chat`
+  contract (retrieves server-side, no `contexts` in the request).
+- **Cloudflare Worker (Anthropic API):** below. **Not yet updated for Task 29** —
+  `worker/worker.js` still requires `contexts` in the `/chat` request body
+  (`validate_chat_body` there 400s without it) and does not retrieve for the
+  caller. If `WORKER_URL` is ever pointed at a Cloudflare Worker deployment, the
+  widget's `/chat` calls (which no longer send `contexts`) will 400 against it.
+  Bringing `worker/worker.js` in line with `functions/tencent/index.py`'s new
+  contract is unstarted work, tracked as a gap by this task, not done here.
+
+> **Deployment order is load-bearing (Task 29).** The widget's `/chat` request no
+> longer sends `contexts`; the OLD deployed Tencent function's `validate_chat_body`
+> requires it and 400s without it. **Redeploy `functions/tencent/` (rebuild
+> `tencent-function-e5.zip` and upload it) before publishing a site build that
+> includes this widget change.** The reverse direction is safe: the NEW function
+> still accepts an old cached widget's `contexts` field, ignoring it and logging
+> `client_contexts_ignored` — so redeploying the function first, ahead of the site,
+> never breaks an already-loaded page.
 
 > **The deployed Tencent SCF package must be rebuilt and redeployed before any
 > gate change in this repo reaches production.** `functions/tencent/index.py`
