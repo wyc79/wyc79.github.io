@@ -3,7 +3,7 @@
 corrected its signal).
 
 build_package.py (see test_build_package.py) refuses to BUNDLE a
-mismatched-preset index.json, but a packaged zip can also be assembled by
+mismatched-preset chunks file, but a packaged zip can also be assembled by
 hand (or by a future refactor of that script) without going through it.
 _load_index() independently re-checks the index it's actually given.
 
@@ -29,12 +29,14 @@ warning instead.
 
 index.py is loaded fresh via importlib per test (mirrors
 test_retrieval_sync.py); _load_index() reads Path(__file__).with_name(
-"index.json") relative to the REAL index.py file on disk, so these tests
-write/remove a real (temporary) functions/tencent/index.json -- guarded by
-a fixture that asserts nothing was already there and always cleans up
-(also now gitignored, belt-and-braces). BUILD_INFO itself is set directly
-on the freshly imported module object per test (mod.BUILD_INFO = {...}) --
-no need to also write a temporary build_info.json on disk.
+"chunks.json") relative to the REAL index.py file on disk (Task 29 Part 2
+renamed this zip-internal artifact from "index.json", matching the
+chat/data/ source rename), so these tests write/remove a real (temporary)
+functions/tencent/chunks.json -- guarded by a fixture that asserts nothing
+was already there and always cleans up (also now gitignored, belt-and-
+braces). BUILD_INFO itself is set directly on the freshly imported module
+object per test (mod.BUILD_INFO = {...}) -- no need to also write a
+temporary build_info.json on disk.
 """
 
 import importlib.util
@@ -45,7 +47,7 @@ import pytest
 from portfolio_rag.config import settings
 
 BACKEND_PATH = settings.chat_root / "functions" / "tencent" / "index.py"
-_SIDE_BY_SIDE_INDEX_JSON = BACKEND_PATH.with_name("index.json")
+_SIDE_BY_SIDE_CHUNKS_JSON = BACKEND_PATH.with_name("chunks.json")
 
 
 def _load_index_module():
@@ -56,17 +58,17 @@ def _load_index_module():
 
 
 @pytest.fixture()
-def no_stray_index_json():
-    """functions/tencent/index.json is a build ARTIFACT (written straight
+def no_stray_chunks_json():
+    """functions/tencent/chunks.json is a build ARTIFACT (written straight
     into the zip by build_package.py, never left loose in the source tree) --
     assert none is already there before writing a temporary one, and always
     remove it after, so this test can never leave a stray file behind or
     silently test against someone else's leftover."""
-    assert not _SIDE_BY_SIDE_INDEX_JSON.exists(), (
-        f"unexpected file at {_SIDE_BY_SIDE_INDEX_JSON} -- remove it before running this test"
+    assert not _SIDE_BY_SIDE_CHUNKS_JSON.exists(), (
+        f"unexpected file at {_SIDE_BY_SIDE_CHUNKS_JSON} -- remove it before running this test"
     )
-    yield _SIDE_BY_SIDE_INDEX_JSON
-    _SIDE_BY_SIDE_INDEX_JSON.unlink(missing_ok=True)
+    yield _SIDE_BY_SIDE_CHUNKS_JSON
+    _SIDE_BY_SIDE_CHUNKS_JSON.unlink(missing_ok=True)
 
 
 def _write_index(path, model_preset: str) -> None:
@@ -86,8 +88,8 @@ def _recording_log(mod) -> list:
     return calls
 
 
-def test_matching_preset_loads_the_index_with_no_warning(no_stray_index_json) -> None:
-    _write_index(no_stray_index_json, "e5")
+def test_matching_preset_loads_the_index_with_no_warning(no_stray_chunks_json) -> None:
+    _write_index(no_stray_chunks_json, "e5")
     mod = _load_index_module()
     mod.BUILD_INFO = {"preset": "e5"}
     calls = _recording_log(mod)
@@ -103,11 +105,11 @@ def test_matching_preset_loads_the_index_with_no_warning(no_stray_index_json) ->
     assert any(c.get("type") == "index_loaded" for c in calls)
 
 
-def test_mismatched_preset_refuses_to_load(no_stray_index_json) -> None:
+def test_mismatched_preset_refuses_to_load(no_stray_chunks_json) -> None:
     # An e5 index packaged (by hand, or by a stale/mismatched zip) into a
     # build whose build_info.json declares minilm. Must refuse, not
     # silently retrieve garbage.
-    _write_index(no_stray_index_json, "e5")
+    _write_index(no_stray_chunks_json, "e5")
     mod = _load_index_module()
     mod.BUILD_INFO = {"preset": "minilm"}
 
@@ -122,11 +124,11 @@ def test_mismatched_preset_refuses_to_load(no_stray_index_json) -> None:
     )
 
 
-def test_mismatched_index_makes_retrieval_report_unavailable(no_stray_index_json) -> None:
+def test_mismatched_index_makes_retrieval_report_unavailable(no_stray_chunks_json) -> None:
     """End-to-end within the module: a mismatched index must flip both the
     GET / health flag and /chat's own availability guard -- not just leave
     an internal error string nobody reads."""
-    _write_index(no_stray_index_json, "minilm")
+    _write_index(no_stray_chunks_json, "minilm")
     mod = _load_index_module()
     mod.BUILD_INFO = {"preset": "e5"}  # deployment expects e5
 
@@ -138,7 +140,7 @@ def test_mismatched_index_makes_retrieval_report_unavailable(no_stray_index_json
     assert (mod._index["matrix"] is not None) is False
 
 
-def test_unknown_build_preset_loads_anyway_and_logs_a_warning(no_stray_index_json) -> None:
+def test_unknown_build_preset_loads_anyway_and_logs_a_warning(no_stray_chunks_json) -> None:
     """The critical fix-round-2 case: build_info.json has no usable
     'preset' (an old or hand-assembled zip -- BUILD_INFO defaults to
     {"build_id": "unknown", "built_at": None} with no "preset" key at all
@@ -147,7 +149,7 @@ def test_unknown_build_preset_loads_anyway_and_logs_a_warning(no_stray_index_jso
     evidence of one. The index must load, and a warning must be logged
     (asserted directly on the log call, not inferred from the load
     succeeding)."""
-    _write_index(no_stray_index_json, "e5")
+    _write_index(no_stray_chunks_json, "e5")
     mod = _load_index_module()
     mod.BUILD_INFO = {"build_id": "unknown", "built_at": None}  # no "preset" key
     calls = _recording_log(mod)
@@ -165,7 +167,7 @@ def test_unknown_build_preset_loads_anyway_and_logs_a_warning(no_stray_index_jso
     assert warnings[0]["index_model_preset"] == "e5"
 
 
-def test_missing_index_json_still_refuses_as_before(no_stray_index_json) -> None:
+def test_missing_chunks_json_still_refuses_as_before(no_stray_chunks_json) -> None:
     """No regression: the "not packaged at all" case must still behave as
     it did before this fix, regardless of BUILD_INFO."""
     mod = _load_index_module()
@@ -174,4 +176,4 @@ def test_missing_index_json_still_refuses_as_before(no_stray_index_json) -> None
     mod._load_index()
 
     assert mod._index["matrix"] is None
-    assert mod._index["error"] == "index.json not packaged"
+    assert mod._index["error"] == "chunks.json not packaged"

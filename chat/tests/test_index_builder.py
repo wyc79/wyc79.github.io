@@ -26,29 +26,42 @@ def tiny_site(tmp_path: Path, monkeypatch) -> Path:
     (tmp_path / "pages" / "projects.html").write_text(SITE_PAGE, encoding="utf-8")
     out = tmp_path / "out"
     out.mkdir()
-    monkeypatch.setattr(settings, "index_path", str(out / "index.json"))
+    monkeypatch.setattr(settings, "chunks_path", str(out / "chunks.json"))
     monkeypatch.setattr(settings, "roles_path", str(out / "roles.json"))
     monkeypatch.setattr(settings, "meta_path", str(out / "meta.json"))
-    monkeypatch.setattr(settings, "gate_vectors_path", str(out / "gate_vectors.json"))
-    monkeypatch.setattr(settings, "fallback_vectors_path", str(out / "fallback_vectors.json"))
+    monkeypatch.setattr(settings, "gate_en_minilm_path", str(out / "gate_en_minilm.json"))
+    monkeypatch.setattr(settings, "gate_zh_bge_path", str(out / "gate_zh_bge.json"))
+    monkeypatch.setattr(settings, "chunks_en_minilm_path", str(out / "chunks_en_minilm.json"))
     return tmp_path
 
 
 def test_tiny_site_fixture_confines_all_build_outputs_to_tmp_path(tiny_site: Path) -> None:
-    # build_index() can write to five settings-driven paths. If any of them
+    # build_index() can write to six settings-driven paths. If any of them
     # isn't patched onto tmp_path, a build under this fixture writes through
     # to the real, gitignored, hand-calibrated files under chat/data/ and
     # destroys them irrecoverably. Check this WITHOUT calling build_index —
     # a test that runs the unfixed build and diffs the real files before/after
     # would destroy the data on every failure, which is exactly the bug this
     # guards against.
-    for field in ("index_path", "roles_path", "meta_path", "gate_vectors_path", "fallback_vectors_path"):
+    for field in (
+        "roles_path", "meta_path", "gate_en_minilm_path", "gate_zh_bge_path",
+        "chunks_en_minilm_path",
+    ):
         resolved = settings.resolve_path(getattr(settings, field))
         assert resolved.is_relative_to(tiny_site), (
             f"settings.{field} resolves to {resolved}, outside the tiny_site "
             f"fixture's tmp_path ({tiny_site}); build_index() would write "
             f"through to the real committed/gitignored file"
         )
+    # chunks_path is resolved through resolve_chunks_path() (it takes
+    # precedence over the model_preset-derived default when set -- see
+    # config.py), not read directly off settings, so it needs its own check.
+    resolved_chunks = settings.resolve_chunks_path()
+    assert resolved_chunks.is_relative_to(tiny_site), (
+        f"settings.resolve_chunks_path() resolves to {resolved_chunks}, outside "
+        f"the tiny_site fixture's tmp_path ({tiny_site}); build_index() would "
+        f"write through to the real committed chunks file"
+    )
 
 
 def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path, monkeypatch) -> None:
@@ -66,28 +79,40 @@ def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path, monke
     # test is actually about.
     monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
     stats = index_builder.build_index(site_root=tiny_site)
-    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
+    chunks_data = json.loads((tiny_site / "out" / "chunks.json").read_text(encoding="utf-8"))
 
-    assert index["schema_version"] == index_builder.SCHEMA_VERSION
-    assert index["dim"] == 384
-    assert index["model_preset"] == "minilm"
-    assert index["query_prefix"] == ""
-    # Thresholds are stat-dependent (a zscore gate can be ~3), and this tiny
-    # one-topic fixture can't calibrate meaningfully — just check the fields.
-    assert index["gate_stat"] in {"top", "contrast", "zscore"}
-    assert isinstance(index["gate_threshold"], float)
-    assert stats["chunks"] == len(index["chunks"]) > 1  # long section got split
+    assert chunks_data["schema_version"] == index_builder.SCHEMA_VERSION
+    assert chunks_data["dim"] == 384
+    assert chunks_data["model_preset"] == "minilm"
+    assert chunks_data["query_prefix"] == ""
+    assert chunks_data["pooling"] == "mean"
+    # Thresholds/gate fields have no place in a chunks file (Task 29 Part 2,
+    # "one file, one job") -- they live in meta.json / the gate files now.
+    assert "gate_stat" not in chunks_data
+    assert "gate_threshold" not in chunks_data
+    assert "gate_margin" not in chunks_data
+    assert stats["chunks"] == len(chunks_data["chunks"]) > 1  # long section got split
 
-    ids = [c["id"] for c in index["chunks"]]
+    ids = [c["id"] for c in chunks_data["chunks"]]
     assert len(set(ids)) == len(ids), "chunk ids must be unique"
 
-    first = index["chunks"][0]
+    first = chunks_data["chunks"][0]
     assert first["id"] == "pages/projects.html#prime-engine:0"
     assert first["page_title"] == "Projects"
     assert first["section_title"] == "Prime Engine"
     vec = np.array(first["vector"])
     assert vec.shape == (384,)
     assert abs(np.linalg.norm(vec) - 1.0) < 1e-3
+
+    # The gate fields dropped from chunks_data above still exist -- just
+    # relocated to meta.json (this is the minilm self-gate branch: no
+    # gate_en_minilm.json at all, meta.json's gate_stat/gate_threshold ARE
+    # the gate).
+    meta = json.loads((tiny_site / "out" / "meta.json").read_text(encoding="utf-8"))
+    assert meta["gate_remote"] is False
+    assert meta["gate_stat"] in {"top", "contrast", "zscore"}
+    assert isinstance(meta["gate_threshold"], float)
+    assert meta["chunks_file"] == "chunks.json"
 
     # dim==384 alone doesn't prove build_index actually embedded with minilm
     # (e5 is also 384-dim) — it only proves the metadata build_index copies
@@ -116,21 +141,22 @@ def test_builds_schema_with_deterministic_ids_and_vectors(tiny_site: Path, monke
     )
 
 
-def test_build_refuses_to_change_preset_of_existing_index(tiny_site: Path, monkeypatch) -> None:
-    # Rebuilding over an index built with a different model_preset would
-    # silently desync data/gate_vectors.json, data/fallback_vectors.json and
-    # the deployed Tencent backend (see .env.example) — the whole bug this
-    # guard exists to prevent. No opt-in env var set, so this must raise.
+def test_build_refuses_to_change_preset_of_existing_chunks_file(tiny_site: Path, monkeypatch) -> None:
+    # Rebuilding over a chunks file built with a different model_preset would
+    # silently desync data/gate_en_minilm.json, data/gate_zh_bge.json,
+    # data/chunks_en_minilm.json and the deployed Tencent backend (see
+    # .env.example) — the whole bug this guard exists to prevent. No opt-in
+    # env var set, so this must raise.
     monkeypatch.delenv("RAG_ALLOW_PRESET_CHANGE", raising=False)
     monkeypatch.setattr(settings, "model_preset", "e5")
-    (tiny_site / "out" / "index.json").write_text(
+    (tiny_site / "out" / "chunks.json").write_text(
         json.dumps({"model_preset": "minilm"}), encoding="utf-8"
     )
 
     with pytest.raises(ValueError) as excinfo:
         index_builder.build_index(site_root=tiny_site)
     message = str(excinfo.value)
-    assert "minilm" in message, "error must name the existing index's preset"
+    assert "minilm" in message, "error must name the existing chunks file's preset"
     assert "e5" in message, "error must name the configured preset"
 
 
@@ -145,27 +171,27 @@ def test_build_allows_preset_change_with_explicit_opt_in(tiny_site: Path, monkey
     # assertion. Opt out of that separate guard explicitly.
     monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
     monkeypatch.setattr(settings, "model_preset", "e5")
-    (tiny_site / "out" / "index.json").write_text(
+    (tiny_site / "out" / "chunks.json").write_text(
         json.dumps({"model_preset": "minilm"}), encoding="utf-8"
     )
 
     index_builder.build_index(site_root=tiny_site)  # must not raise
 
-    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
-    assert index["model_preset"] == "e5"
+    chunks_data = json.loads((tiny_site / "out" / "chunks.json").read_text(encoding="utf-8"))
+    assert chunks_data["model_preset"] == "e5"
 
 
-def test_build_with_no_existing_index_does_not_require_opt_in(
+def test_build_with_no_existing_chunks_file_does_not_require_opt_in(
     tiny_site: Path, monkeypatch
 ) -> None:
-    # A fresh clone / first build has no index.json to compare against — the
+    # A fresh clone / first build has no chunks file to compare against — the
     # guard must not block that case even without RAG_ALLOW_PRESET_CHANGE.
     monkeypatch.delenv("RAG_ALLOW_PRESET_CHANGE", raising=False)
     # See the comment in test_build_allows_preset_change_with_explicit_opt_in
     # above — same orthogonal opt-out, same reason.
     monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
     monkeypatch.setattr(settings, "model_preset", "e5")
-    assert not (tiny_site / "out" / "index.json").exists()
+    assert not (tiny_site / "out" / "chunks.json").exists()
 
     index_builder.build_index(site_root=tiny_site)  # must not raise
 
@@ -191,11 +217,11 @@ def test_build_raises_before_writing_any_artifact_on_a_negative_margin(
 ) -> None:
     monkeypatch.delenv("RAG_ALLOW_NEGATIVE_MARGIN", raising=False)
     monkeypatch.delenv("RAG_MIN_GATE_MARGIN", raising=False)
-    # e5 (not minilm): this is the branch that writes gate_vectors.json and
-    # fallback_vectors.json BEFORE index.json and roles.json — the exact
-    # half-updated-data/ scenario amendment 1 is about. A raise placed after
-    # any of those writes would be strictly worse than the silent-ship bug
-    # it replaces.
+    # e5 (not minilm): this is the branch that writes gate_en_minilm.json,
+    # gate_zh_bge.json and chunks_en_minilm.json BEFORE the retrieval chunks
+    # file, meta.json and roles.json — the exact half-updated-data/ scenario
+    # amendment 1 is about. A raise placed after any of those writes would be
+    # strictly worse than the silent-ship bug it replaces.
     monkeypatch.setattr(settings, "model_preset", "e5")
     monkeypatch.setattr(index_builder, "compute_gate", lambda *a, **k: _FAKE_NEGATIVE_GATE)
 
@@ -227,8 +253,8 @@ def test_build_allows_negative_margin_with_explicit_opt_in(tiny_site: Path, monk
     index_builder.build_index(site_root=tiny_site)  # must not raise
 
     out = tiny_site / "out"
-    assert (out / "index.json").exists()
-    assert (out / "gate_vectors.json").exists()
+    assert (out / "chunks.json").exists()
+    assert (out / "gate_en_minilm.json").exists()
 
 
 def test_gate_margin_floor_is_configurable_not_a_hardcoded_sign(
@@ -286,8 +312,8 @@ def test_build_persists_gate_margin_in_artifacts_and_summary(
     # A recorded margin shows a gate decaying across builds while it is
     # still positive -- the raise above only fires the instant it crosses
     # the floor, far too late to be the primary signal. Written into
-    # gate_vectors.json per language, into index.json, and returned in the
-    # summary, using e5 so BOTH gate_vectors.json (en+zh) and index.json are
+    # gate_en_minilm.json/gate_zh_bge.json per language, into meta.json, and
+    # returned in the summary, using e5 so both gate files and meta.json are
     # exercised in one build.
     monkeypatch.setattr(settings, "model_preset", "e5")
     monkeypatch.setattr(index_builder, "compute_gate", lambda *a, **k: _FAKE_POSITIVE_GATE)
@@ -295,36 +321,44 @@ def test_build_persists_gate_margin_in_artifacts_and_summary(
     summary = index_builder.build_index(site_root=tiny_site)
     assert summary["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
 
-    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
-    assert index["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    meta = json.loads((tiny_site / "out" / "meta.json").read_text(encoding="utf-8"))
+    assert meta["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
 
-    gates = json.loads((tiny_site / "out" / "gate_vectors.json").read_text(encoding="utf-8"))
-    assert gates["en"]["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    gate_en = json.loads((tiny_site / "out" / "gate_en_minilm.json").read_text(encoding="utf-8"))
+    assert gate_en["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    assert gate_en["lang"] == "en"
+    assert gate_en["corpus"] == "knowledge/about_en.md"
+    assert "chunks" not in gate_en, "a gate file must carry no chunk records"
     # zh gate: the fake compute_gate is reused for _build_zh_gate's call too
     # (real bge-zh model + real knowledge/about_zh.md corpus), so a positive
     # margin here means the zh gate is ALSO enabled and must carry its own
     # gate_margin -- proving "per language", not just "en only".
-    assert gates["zh"]["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    gate_zh = json.loads((tiny_site / "out" / "gate_zh_bge.json").read_text(encoding="utf-8"))
+    assert gate_zh["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    assert gate_zh["lang"] == "zh"
 
-    fallback = json.loads((tiny_site / "out" / "fallback_vectors.json").read_text(encoding="utf-8"))
-    assert fallback["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    chunks_en_minilm = json.loads(
+        (tiny_site / "out" / "chunks_en_minilm.json").read_text(encoding="utf-8")
+    )
+    assert "gate_margin" not in chunks_en_minilm, "a chunks file must carry no gate fields"
 
 
 def test_build_persists_gate_margin_for_the_local_minilm_gate_too(
     tiny_site: Path, monkeypatch
 ) -> None:
-    # minilm has no gate_model (it gates itself, no gate_vectors.json at
+    # minilm has no gate_model (it gates itself, no gate_en_minilm.json at
     # all) -- a different code path than the e5/delegate branch above.
-    # index.json's top-level gate_margin must still be populated there.
+    # meta.json's top-level gate_margin must still be populated there.
     monkeypatch.setattr(settings, "model_preset", "minilm")
     monkeypatch.setattr(index_builder, "compute_gate", lambda *a, **k: _FAKE_POSITIVE_GATE)
 
     summary = index_builder.build_index(site_root=tiny_site)
     assert summary["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
 
-    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
-    assert index["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
-    assert not (tiny_site / "out" / "gate_vectors.json").exists()
+    meta = json.loads((tiny_site / "out" / "meta.json").read_text(encoding="utf-8"))
+    assert meta["gate_margin"] == _FAKE_POSITIVE_GATE["margin"]
+    assert not (tiny_site / "out" / "gate_en_minilm.json").exists()
+    assert not (tiny_site / "out" / "chunks_en_minilm.json").exists()
 
 
 def test_writes_roles_json_for_widget_and_worker(tiny_site: Path, monkeypatch) -> None:
@@ -346,24 +380,35 @@ def test_writes_meta_json_with_the_widgets_five_fields_plus_build_stamp(
     tiny_site: Path, monkeypatch
 ) -> None:
     # meta.json is what chat-widget.js now fetches on every load instead of
-    # the multi-MB index.json -- it must carry every field the widget used to
-    # read off state.index (gate_threshold, gate_stat, gate_remote, model,
+    # the multi-MB chunks file -- it must carry every field the widget used
+    # to read off state.index (gate_threshold, gate_stat, gate_remote, model,
     # query_prefix) plus enough to identify the build (schema_version,
     # model_preset, built_at, dim, chunk_count) without the chunks array
-    # itself. Ambient settings.model_preset is "e5" (chat/.env).
+    # itself, plus chunks_file (Task 29 Part 2) naming the retrieval corpus.
+    # Ambient settings.model_preset is "e5" (chat/.env).
     monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
     index_builder.build_index(site_root=tiny_site)
-    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
+    chunks_data = json.loads((tiny_site / "out" / "chunks.json").read_text(encoding="utf-8"))
     meta = json.loads((tiny_site / "out" / "meta.json").read_text(encoding="utf-8"))
 
     assert set(meta) == {
-        "schema_version", "model", "model_preset", "query_prefix", "gate_remote",
-        "gate_stat", "gate_threshold", "gate_margin", "built_at", "dim", "chunk_count",
+        "schema_version", "model", "model_preset", "query_prefix", "chunks_file",
+        "gate_remote", "gate_stat", "gate_threshold", "gate_margin", "built_at",
+        "dim", "chunk_count",
     }
-    for field in ("schema_version", "model", "model_preset", "query_prefix",
-                  "gate_remote", "gate_stat", "gate_threshold", "gate_margin",
-                  "built_at", "dim"):
-        assert meta[field] == index[field], f"meta.{field} does not match index.json"
-    assert meta["chunk_count"] == len(index["chunks"])
+    # Fields the chunks file itself still carries must agree with meta's copy.
+    for field in ("schema_version", "model", "model_preset", "query_prefix", "built_at", "dim"):
+        assert meta[field] == chunks_data[field], f"meta.{field} does not match chunks.json"
+    assert meta["chunk_count"] == len(chunks_data["chunks"])
+    assert meta["chunks_file"] == "chunks.json"
+    # gate_remote/gate_stat/gate_threshold/gate_margin have NO chunks.json
+    # counterpart to compare against any more (Task 29 Part 2 dropped gate
+    # fields from chunks files entirely) -- meta.json is now their only home
+    # alongside the gate files themselves. gate_remote True here confirms
+    # this build actually took the e5/delegate branch, not the self-gate one.
+    assert meta["gate_remote"] is True
+    assert meta["gate_stat"] in {"top", "contrast", "zscore"}
+    assert isinstance(meta["gate_threshold"], float)
+    assert isinstance(meta["gate_margin"], float)
     # meta.json carries no chunks -- that's the whole point of the sidecar.
     assert "chunks" not in meta

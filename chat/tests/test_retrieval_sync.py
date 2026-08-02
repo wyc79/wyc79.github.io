@@ -43,7 +43,7 @@ separate file):
   (a) tie-breaking -- np.argsort's default is not stable, so two candidates
   with EXACTLY equal scores could rank differently than JS's
   Array.prototype.sort (stable since ES2019, which chat-widget.js relies on
-  implicitly). Not hypothetical: chat/data/index.json holds several groups
+  implicitly). Not hypothetical: chat/data/chunks_e5.json holds several groups
   of exact-duplicate chunk vectors (identical sections indexed under more
   than one anchor/language), so ties are real fixture material, not a
   contrived edge case. (b) floor-vs-rounding order -- both Python copies
