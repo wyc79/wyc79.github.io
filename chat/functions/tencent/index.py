@@ -15,8 +15,22 @@ Same contract and guarantees as the Cloudflare worker:
   the client no longer sends contexts (a `contexts` field on an old cached
   widget is ignored outright, logged as client_contexts_ignored, never used
   to build the prompt). Retrieval returning nothing -> canned refusal, no LLM
-  call (server-side off-topic guard, now independent of what the client
-  sends).
+  call.
+- WHICH GUARDS ARE SERVER-SIDE, precisely (these are two different things and
+  the boundary is easy to misread):
+    * The retrieval-empty refusal above IS a server-side backstop, and it is
+      the one that is genuinely independent of what the client sends: it is
+      computed from this function's own index over the client's question, and
+      no client field can turn it off. Rate limiting is the other one.
+    * The CALIBRATED OFF-TOPIC GATE IS NOT a server-side backstop. It lives on
+      /embed, it judges `gate_text` — a string the CLIENT computes and sends —
+      and /chat has no gate at all. Any client that skips /embed, ignores its
+      verdict, or sends a benign gate_text still reaches the LLM as long as
+      something clears MIN_SCORE. The gate is a UX filter the server computes
+      on the client's behalf, not an access control, and the refusal rates the
+      golden harness measures for it are measurements of that filter.
+      Deliberate: for a portfolio site the practical exposure is LLM spend,
+      which rate_limited() covers.
 - Role prompts come from the site's roles.json (client sends a role id only);
   a bundled roles.json copy is the fallback if github.io is unreachable from
   the function's region.
@@ -440,7 +454,14 @@ def embed_text(text: str) -> list[float]:
 
 
 def gate_decision(gate_text: str) -> dict | None:
-    """Language-routed off-topic gate; None when no gate is packaged."""
+    """Language-routed off-topic gate; None when no gate is packaged.
+
+    `gate_text` is CLIENT-SUPPLIED (see _embed_route). This function is the
+    whole of the calibrated gate on the server side, it is reachable only via
+    /embed, and /chat never calls it -- so this is a UX filter computed on the
+    client's behalf, not an enforcement point. See the module docstring's
+    "which guards are server-side" note; the server-side backstops are the
+    retrieval-empty refusal in _chat and rate_limited()."""
     global CJK_RE
     if _gates["en"] is None:
         return None

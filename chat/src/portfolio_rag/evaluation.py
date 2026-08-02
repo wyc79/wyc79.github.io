@@ -80,9 +80,7 @@ class GoldenCase:
     expected_keywords: tuple[str, ...] = ()
     note: str = ""
     # Required on off_topic ("easy" or "adjacent"); empty on positive and
-    # injection. See ADJACENCY. Validated in tests/test_golden.py only --
-    # load_cases must not raise on a missing/invalid value so an unmigrated
-    # dataset still loads (see the comment on load_cases below).
+    # injection. See ADJACENCY, and load_cases, which enforces it.
     adjacency: str = ""
 
     @property
@@ -95,11 +93,20 @@ class GoldenCase:
 
 
 def load_cases(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
-    """Read `adjacency` if present, default to "". Deliberately does NOT
-    validate it (that lives in tests/test_golden.py): scripts/run_eval.py has
-    to keep working over a dataset that has not been migrated to the
-    adjacency schema yet, and a loader that rejects those cases would brick
-    the CLI before there is anything to harvest."""
+    """Load and VALIDATE the golden set.
+
+    `adjacency` used to be read without validation, plus a matching tolerance
+    in aggregate() (a dynamic "unmigrated" bucket) and two more pieces in
+    scripts/run_eval.py that found those buckets again and footnoted them --
+    ~25 lines coordinated across three files so the CLI kept working over a
+    dataset not yet migrated to the adjacency schema. That migration is
+    complete (all 16 off_topic cases carry a valid easy/adjacent; all 96
+    positives and 8 injections correctly carry none) and
+    tests/test_golden.py::test_off_topic_adjacency_is_valid forbids the
+    untolerated state from returning. Tolerating a condition that cannot
+    occur, and that is separately asserted not to, is machinery with nothing
+    to do -- so the tolerance is gone and this is now the single place the
+    schema is enforced."""
     cases: list[GoldenCase] = []
     for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip()
@@ -112,6 +119,19 @@ def load_cases(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
         missing = {"id", "role", "lang", "type", "q"} - set(raw)
         if missing:
             raise ValueError(f"{path.name}:{lineno}: missing field(s) {sorted(missing)}")
+        adjacency = raw.get("adjacency", "")
+        if raw["type"] == "off_topic" and adjacency not in ADJACENCY:
+            raise ValueError(
+                f"{path.name}:{lineno}: off_topic case {raw['id']!r} has adjacency "
+                f"{adjacency!r}, not one of {ADJACENCY}. It drives the shared-negative "
+                "bucketing, and a case that lands in no bucket is a case nothing measures."
+            )
+        if raw["type"] != "off_topic" and adjacency:
+            raise ValueError(
+                f"{path.name}:{lineno}: {raw['type']} case {raw['id']!r} must not carry "
+                f"adjacency (has {adjacency!r}) -- injections are adjacent by definition "
+                "and positives have no adjacency at all."
+            )
         cases.append(
             GoldenCase(
                 id=raw["id"],
@@ -122,7 +142,7 @@ def load_cases(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
                 expected_urls=tuple(raw.get("expected_urls", ())),
                 expected_keywords=tuple(raw.get("expected_keywords", ())),
                 note=raw.get("note", ""),
-                adjacency=raw.get("adjacency", ""),
+                adjacency=adjacency,
             )
         )
     return cases
@@ -298,15 +318,15 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             )
             cell["n_negative"] += 1
             # injection carries no adjacency (it is always adjacent by
-            # design); off_topic must carry "easy" or "adjacent". Anything
-            # else -- including "" on a not-yet-migrated case -- still gets
-            # counted, under its own dynamic bucket, rather than raising or
-            # silently dropping the case: run_eval.py has to keep working
-            # over an unmigrated dataset (see load_cases).
-            bucket = "injection" if c.type == "injection" else (c.adjacency or "unmigrated")
-            refusal_key, n_key = f"refusal_{bucket}", f"n_{bucket}"
-            cell[refusal_key] = cell.get(refusal_key, 0) + int(not r.gate_passed)
-            cell[n_key] = cell.get(n_key, 0) + 1
+            # design); off_topic carries "easy" or "adjacent", enforced by
+            # load_cases. Indexed, not .get()-ed with a dynamic fallback: the
+            # three buckets are fixed, so anything else is a KeyError naming
+            # the bad bucket rather than a silently invented one. (The old
+            # dynamic "unmigrated" bucket, and the two pieces of run_eval.py
+            # that existed to find it again, are gone -- see load_cases.)
+            bucket = "injection" if c.type == "injection" else c.adjacency
+            cell[f"refusal_{bucket}"] += int(not r.gate_passed)
+            cell[f"n_{bucket}"] += 1
         # A cjk_bypass decision means there is no zh gate; the gate columns for
         # that cell are unmeasured rather than perfect. Read off the decision's
         # OWN reason (threaded through CaseResult.gate_reason -- see its
