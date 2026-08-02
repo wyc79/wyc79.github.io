@@ -285,12 +285,13 @@ He took an Artificial Intelligence course as an undergraduate at Rochester
 and a Machine Learning course during his Harvard biomedical informatics
 master's, in addition to his rendering and engine coursework at USC.
 
-## Browser-side retrieval versus server-side judgment
+## Server-side retrieval and judgment for the chat widget
 link: pages/chat-agent.html
 For this site's chat widget, nearest-neighbor search over site content
-happens entirely in the visitor's browser against a static index file;
-only the query embedding and the relevance-gate check happen through a
-small server function.
+happens entirely inside a small server function, against its own bundled
+retrieval corpus, not in the visitor's browser; the browser only ever
+sends the question, and the query embedding and relevance-gate check
+happen through that same function too.
 
 ## Separate gate models per language
 link: pages/chat-agent.html
