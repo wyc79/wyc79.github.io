@@ -16,8 +16,10 @@ chat/models/ (build_package.py fetches them on the first --function run). With
 needed, rebuilds the retrieval corpus itself, and writes
 tencent-function-<preset>.zip.
 
-After building: git add/commit/push the data/ files (and knowledge/, roles, etc.
-if you changed them); if you built the function, re-upload the zip to SCF.
+After building: if you built the function (--function), upload the zip and redeploy it
+FIRST — the widget's /chat sends no `contexts`, and an old deployed function 400s
+without it. Only then git add/commit/push the data/ files (and knowledge/, roles, etc.
+if you changed them) and publish the site.
 """
 
 import argparse
