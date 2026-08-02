@@ -3,13 +3,28 @@
 // when there is no backend (light mode) or it's unreachable (degraded mode).
 //
 // Architecture (see chat/README.md):
-//   chat/data/meta.json     small metadata sidecar (build-time, Python) —
-//                          gate_threshold/gate_stat/gate_remote/model/
-//                          query_prefix. Fetched on every load.
-//   chat/data/index.json   precomputed chunk vectors. Fetched ONLY when the
-//                          vendored in-browser model matches meta.model
-//                          (light mode / the local half of degraded mode) —
-//                          normal mode's retrieval happens server-side.
+//   chat/data/meta.json         small metadata sidecar (build-time, Python) —
+//                              gate_threshold/gate_stat/gate_remote/model/
+//                              query_prefix/chunks_file. Fetched on every load.
+//   chat/data/{meta.chunks_file}  precomputed chunk vectors for the CONFIGURED
+//                              model (chunks_e5.json in production). Fetched
+//                              ONLY when the vendored in-browser model matches
+//                              meta.model (light mode / a `--model minilm`
+//                              build) — normal mode's retrieval happens
+//                              server-side, and degraded mode never uses this
+//                              file (see chat/data/chunks_en_minilm.json below).
+//   chat/data/gate_en_minilm.json    English off-topic gate vectors (MiniLM,
+//                              knowledge/about_en.md). Fetched only in
+//                              degraded mode (backend unreachable).
+//   chat/data/chunks_en_minilm.json  degraded mode's own retrieval corpus:
+//                              the SAME 192 English chunks as chunks_e5.json's
+//                              lang=="en" entries, re-embedded with MiniLM so
+//                              the self-hosted model can score real chunk
+//                              records — resolved by id, never by borrowing a
+//                              position from an unrelated array (Task 29
+//                              Part 2; this is the fix for the degraded-mode
+//                              source links Task 24 broke). Fetched only in
+//                              degraded mode.
 //   chat/models/           self-hosted MiniLM ONNX — the SAME weights the
 //                          build pipeline used, so query and document vectors
 //                          share one embedding space
@@ -32,10 +47,10 @@
   var TOP_K = 4;
   var MIN_SCORE = 0.18;  // per-source display floor
   // Off-topic gate: statistic + threshold are calibrated per embedding model
-  // at build time and shipped in index.json (gate_stat, gate_threshold) —
+  // at build time and shipped in meta.json (gate_stat, gate_threshold) —
   // see chat/src/portfolio_rag/gate_calibration.py, mirrored in
   // chat/tests/test_gate.py. These constants are only the fallback for old
-  // indexes: raw top-score >= 0.22 (the MiniLM calibration).
+  // builds: raw top-score >= 0.22 (the MiniLM calibration).
   var OFFTOPIC_GATE = 0.22;
 
   function gateThreshold() {
@@ -135,13 +150,16 @@
       degradedCJK: 'The AI answer service is unreachable right now, and offline search only covers English. Here are some pages you can browse in the meantime:',
       degradedLoading: function (pct) { return 'Backend unreachable — loading offline search (' + pct + '%)…'; },
       degradedSources: 'The AI answer service is unreachable right now, but these pages look most relevant to your question:',
-      // Task 24 review, Important: fb.vectors is now the curated en gate
-      // corpus (~55 sections), no longer chunk-order-aligned with
-      // state.chunks (see the fallback_vectors.json comment in
-      // index_builder.py) -- so degradedSources' specific "these pages look
-      // most relevant" claim would be naming an unrelated chunk by accident
-      // of position. This string is honest about what local search actually
-      // confirmed (on-topic) vs. what it can't do (point to a specific page).
+      // Task 24 broke this claim by pointing the (then single, dual-purpose)
+      // fallback file's retrieval half at a curated corpus that no longer
+      // chunk-order-aligned with the full index. Task 29 Part 2 fixed it for
+      // real, not just reworded it: chat/data/chunks_en_minilm.json is now a
+      // genuine retrieval corpus (real chunk records, resolved by id -- see
+      // retrieveFallback), so degradedSources is accurate again. Kept as a
+      // SEPARATE string from degradedNoSources (below) rather than merged
+      // back into one, because that case -- gate passed, but nothing
+      // individually cleared MIN_SCORE -- is still real and still deserves
+      // its own honest wording.
       degradedNoSources: 'The AI answer service is unreachable right now. Offline search confirms this is something I can help with, but can\'t reliably point to a specific page yet — here are some pages you can browse:',
       backendDown: 'The chat backend is unreachable right now — please try again in a minute.',
       retrievalOnly: 'Demo is in retrieval-only mode (no LLM connected yet), but here\'s what the semantic index surfaces for that — sources below:',
@@ -206,8 +224,10 @@
     open: false,
     role: null,
     roles: null,
-    meta: null, // chat/data/meta.json — gate_threshold/gate_stat/gate_remote/model/query_prefix
-    chunks: null, // chat/data/index.json's chunk array — fetched only when localModelMatchesIndex()
+    meta: null, // chat/data/meta.json — gate_threshold/gate_stat/gate_remote/model/query_prefix/chunks_file
+    chunks: null, // chat/data/{meta.chunks_file}'s chunk array — fetched only when localModelMatchesIndex()
+    degradedGate: null, // chat/data/gate_en_minilm.json — fetched lazily, degraded mode only
+    degradedChunks: null, // chat/data/chunks_en_minilm.json — fetched lazily, degraded mode only
     extractor: null,
     loading: null, // Promise while core assets load
     extractorLoading: null, // Promise while the local model loads
@@ -350,8 +370,11 @@
       state.roles = await rolesRes;
       state.meta = await metaRes;
       if (localModelMatchesIndex()) {
-        var indexRes = fetch(PREFIX + 'chat/data/index.json', { cache: 'no-cache' }).then(function (r) {
-          if (!r.ok) throw new Error('index.json ' + r.status);
+        // chunks_file (Task 29 Part 2) names the retrieval corpus for
+        // WHATEVER preset actually built this meta.json -- fetched by name,
+        // never inferred from `model` here.
+        var indexRes = fetch(PREFIX + 'chat/data/' + state.meta.chunks_file, { cache: 'no-cache' }).then(function (r) {
+          if (!r.ok) throw new Error(state.meta.chunks_file + ' ' + r.status);
           return r.json();
         });
         state.chunks = (await indexRes).chunks || [];
@@ -441,7 +464,10 @@
 
   // Dot-product retrieval + gate stats. vecAt(i) yields the i-th chunk vector,
   // chunkAt(i) the chunk it maps to — the only thing that differs between the
-  // primary (index.json) and degraded (fallback_vectors.json) paths.
+  // primary (state.chunks) and degraded (state.degradedChunks) paths. Both
+  // paths index vecAt/chunkAt into the SAME array at the SAME position i, so
+  // this is never a cross-array positional guess — see retrieveFallback below
+  // for why that distinction matters.
   function scoreChunks(count, queryVec, vecAt, chunkAt) {
     var scored = [], sum = 0, sumSq = 0;
     for (var i = 0; i < count; i++) {
@@ -478,39 +504,57 @@
     return out;
   }
 
-  // ── Degraded mode: backend down + e5 index ────────────────────────────
-  // The published fallback_vectors.json holds MiniLM copies of the en gate's
-  // vectors, so the local MiniLM model can still answer the gate question
-  // (on-/off-topic?) when server-side embedding and LLM answers are
-  // unreachable — that gate check is the one thing every caller of
-  // retrieveFallback needs and always gets right.
+  // ── Degraded mode: backend down + e5 index (Task 29 Part 2) ───────────
+  // Two SEPARATE single-purpose files now, never one file doing both jobs:
+  //   chat/data/gate_en_minilm.json    — MiniLM vectors over knowledge/
+  //                                      about_en.md's ~55 curated sections.
+  //                                      GATE ONLY: no chunk records, so
+  //                                      there is nothing here to resolve a
+  //                                      source link from.
+  //   chat/data/chunks_en_minilm.json  — the SAME 192 English chunks as the
+  //                                      normal-mode retrieval corpus's
+  //                                      lang=="en" entries (same ids, same
+  //                                      order, same text), re-embedded with
+  //                                      MiniLM. RETRIEVAL ONLY: real chunk
+  //                                      records, each carrying its own real
+  //                                      id/url/anchor/page_title/
+  //                                      section_title/text.
   //
-  // As of the curated-gate-corpus change (chat/src/portfolio_rag/
-  // index_builder.py, task 24), fb.vectors is knowledge/about_en.md's ~55
-  // curated sections, NOT a chunk-order-aligned prefix of index.json's
-  // chunks — fb.vectors[i] has no real relationship to any particular real
-  // chunk, so chunkAt(i) below cannot name one. (Task 29 also stopped
-  // fetching index.json unconditionally, so state.chunks may not even be
-  // loaded here — the old state.index.chunks[i] lookup would throw outright
-  // instead of merely being wrong.) retrieveFallback's RESULT is only ever
-  // used for record.retrieved, an audit log never re-rendered to the visitor
-  // (see runOfflineSearch below — source links are shown from the static
-  // SUGGESTED_PAGES list instead), so chunkAt(i) reports the fallback
-  // corpus's own position instead of borrowing an unrelated chunk id. Part 2
-  // (splitting the vector files) is expected to give degraded mode a real,
-  // retrieval-shaped corpus with its own ids — see the fallback_vectors.json
-  // comment in index_builder.py.
-  function loadFallbackVectors() {
-    if (state.fallback) return Promise.resolve(state.fallback);
-    return fetch(PREFIX + 'chat/data/fallback_vectors.json', { cache: 'no-cache' }).then(function (r) {
-      if (!r.ok) throw new Error('fallback index unavailable');
+  // Task 24 broke degraded-mode source links by pointing the (then single,
+  // dual-purpose) gate file at a curated corpus that no longer order-aligned
+  // with the full chunk index, while retrieveFallback kept mapping
+  // fb.vectors[i] -> state.index.chunks[i] positionally across those two
+  // now-unrelated arrays. The fix here is not a rename: gate scoring and
+  // retrieval now run against two INDEPENDENT arrays, and retrieveFallback
+  // below resolves each result from chunks_en_minilm.json's OWN chunk
+  // record at that SAME position — never a position borrowed from a
+  // different array. That is exactly the "resolve by id, never by a
+  // position borrowed from an unrelated array" property this split exists
+  // to restore; addSources/dedupeForDisplay/sourcesForLog/record.retrieved
+  // all read real chunk ids again, same as normal mode.
+  function loadDegradedGate() {
+    if (state.degradedGate) return Promise.resolve(state.degradedGate);
+    return fetch(PREFIX + 'chat/data/gate_en_minilm.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('offline gate unavailable');
       return r.json();
-    }).then(function (fb) { state.fallback = fb; return fb; });
+    }).then(function (g) { state.degradedGate = g; return g; });
   }
 
-  function retrieveFallback(fb, queryVec) {
-    return scoreChunks(fb.vectors.length, queryVec,
-      function (i) { return fb.vectors[i]; }, function (i) { return { id: 'fallback:' + i }; });
+  function loadDegradedChunks() {
+    if (state.degradedChunks) return Promise.resolve(state.degradedChunks);
+    return fetch(PREFIX + 'chat/data/chunks_en_minilm.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('offline search index unavailable');
+      return r.json();
+    }).then(function (c) { state.degradedChunks = c; return c; });
+  }
+
+  // Identical shape to retrieve() above, parameterized on WHICH chunk array
+  // to score — chunks_en_minilm.json's real chunk records, not fb.vectors'
+  // curated gate corpus. vecAt/chunkAt both index the SAME array at the
+  // SAME position, so this is never a cross-array positional guess.
+  function retrieveFallback(chunks, queryVec) {
+    return scoreChunks(chunks.length, queryVec,
+      function (i) { return chunks[i].vector; }, function (i) { return chunks[i]; });
   }
 
   async function degradedTurn(question, stripped, thinking, record) {
@@ -574,17 +618,18 @@
   // Consent granted: pull the MiniLM model and do local fallback retrieval.
   async function runOfflineSearch(question, stripped, thinking, record) {
     try {
-      var fb = await loadFallbackVectors();
+      var gate = await loadDegradedGate();
+      var chunks = await loadDegradedChunks();
       thinking.classList.add('ycchat-dots');
       await ensureExtractor(function (pct) {
         thinking.textContent = t('degradedLoading', pct);
         thinking.classList.remove('ycchat-dots');
       });
-      var embedFb = async function (q) {
-        var out = await state.extractor((fb.query_prefix || '') + q, { pooling: 'mean', normalize: true });
+      var embedLocal = async function (q, prefix) {
+        var out = await state.extractor((prefix || '') + q, { pooling: 'mean', normalize: true });
         return out.data;
       };
-      var retrieved = retrieveFallback(fb, await embedFb(question));
+      var retrieved = retrieveFallback(chunks.chunks, await embedLocal(question, chunks.query_prefix));
       // Gate on gateForm()'s output, not on `stripped ? stripped : question`.
       // Those differ when the name was KEPT (a bio question): gateForm then
       // normalizes the name to the gate corpus's own language, which the raw
@@ -592,34 +637,37 @@
       // on gateForm's output, so the shortcut was a silent third divergence —
       // the same class as BIO_STUB_RE's, which has already drifted twice.
       var degradedGateText = gateForm(question, stripped);
-      var gateScore = statValue(
-        retrieveFallback(fb, await embedFb(degradedGateText)).stats,
-        fb.gate_stat || 'top'
-      );
+      var gateVec = await embedLocal(degradedGateText, gate.query_prefix);
+      var gateStats = scoreChunks(
+        gate.vectors.length, gateVec,
+        function (i) { return gate.vectors[i]; }, function () { return null; }
+      ).stats;
+      var gateScore = statValue(gateStats, gate.gate_stat || 'top');
       thinking.classList.remove('ycchat-dots');
-      if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
+      if (gateScore < (gate.gate_threshold || OFFTOPIC_GATE)) {
         thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
         pushLog({ type: 'bot', text: thinking.textContent });
         pushLog({ type: 'starters' });
+      } else if (retrieved.results.length) {
+        // Task 29 Part 2: retrieved.results now names REAL chunks from
+        // chunks_en_minilm.json (see retrieveFallback above), so degraded
+        // mode can show real source links again, same as normal mode.
+        thinking.textContent = t('degradedSources');
+        addSources(retrieved.results);
+        pushLog({ type: 'bot', text: thinking.textContent });
+        pushLog({ type: 'sources', results: sourcesForLog(retrieved.results) });
       } else {
-        // Task 24 review, Important: retrieved.results' chunkAt(i) mapping is
-        // no longer trustworthy (see retrieveFallback's comment above) -- it
-        // would confidently name a chunk that has nothing to do with the
-        // query. Showing wrong sources is worse than showing none, so this
-        // shows the same static, curated page-link list degradedCJK and
-        // offlineDeclined already use elsewhere, not addSources(retrieved.
-        // results). The gate decision itself (gateScore above) is unaffected
-        // and still gates on the real fb vectors.
+        // Gate passed (on-topic) but nothing cleared MIN_SCORE -- genuinely
+        // no reliable source to point to, so fall back to the static,
+        // curated page-link list degradedCJK/offlineDeclined already use.
         thinking.textContent = t('degradedNoSources');
         addPageLinks();
         pushLog({ type: 'bot', text: thinking.textContent });
         pushLog({ type: 'pagelinks' });
       }
-      // Internal audit log only (console.debug / analytics /log, never
-      // re-rendered to the visitor -- contrast pushLog above) -- kept as the
-      // raw fb-based scores/ids for the site owner's own debugging even
-      // though the chunkAt(i) mapping is unreliable for display purposes.
+      // record.retrieved carries real chunk ids again (Task 29 Part 2) --
+      // contrast the old fallback-corpus-position ids this used to log.
       record.retrieved = retrieved.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
       record.answer = thinking.textContent;
       logTurn(record);
