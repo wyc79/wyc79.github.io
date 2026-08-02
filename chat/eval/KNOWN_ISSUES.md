@@ -595,6 +595,42 @@ somewhere unexpected; check `expected_urls`" rather than a retrieval defect.
 
 ---
 
+## Accepted by design
+
+### Y — Two `zh`-labelled chunks contain English text, and that is correct
+
+`pages/publications.html` has no Chinese translation of its citation list, so
+the Chinese view falls back to the English text and the builder labels the
+resulting chunks `lang="zh"`:
+
+```
+pages/publications.html#publications:zh:0   cjk=0.0%   "Publications Huang, J., He, Y., ..."
+pages/publications.html#publications:zh:1   cjk=0.0%   ", Wang, Z., Yu, L., ... (2024). Enhancing semantic segme..."
+```
+
+**Confirmed by the site owner as intended: there is no Chinese version of the
+publications page.** Citations are not translated in any case, so a Chinese
+question about papers retrieving an English author list is the right answer,
+not a leak — the LLM answers in Chinese and cites the titles as published.
+
+Do **not** "fix" this by suppressing `zh` chunks for untranslated sections.
+That would make the publications content unreachable to Chinese visitors
+entirely, which is strictly worse than serving it in English.
+
+**The mechanism is worth watching, though**, because it is the same one behind
+Finding C: any page lacking a Chinese translation yields `zh`-labelled chunks
+carrying English text. Two exist today and both are benign. If that count
+grows, check whether the new cases are also legitimately untranslated content
+(fine) or a loader defect leaking boilerplate across the language views (not).
+
+Related: this is why `retrieved_langs` reports language by **chunk label**, not
+by detected script. Across all 8 cells the current build shows a clean
+`en:48` / `zh:48` — 384 retrieved chunks, zero cross-language drift — which is
+the evidence that the single mixed-language e5 index does not need splitting
+by language. e5 separates them without help.
+
+---
+
 ## Deferred by user decision
 
 ### I — `test_index_carries_a_calibrated_gate` asserts on dead fields
