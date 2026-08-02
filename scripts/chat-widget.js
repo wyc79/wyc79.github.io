@@ -631,6 +631,12 @@
         history: state.history.slice(-6),
       }),
     });
+    // Same rate-limit message /embed's remote branch throws (see
+    // embedQuery) -- send()'s chatErr handler bubbles this one to the
+    // generic "something went wrong" path instead of degraded mode, for the
+    // same reason: a transient rate limit isn't "the backend is down," and
+    // shouldn't prompt a 23MB offline-model download.
+    if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
     if (!res.ok) throw new Error('worker ' + res.status);
     return await res.json(); // {answer, model, rid, sources[], refused?}
   }
@@ -641,12 +647,20 @@
   // used to return, now that retrieval happens server-side (Task 29).
   function resultsFromSources(sources) {
     return (sources || []).map(function (s) {
+      // Guard at the boundary where server-supplied data becomes the
+      // widget's internal {chunk, score} shape: every downstream reader
+      // (addSources' r.score.toFixed(2), the record.retrieved/sourcesForLog
+      // .toFixed(3) call sites) assumes a real number, the same guarantee
+      // scoreChunks' own numeric loop always provides for the client-side
+      // path. A backend that omits or malforms `score` must not throw deep
+      // inside rendering.
+      var score = typeof s.score === 'number' && isFinite(s.score) ? s.score : 0;
       return {
         chunk: {
           id: s.id, url: s.url, anchor: s.anchor,
           page_title: s.page_title, section_title: s.section_title, text: s.text,
         },
-        score: s.score,
+        score: score,
       };
     });
   }
@@ -926,6 +940,12 @@
         try {
           resp = await askWorker(question);
         } catch (chatErr) {
+          if (String(chatErr && chatErr.message).indexOf('rate limited') === 0) throw chatErr;
+          // Log before falling into degradedTurn -- otherwise a /chat
+          // failure left no diagnostic anywhere (degradedTurn's own
+          // logTurn calls describe the offline-consent flow, not why this
+          // turn ended up there).
+          logTurn({ event: 'error', role: state.role, question: question, error: String(chatErr) });
           // A gate_only /embed call can succeed even when /chat itself is
           // down or misconfigured (e.g. an old zip with no bundled index,
           // Task 29) — treat that the same as an unreachable backend.
