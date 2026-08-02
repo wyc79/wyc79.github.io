@@ -3,11 +3,12 @@
   "model": "Xenova/multilingual-e5-small (quantized ONNX, mean pooling, normalized, query:/passage: prefixes)",
   "model_preset": "e5",
   "query_prefix": "query: ",
+  "chunks_file": "chunks_e5.json",
   "gate_remote": true,
   "gate_stat": "top",
   "gate_threshold": 0.2006,
   "gate_margin": 0.025,
-  "built_at": "2026-08-02T06:09:48+00:00",
+  "built_at": "2026-08-02T08:20:35+00:00",
   "dim": 384,
   "chunk_count": 308
 }
