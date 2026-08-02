@@ -143,9 +143,11 @@ reports this when it happens; `scripts/run_eval.py` prints a note if so).
 
 ```
 chat/
+├── build.py               # CLI: THE master build -- one call for site artifacts, `--function`
+│                          #   also for the Tencent SCF zip (see "Rebuilding the index" below)
 ├── src/portfolio_rag/     # the pipeline: config, loader, chunker, embedder, roles, index_builder
 ├── knowledge/             # curated .md chunks (resume/CV vocabulary the pages lack)
-├── scripts/build_index.py # CLI: rebuild data/ after editing site content
+├── scripts/build_index.py # CLI: rebuild data/ after editing site content (what build.py calls)
 ├── scripts/run_eval.py    # CLI: score the golden set against data/eval_baseline.json
 ├── eval/                  # golden.jsonl (held-out cases) + README.md (authoring guide)
 ├── tests/                 # pytest suite
@@ -154,21 +156,37 @@ chat/
 │                          #   (degraded-mode retrieval), meta.json (small sidecar the widget
 │                          #   fetches instead of the full chunks file), roles.json (personas)
 ├── models/                # self-hosted MiniLM ONNX (weights + tokenizer)
-└── worker/                # Cloudflare Worker (LLM proxy + logging) + wrangler.toml
+├── functions/tencent/     # Tencent SCF backend + build_package.py (what build.py --function calls)
+└── worker/                # Cloudflare Worker (LLM proxy + logging) + wrangler.toml -- NOT
+                           #   interchangeable with functions/tencent/, see "Deploying a backend"
 ../scripts/chat-widget.js  # the site-side widget (self-contained, no framework)
 ../scripts/vendor/         # self-hosted transformers.min.js + ONNX Runtime WASM
 ```
 
 ## Rebuilding the index
 
-Run after editing any site page:
+Run after editing any site page. `build.py` is the one-call master build — it wraps
+`scripts/build_index.py` (and, with `--function`, `functions/tencent/build_package.py` too) so
+you never have to remember which script does what:
 
 ```bash
 cd chat
 pip install -e ".[dev]"
-python scripts/build_index.py
+python build.py                # rebuild data/ (chunks/gate/meta/roles) -- fast, no network needed
+python build.py --function     # ALSO rebuild the Tencent SCF zip -- downloads any missing
+                                #   models/wheels first; see "Deploying a backend" below for
+                                #   what to do with the zip afterward
 pytest -q   # chunker contract, loader, embedder parity, index schema, gate, eval harness
 ```
+
+Without `--function`, `build.py` just runs `scripts/build_index.py --model <preset>` (default
+preset `e5`, matching production). With `--function` it instead runs
+`functions/tencent/build_package.py`, which downloads any missing models/wheels, calls
+`scripts/build_index.py` itself as one of its steps, and writes
+`functions/tencent/tencent-function-<preset>.zip`. Call `scripts/build_index.py` directly only
+if you specifically want the site artifacts without `build.py`'s summary/next-steps output —
+everything below about what gets printed and what to commit applies either way, since
+`build.py` doesn't change what `build_index.py` writes.
 
 `build_index.py` prints a one-line summary (page/section/chunk counts, chunks-file
 size, gate threshold, elapsed seconds) — the numbers depend on current site
@@ -185,6 +203,10 @@ Commit the regenerated `data/chunks_e5.json`, `data/gate_en_minilm.json`,
 the widget fetches on every load instead of the full chunks file; see "Why it's built
 this way" above). `data/gate_zh_bge.json` is gitignored and never committed. Chunk ids
 are deterministic (`{url}#{anchor}:{i}`), so diffs stay readable.
+
+If you ran `python build.py --function`, upload and redeploy the zip **before** committing
+and publishing the site — see "Deploying a backend" below for why the order matters and the
+exact steps; it is the reverse of the order you'd guess.
 
 ## Evaluating retrieval and the gate (golden set)
 
@@ -243,6 +265,20 @@ python -m http.server 8000   # then open http://localhost:8000
 ```
 
 ## Deploying a backend (enables LLM answers)
+
+**Redeploying the existing Tencent SCF backend** (console credentials in hand — the upload
+itself is a manual console step, not automated here, since it needs your Tencent login
+rather than a token this repo could hold):
+
+```bash
+cd chat && python build.py --function   # rebuilds data/ AND functions/tencent/tencent-function-e5.zip
+```
+
+Then, in order: **(1) upload the new zip in the SCF console and redeploy the function
+FIRST**, confirm it's live, **(2) only then** `git add/commit/push chat/data/` and publish the
+site. Reversed, visitors get a 400 on every chat turn until the function catches up — see the
+load-bearing-order callout below for the exact mechanism, and `.claude/DEPLOY.md` (gitignored,
+local-only) for the step-by-step console walkthrough.
 
 The site works without this step — the widget stays in retrieval-only mode until
 `WORKER_URL` is set. Two backends exist, but as of Task 29 they are **not**

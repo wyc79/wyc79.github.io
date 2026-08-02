@@ -66,10 +66,17 @@ def main() -> None:
     if args.function:
         print(f"[OK] cloud function: {zipname}")
     print("Next:")
-    print("  - git add/commit/push the data/ files (chunks/meta/gate/roles)")
     if args.function:
-        print(f"  - re-upload {zipname} to the SCF function, then redeploy")
+        # Order is load-bearing (Task 29): the widget's /chat sends no
+        # `contexts`, and the OLD deployed function 400s without it, so
+        # publishing the site before the function catches up breaks live
+        # chat for every visitor until the function is redeployed. Function
+        # first, always.
+        print(f"  1. Upload {zipname} to the SCF console and redeploy the function FIRST "
+              "-- an old function 400s on /chat's contexts-free request.")
+        print("  2. THEN git add/commit/push the data/ files (chunks/meta/gate/roles) and publish the site.")
     else:
+        print("  - git add/commit/push the data/ files (chunks/meta/gate/roles)")
         print("  - run with --function when you also need to redeploy the backend")
 
 
