@@ -6,21 +6,28 @@ provider that exposes /v1/chat/completions). Listens on :9000 as SCF web
 functions require; scf_bootstrap starts it.
 
 Same contract and guarantees as the Cloudflare worker:
-  POST /chat  {session, role, question, history?, contexts[]} -> {answer, model, rid}
-  POST /embed {session?, text, gate_text?} -> {vector, gate?, rid}
+  POST /chat  {session, role, lang, question, history?} -> {answer, model, rid, sources[]}
+  POST /embed {session?, text, gate_text?, gate_only?} -> {vector?, gate?, rid}
   POST /log   client-side event record -> 204
   GET  /      health
 - Origin allowlist, size caps on every field.
-- Empty contexts -> canned refusal, no LLM call (server-side off-topic guard).
+- Retrieval (Task 29): /chat retrieves from its own bundled data/index.json —
+  the client no longer sends contexts (a `contexts` field on an old cached
+  widget is ignored outright, logged as client_contexts_ignored, never used
+  to build the prompt). Retrieval returning nothing -> canned refusal, no LLM
+  call (server-side off-topic guard, now independent of what the client
+  sends).
 - Role prompts come from the site's roles.json (client sends a role id only);
   a bundled roles.json copy is the fallback if github.io is unreachable from
   the function's region.
 - Every turn logged as JSON (SCF 日志查询), keyed by a short human-scannable
   request id (rid) + hashed session (sid). /chat logs the exact LLM input
   (system_head + clipped chunks with ids/scores + messages) and output
-  (answer, finish_reason, usage); /embed logs the gate decision only, never
-  the query vector. contexts may carry a client-side retrieval score, and the
-  widget can POST its top-k {id, score} to /log — all correlate by rid/sid.
+  (answer, finish_reason, usage) — the chunks and their scores now come from
+  this function's own retrieval, not client-sent contexts; /embed logs the
+  gate decision only, never the query vector. The widget can still POST its
+  own client-side top-k {id, score} to /log (degraded/light-mode audit) — all
+  correlate by rid/sid.
 Config via environment variables: LLM_API_KEY (required), LLM_BASE_URL,
 LLM_MODEL, SITE_BASE, ALLOWED_ORIGINS, RATE_LIMIT_PER_HOUR.
 """
@@ -53,8 +60,6 @@ BUILD_ID = BUILD_INFO.get("build_id", "unknown")
 
 LIMITS = {
     "question": 1000,
-    "contexts": 6,
-    "context_text": 1600,
     "history_turns": 8,
     "history_text": 1200,
     "log_bytes": 4096,
@@ -89,6 +94,20 @@ _embed = {"lock": threading.Lock(), "session": None, "tokenizer": None, "error":
 # (bge-zh vs the hand-written knowledge/about_zh.md corpus). CJK queries use zh when
 # available, otherwise bypass to the LLM-prompt guard.
 _gates: dict = {"en": None, "zh": None}
+
+# ── retrieval (Task 29) ────────────────────────────────────────────────────
+# data/index.json, bundled into the zip next to gate_vectors.json (see
+# build_package.py). /chat retrieves from this directly instead of trusting
+# client-sent contexts -- see the module docstring. matrix stays None (not an
+# empty array) until a real index loads, so callers can tell "not packaged /
+# failed to load" apart from "packaged but genuinely empty".
+_index: dict = {"matrix": None, "chunks": None, "error": None}
+
+# Mirrors chat-widget.js's TOP_K/MIN_SCORE and portfolio_rag.runtime's same
+# constants -- see rank_chunks below and chat/tests/test_retrieval_sync.py,
+# which executes all three implementations against one shared fixture.
+TOP_K = 4
+MIN_SCORE = 0.18
 
 CJK_RE = None  # compiled lazily
 
@@ -154,6 +173,71 @@ def _load_embedder() -> None:
                      "threshold": spec["gate_threshold"]})
             except Exception as err:
                 log({"type": "gate_load_failed", "lang": lang, "error": repr(err)})
+
+
+def _load_index() -> None:
+    """Load the bundled retrieval index (Task 29). Same "before binding the
+    port" window as _load_embedder() -- see main(). Leaves _index["matrix"]
+    None (not an empty matrix) on any failure, which /chat's availability
+    check treats as "retrieval not available" (503), never as a silent
+    fall-through to client-sent contexts (see the module docstring)."""
+    index_file = Path(__file__).with_name("index.json")
+    if not index_file.exists():
+        _index["error"] = "index.json not packaged"
+        log({"type": "index_load_failed", "error": _index["error"]})
+        return
+    try:
+        import numpy as np
+
+        payload = json.loads(index_file.read_text(encoding="utf-8"))
+        chunks = payload.get("chunks") or []
+        matrix = (
+            np.array([c["vector"] for c in chunks], dtype=np.float32)
+            if chunks
+            else np.empty((0, 0), dtype=np.float32)
+        )
+        _index["matrix"] = matrix
+        _index["chunks"] = chunks
+        log({"type": "index_loaded", "chunks": len(chunks),
+             "model_preset": payload.get("model_preset")})
+    except Exception as err:
+        _index["error"] = repr(err)
+        log({"type": "index_load_failed", "error": repr(err)})
+
+
+def rank_chunks(matrix, chunks: list, query_vec) -> list:
+    """Pure ranking function: score every chunk row by dot product against
+    query_vec (all vectors are unit-normalized, so this is cosine), sort
+    descending, take the top TOP_K, THEN drop any below MIN_SCORE. Order
+    matters -- floor after top-k, not before.
+
+    Deliberately separate from the embedding call (retrieve(), below) so it
+    can be executed directly, without an ONNX model. Mirrored, with the same
+    two constants and the same floor-after-top-k order, by chat-widget.js's
+    scoreChunks and portfolio_rag.runtime's rank_hits --
+    chat/tests/test_retrieval_sync.py executes all three against one shared
+    fixture and asserts they agree. Returns a list of {"chunk": <chunk
+    dict>, "score": float}, highest score first.
+    """
+    import numpy as np
+
+    if matrix.shape[0] == 0:
+        return []
+    scores = matrix @ np.asarray(query_vec, dtype=np.float32)
+    order = np.argsort(-scores)[:TOP_K]
+    top = [{"chunk": chunks[i], "score": round(float(scores[i]), 4)} for i in order]
+    return [h for h in top if h["score"] >= MIN_SCORE]
+
+
+def retrieve(question: str) -> list:
+    """Embed the query with the packaged retrieval model (reusing
+    _run_embedding, which already applies QUERY_PREFIX -- no second embedding
+    path) and rank the bundled index. Raises if the index or embedder isn't
+    loaded; callers must check availability first (see _chat)."""
+    if _index["matrix"] is None:
+        raise RuntimeError(_index["error"] or "index not loaded")
+    query_vec = _run_embedding(_embed, question)
+    return rank_chunks(_index["matrix"], _index["chunks"], query_vec)
 
 
 def _run_embedding(bundle: dict, text: str) -> "object":
@@ -244,23 +328,23 @@ def clip(text, limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + f"…(+{len(text) - limit})"
 
 
-def log_contexts(contexts: list) -> list:
+def log_contexts(hits: list) -> list:
     """Compact per-chunk log rows: ids/urls/scores kept FULL (that's the
-    retrieval-quality signal), chunk text clipped to fit CLS line limits. score
-    is the widget's client-side top-k similarity when it piggybacks it."""
+    retrieval-quality signal), chunk text clipped to fit CLS line limits.
+    `hits` is rank_chunks()'s own output ({"chunk": ..., "score": ...}) --
+    Task 29 moved retrieval server-side, so this reads this function's own
+    ranking, not a client-supplied contexts list."""
     rows = []
-    for i, c in enumerate(contexts):
-        row = {
+    for i, h in enumerate(hits):
+        c, score = h["chunk"], h["score"]
+        rows.append({
             "i": i + 1,
             "id": c.get("id"),
-            "title": c.get("title"),
+            "title": c.get("page_title"),
             "url": c.get("url"),
             "text": clip(c.get("text", ""), LIMITS["log_ctx_text"]),
-        }
-        score = c.get("score")
-        if isinstance(score, (int, float)) and not isinstance(score, bool):
-            row["score"] = round(float(score), 4)
-        rows.append(row)
+            "score": round(float(score), 4),
+        })
     return rows
 
 
@@ -297,16 +381,14 @@ def rate_limited(ip: str, bucket: str = "chat", per_hour_env: str = "RATE_LIMIT_
 
 
 def validate_chat_body(body) -> str | None:
+    """Task 29: `contexts` is no longer part of the request contract, so it is
+    no longer validated here either. If an old cached widget still sends one,
+    the caller ignores it outright (see _chat) rather than rejecting the
+    request -- an old client must keep working while the site rolls out."""
     if not isinstance(body, dict) or not isinstance(body.get("question"), str) or not body["question"].strip():
         return "question required"
     if len(body["question"]) > LIMITS["question"]:
         return "question too long"
-    contexts = body.get("contexts")
-    if not isinstance(contexts, list) or len(contexts) > LIMITS["contexts"]:
-        return "bad contexts"
-    for c in contexts:
-        if not isinstance(c, dict) or not isinstance(c.get("text"), str) or len(c["text"]) > LIMITS["context_text"]:
-            return "bad context item"
     history = body.get("history")
     if history is not None:
         if not isinstance(history, list) or len(history) > LIMITS["history_turns"]:
@@ -401,6 +483,7 @@ class Handler(BaseHTTPRequestHandler):
                 "service": "portfolio-chat",
                 "ok": True,
                 "embed": _embed["session"] is not None,
+                "retrieval": _index["matrix"] is not None,
                 "build": BUILD_INFO,
             })
         self._json(404, {"error": "not found"})
@@ -437,7 +520,16 @@ class Handler(BaseHTTPRequestHandler):
         gate_text = body.get("gate_text") if isinstance(body.get("gate_text"), str) else body["text"]
         gate = gate_decision(gate_text[: LIMITS["question"]])
         rid, sid = new_request_id(), session_hash(body.get("session"))
-        response = {"vector": embed_text(body["text"]), "model": env("MODEL_NAME", "server-embedder"), "rid": rid}
+        response = {"model": env("MODEL_NAME", "server-embedder"), "rid": rid}
+        # gate_only (Task 29): the widget calls /embed first just to get the
+        # gate decision (and to detect the backend is up) -- retrieval moved
+        # server-side into /chat, so it no longer needs a query vector at
+        # all. Skip the ONNX inference that would only be thrown away.
+        # Everything else (gate decision, rid, logging, rate limiting, 503
+        # semantics) is unchanged; old clients that omit the field still get
+        # a vector.
+        if not body.get("gate_only"):
+            response["vector"] = embed_text(body["text"])
         if gate is not None:
             response["gate"] = gate
         # Log the gate decision only — NEVER the query vector. gate carries
@@ -448,6 +540,16 @@ class Handler(BaseHTTPRequestHandler):
     def _chat(self):
         if not env("LLM_API_KEY"):
             return self._json(503, {"error": "function not configured: missing LLM_API_KEY env var"})
+        # Retrieval (Task 29): /chat does its own retrieval now, so it needs
+        # both the query embedder AND the bundled index. Neither loading is
+        # an old-zip-vs-new-zip partial state worth distinguishing in the
+        # response -- either way /chat cannot honor the new contract, and
+        # must NOT silently fall back to trusting client-sent contexts (that
+        # would quietly reopen the prompt-injection surface this change
+        # closes). The widget treats a failing /chat as backend-down and
+        # goes to degraded mode.
+        if _embed["session"] is None or _index["matrix"] is None:
+            return self._json(503, {"error": "retrieval not available"})
         if rate_limited(self._ip()):
             return self._json(429, {"error": "rate limited, try later"})
 
@@ -461,22 +563,32 @@ class Handler(BaseHTTPRequestHandler):
 
         rid, sid = new_request_id(), session_hash(body.get("session"))
 
-        if len(body["contexts"]) == 0:
+        # An old cached widget may still send `contexts` -- ignore it
+        # completely (never let client-supplied text reach the prompt) but
+        # log how often it happens so the old-client tail is visible.
+        client_contexts = body.get("contexts")
+        client_contexts_ignored = len(client_contexts) if isinstance(client_contexts, list) else 0
+
+        hits = retrieve(body["question"])
+
+        if not hits:
             log({
                 "type": "chat_refused",
                 "rid": rid,
                 "sid": sid,
                 "role": body.get("role"),
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
+                "client_contexts_ignored": client_contexts_ignored,
             })
-            return self._json(200, {"answer": REFUSAL, "refused": True, "rid": rid})
+            return self._json(200, {"answer": REFUSAL, "refused": True, "rid": rid, "sources": []})
 
         roles_data = load_roles()
         role = roles_data["roles"].get(body.get("role")) or roles_data["roles"][roles_data["default_role"]]
 
         context_block = "\n".join(
-            f'<chunk index="{i + 1}" page="{c.get("title", "")}" url="{c.get("url", "")}">\n{c["text"]}\n</chunk>'
-            for i, c in enumerate(body["contexts"])
+            f'<chunk index="{i + 1}" page="{h["chunk"].get("page_title", "")}" '
+            f'url="{h["chunk"].get("url", "")}">\n{h["chunk"]["text"]}\n</chunk>'
+            for i, h in enumerate(hits)
         )
         # system_head = the role/persona prompt WITHOUT the injected chunks; the
         # chunks are logged separately (clipped) via log_contexts, so the whole
@@ -502,17 +614,19 @@ class Handler(BaseHTTPRequestHandler):
                  "detail": err.read().decode("utf-8", "replace")[:500]})
             return self._json(502, {"error": "llm call failed"})
 
-        # Full LLM I/O for every turn: system_head + clipped contexts (ids &
-        # widget-supplied scores kept full) + clipped messages in; answer +
-        # finish_reason + usage out. Enough to reproduce and audit any answer.
+        # Full LLM I/O for every turn: system_head + clipped chunks (ids &
+        # this function's own retrieval scores kept full) + clipped messages
+        # in; answer + finish_reason + usage out. Enough to reproduce and
+        # audit any answer.
         log({
             "type": "chat",
             "rid": rid,
             "sid": sid,
             "role": body.get("role"),
+            "client_contexts_ignored": client_contexts_ignored,
             "in": {
                 "system_head": system_head,
-                "contexts": log_contexts(body["contexts"]),
+                "contexts": log_contexts(hits),
                 "messages": [
                     {"role": m.get("role"), "content": clip(m.get("content"), LIMITS["log_msg_text"])}
                     for m in messages
@@ -525,7 +639,21 @@ class Handler(BaseHTTPRequestHandler):
                 "usage": usage,
             },
         })
-        self._json(200, {"answer": answer, "model": model, "rid": rid})
+        # Seven fields per source -- exactly what chat-widget.js's addSources,
+        # dedupeForDisplay and sourcesForLog read. Do not rename them.
+        sources = [
+            {
+                "id": h["chunk"].get("id"),
+                "url": h["chunk"].get("url"),
+                "anchor": h["chunk"].get("anchor"),
+                "page_title": h["chunk"].get("page_title"),
+                "section_title": h["chunk"].get("section_title"),
+                "text": h["chunk"].get("text"),
+                "score": h["score"],
+            }
+            for h in hits
+        ]
+        self._json(200, {"answer": answer, "model": model, "rid": rid, "sources": sources})
 
     def _log(self):
         raw = self._read_body(LIMITS["log_bytes"] + 1)
@@ -554,8 +682,10 @@ def main() -> None:
     # only once it listens, so cold-start requests queue until the models are
     # in memory instead of racing a background load and seeing 503s (the init
     # timeout covers this — see DEPLOY.md). /embed's 503 now only ever means
-    # "not packaged".
+    # "not packaged". _load_index() (Task 29) loads the bundled retrieval
+    # index in the same window -- /chat's 503 means either piece is missing.
     _load_embedder()
+    _load_index()
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 

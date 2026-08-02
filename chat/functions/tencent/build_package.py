@@ -148,6 +148,14 @@ def build_zip(preset: dict, model_src: Path, wheels: list[Path], out_zip: Path,
         gate_file = CHAT / "data" / "gate_vectors.json"
         if gate_models and gate_file.exists():
             zf.write(gate_file, "gate_vectors.json")
+        # Retrieval index (Task 29): index.py loads this at startup and
+        # retrieves from it directly instead of trusting client-sent
+        # contexts. Not packaged (an older zip build, or a fresh checkout
+        # with no chat/data/index.json yet) -> /chat returns 503 at runtime;
+        # see index.py's _load_index().
+        index_file = CHAT / "data" / "index.json"
+        if index_file.exists():
+            zf.write(index_file, "index.json")
         # dependencies, extracted wheel contents at package root
         for wheel in wheels:
             with zipfile.ZipFile(wheel) as wz:
