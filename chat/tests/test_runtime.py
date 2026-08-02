@@ -288,3 +288,37 @@ def test_retrieval_embedder_matches_the_index_that_was_built(rt) -> None:
         f"the query embedder is probably not the {rt.model_preset} model "
         "that built the index"
     )
+
+
+def test_a_missing_en_gate_fails_open_the_way_production_does(rt, monkeypatch) -> None:
+    """runtime.py's own docstring: "Python mirror of the widget's read path...
+    when this file and chat-widget.js disagree, chat-widget.js wins and this
+    file is wrong." On a gate that is EXPECTED but unavailable, the widget's
+    `else if (state.meta.gate_remote)` branch records
+    {remote: true, unavailable: true} and leaves `refused` false -- the
+    question goes through to the LLM-prompt guard. This file used to return
+    passed=False: fail closed where production fails open.
+
+    Unreachable today (gate_en_minilm.json is committed, and e5 can never
+    self-gate) and invisible to the three sync tests, which cover regexes and
+    ranking arithmetic rather than gate-availability semantics -- which is
+    exactly why it needs pinning here.
+
+    available=False is the orthogonal half and must survive the change: the
+    question is let through AND the measurement is still reported as
+    unavailable, never as a gate pass. Mirroring production must not turn an
+    unmeasured cell into a scored one."""
+    monkeypatch.setitem(rt._gates, "en", None)
+
+    decision = rt.gate("Which action game did he own the combat mechanics on?")
+
+    assert decision.reason == "no_en_gate"
+    assert decision.passed is True, (
+        "the mirror fails closed where chat-widget.js fails open -- a visitor "
+        "whose gate is merely unavailable would be refused here but served there"
+    )
+    assert decision.available is False, (
+        "letting the question through must not be reported as a gate PASS -- "
+        "the measurement is still missing"
+    )
+    assert decision.value is None

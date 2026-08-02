@@ -177,6 +177,22 @@ class CaseResult:
     # see aggregate()'s hit_at_4_page_only and _find_regressions in
     # tests/test_golden.py, which deliberately does not compare it.
     hit_page_only: bool | None = None
+    # The AUTHORITATIVE reason Runtime.gate() reached its verdict
+    # (GateDecision.reason: "cjk_bypass", "no_en_gate", or None for a real
+    # measurement). Carried through rather than re-derived downstream:
+    # aggregate() used to infer "this was a CJK bypass" from
+    # `gate_value is None and case.lang == "zh"`, which is a proxy that
+    # coincides with the truth only while every case's declared language
+    # matches the language its GATE TEXT routes to -- nothing enforces that
+    # and nothing tested it. An en-lang case whose question carries CJK
+    # routes to the zh gate; on a machine with no gate_zh_bge.json (it is
+    # gitignored, so every fresh clone) it bypassed, and the proxy then
+    # reported gate_available=True and scored the bypass as a refusal
+    # FAILURE -- a missing measurement recorded as a zero, which this
+    # project's working agreements forbid. This is the fifth proxy-signal
+    # defect on the branch; the fix is to thread the real value, not to pick
+    # a better stand-in.
+    gate_reason: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -215,6 +231,7 @@ def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
         gate_passed=decision.passed,
         gate_value=decision.value,
         gate_available=decision.available,
+        gate_reason=decision.reason,
         hit=hit,
         top_urls=urls,
         top_scores=tuple(h.score for h in retrieval.hits),
@@ -291,7 +308,11 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             cell[refusal_key] = cell.get(refusal_key, 0) + int(not r.gate_passed)
             cell[n_key] = cell.get(n_key, 0) + 1
         # A cjk_bypass decision means there is no zh gate; the gate columns for
-        # that cell are unmeasured rather than perfect.
-        if not r.gate_available or r.gate_value is None and r.case.lang == "zh":
+        # that cell are unmeasured rather than perfect. Read off the decision's
+        # OWN reason (threaded through CaseResult.gate_reason -- see its
+        # comment), never re-derived from the case's declared language: those
+        # two agree only while no case's gate text routes to a language other
+        # than the one the case declares, which nothing enforces.
+        if not r.gate_available or r.gate_reason == "cjk_bypass":
             cell["gate_available"] = False
     return cells

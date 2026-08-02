@@ -413,7 +413,26 @@ class Runtime:
         else:
             bundle, lang = self._gates.get("en"), "en"
             if bundle is None:
-                return GateDecision(False, False, None, "en", None, reason="no_en_gate")
+                # FAIL OPEN, matching production. chat-widget.js's
+                # `else if (state.meta.gate_remote)` branch records
+                # {remote: true, unavailable: true} and leaves `refused`
+                # false -- a gate that is expected but unavailable lets the
+                # question through to the LLM-prompt guard rather than
+                # refusing every visitor. This file is a mirror of that read
+                # path ("when this file and chat-widget.js disagree,
+                # chat-widget.js wins and this file is wrong"), and it used to
+                # return passed=False: fail CLOSED where production fails
+                # open. Unreachable today (gate_en_minilm.json is committed
+                # and e5 can never self-gate) and invisible to the three sync
+                # tests, which cover regexes and ranking arithmetic, not
+                # gate-availability semantics.
+                #
+                # available=False is the separate, orthogonal half: the
+                # question is let through AND the measurement is reported as
+                # unavailable (n/a), never as a gate pass. Mirroring
+                # production must not turn an unmeasured cell into a scored
+                # one.
+                return GateDecision(False, True, None, "en", None, reason="no_en_gate")
         passed, value = bundle.judge(text)
         return GateDecision(True, passed, value, lang, bundle.threshold)
 

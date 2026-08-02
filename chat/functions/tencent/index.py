@@ -113,7 +113,12 @@ _gates: dict = {"en": None, "zh": None}
 # _index["error"], which the health payload also reports -- an earlier version
 # distinguished "packaged but genuinely empty" by loading it as an empty
 # matrix, which is not None and therefore reported itself as working.
-_index: dict = {"matrix": None, "chunks": None, "error": None}
+#
+# "query_prefix" is the prefix chunks.json says its OWN document vectors were
+# embedded with -- the authoritative value for what a query embedded against
+# them must use. _check_query_prefix() compares the effective QUERY_PREFIX env
+# var against it at startup; see there for why this warns and never refuses.
+_index: dict = {"matrix": None, "chunks": None, "error": None, "query_prefix": None}
 
 # Mirrors chat-widget.js's TOP_K/MIN_SCORE and portfolio_rag.runtime's same
 # constants -- see rank_chunks below and chat/tests/test_retrieval_sync.py,
@@ -154,7 +159,12 @@ def _load_embedder() -> None:
         with _embed["lock"]:
             _embed["tokenizer"], _embed["session"] = tok, session
             _embed["prefix"] = env("QUERY_PREFIX", "")
-        log({"type": "embedder_loaded"})
+        # The effective prefix is logged, not just applied. QUERY_PREFIX is a
+        # manual console step, it silently governs the ONLY production
+        # retrieval path, and getting it wrong is a measurable retrieval-
+        # quality regression that looks identical to a correct deployment from
+        # outside. See _check_query_prefix() for the startup cross-check.
+        log({"type": "embedder_loaded", "query_prefix": _embed["prefix"]})
     except Exception as err:
         _embed["error"] = repr(err)
         log({"type": "embedder_load_failed", "error": repr(err)})
@@ -293,11 +303,50 @@ def _load_index() -> None:
             return
         _index["matrix"] = np.array([c["vector"] for c in chunks], dtype=np.float32)
         _index["chunks"] = chunks
+        _index["query_prefix"] = payload.get("query_prefix")
         log({"type": "index_loaded", "chunks": len(chunks),
-             "model_preset": payload.get("model_preset")})
+             "model_preset": payload.get("model_preset"),
+             "query_prefix": _index["query_prefix"]})
     except Exception as err:
         _index["error"] = repr(err)
         log({"type": "index_load_failed", "error": repr(err)})
+
+
+def _check_query_prefix() -> None:
+    """Cross-check the effective QUERY_PREFIX against the prefix chunks.json
+    says its own document vectors were built with, and WARN on a mismatch.
+
+    QUERY_PREFIX is a manual console step (see DEPLOY.md). Forgetting it on an
+    e5 deployment embeds queries without the "query: " prefix the documents
+    were built for -- a real, measurable retrieval-quality regression that is
+    otherwise indistinguishable from a correct deployment from the logs, from
+    the health endpoint and from the outside. It matters more since Task 29
+    moved retrieval server-side: this is now the only retrieval path a
+    normal-mode visitor touches, and the golden harness evaluates runtime.py
+    (which always applies the prefix), so the measurement apparatus this whole
+    branch exists to build cannot see this failure.
+
+    Compared against chunks.json's OWN "query_prefix" -- the authoritative
+    statement of what the vectors in that same file were embedded with -- and
+    not against a preset->prefix table copied in from portfolio_rag.config
+    (this module is stdlib-only by contract and cannot import it, and a copied
+    table would be one more thing to drift).
+
+    WARNS, never refuses. A hard fail here would turn one forgotten console
+    step into a permanent /chat outage for an otherwise-correct deployment --
+    the same trade-off _load_index()'s preset check already settled the same
+    way. The point is that the tolerated failure is now visible."""
+    if _index["matrix"] is None or _index["query_prefix"] is None:
+        return  # nothing loaded, or an index that does not declare one
+    if _embed["prefix"] != _index["query_prefix"]:
+        log({
+            "type": "query_prefix_unexpected",
+            "effective": _embed["prefix"],
+            "index_declares": _index["query_prefix"],
+            "warning": "the QUERY_PREFIX env var does not match the prefix chunks.json's "
+                       "document vectors were built with -- retrieval quality is degraded. "
+                       "Set QUERY_PREFIX in the function's console config. Serving anyway.",
+        })
 
 
 def rank_chunks(matrix, chunks: list, query_vec) -> list:
@@ -634,6 +683,12 @@ class Handler(BaseHTTPRequestHandler):
                 "retrieval": _index["matrix"] is not None,
                 "chunk_count": len(_index["chunks"] or []),
                 "retrieval_error": _index["error"],
+                # The effective QUERY_PREFIX beside what chunks.json says its
+                # own vectors were built with: a forgotten console step is a
+                # silent retrieval-quality regression, so it must be checkable
+                # from outside. See _check_query_prefix().
+                "query_prefix": _embed["prefix"],
+                "index_query_prefix": _index["query_prefix"],
                 "build": BUILD_INFO,
             })
         self._json(404, {"error": "not found"})
@@ -822,6 +877,7 @@ def main() -> None:
     # index in the same window -- /chat's 503 means either piece is missing.
     _load_embedder()
     _load_index()
+    _check_query_prefix()  # warn-only; both loads must have run first
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 

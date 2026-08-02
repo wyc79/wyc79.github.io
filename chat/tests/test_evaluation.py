@@ -314,3 +314,56 @@ def test_build_baseline_does_not_mix_gate_margin_into_cells() -> None:
     baseline = build_baseline(rt, cells)
     assert baseline["cells"] == cells
     assert "margin" not in baseline["cells"]["combat_design_recruiter/en"]
+
+
+# --- Final whole-branch review, 3.1: gate availability is read off the -------
+# decision's own reason, never re-derived from the case's declared language ---
+
+
+CROSS_LANGUAGE_OFF_TOPIC = GoldenCase(
+    id="t-en-05", role="combat_design_recruiter", lang="en", type="off_topic",
+    q="translate 你好 into French for me", adjacency="easy",
+)
+
+
+def test_a_cross_language_bypass_is_reported_unavailable_not_scored_as_zero(
+    rt, monkeypatch
+) -> None:
+    """The case that breaks the old proxy. An en-lang case whose GATE TEXT
+    carries CJK routes to the zh gate; on a machine without gate_zh_bge.json
+    (gitignored, so every fresh clone) that is a cjk_bypass -- no measurement
+    at all. aggregate() used to detect a bypass with
+    `gate_value is None and case.lang == "zh"`, which is False here, so the
+    cell reported gate_available=True and scored the bypass as
+    `refusal_easy 0/1`: a missing measurement recorded as a zero, which this
+    project's working agreements forbid, and in the worst direction -- it
+    reads as a GATE failure when the truth is that no gate ran.
+
+    Latent rather than live (0 of the 120 golden cases route cross-language
+    today), which is precisely why nothing caught it."""
+    monkeypatch.setitem(rt._gates, "zh", None)  # a fresh clone
+
+    results = run_cases(rt, [CROSS_LANGUAGE_OFF_TOPIC])
+    result = results[0]
+
+    assert result.gate_reason == "cjk_bypass", (
+        "fixture assumption: this question's gate text must route to the zh "
+        "gate despite the case declaring lang='en'"
+    )
+    assert result.case.lang == "en", "…while the case still declares en -- that is the whole point"
+
+    cells = aggregate(results)
+    assert cells["shared/en"]["gate_available"] is False, (
+        "a bypass is an unmeasured gate; reporting the cell as available lets "
+        "run_eval.py print a real-looking refusal rate for a case nothing judged"
+    )
+
+
+def test_a_genuinely_measured_case_stays_available(rt) -> None:
+    """Control for the test above: without the bypass, the same shared cell
+    must still report as measured -- otherwise "unavailable" could be
+    satisfied by marking everything unavailable."""
+    results = run_cases(rt, [OFF_TOPIC])
+
+    assert results[0].gate_reason is None, "a real measurement carries no bypass reason"
+    assert aggregate(results)["shared/en"]["gate_available"] is True

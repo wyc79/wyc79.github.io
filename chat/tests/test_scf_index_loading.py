@@ -215,6 +215,113 @@ def test_a_zero_chunk_index_reports_itself_unavailable(no_stray_chunks_json) -> 
     assert any(c.get("type") == "index_load_failed" for c in calls)
 
 
+# ── driving the real handlers ───────────────────────────────────────────────
+
+
+class _StubHandler:
+    """The minimal `self` do_GET and _chat need. Both are called as plain
+    functions against it (mod.Handler.do_GET(stub)), so the REAL handler body
+    runs -- no socket, no server. BaseHTTPRequestHandler.__init__ would try to
+    read from a live connection, and the branches under test all return before
+    touching rfile/wfile, so a stub is both sufficient and closer to what is
+    being asserted.
+
+    _json is the sink: every handler reply goes through it, so recording it
+    captures the real status and the real payload dict the handler built."""
+
+    def __init__(self, path: str = "/", origin: str = "https://wyc79.github.io"):
+        self.path = path
+        self._origin_value = origin
+        self.responses: list = []
+
+    def _origin(self):
+        return self._origin_value
+
+    def _json(self, status: int, obj: dict) -> None:
+        self.responses.append((status, obj))
+
+
+def _health_payload(mod) -> dict:
+    """Whatever the real GET / handler answers, unwrapped."""
+    handler = _StubHandler(path="/")
+    mod.Handler.do_GET(handler)
+    assert len(handler.responses) == 1, f"do_GET replied {len(handler.responses)} times"
+    status, payload = handler.responses[0]
+    assert status == 200, f"health check returned {status}: {payload!r}"
+    return payload
+
+
+# ── QUERY_PREFIX observability ──────────────────────────────────────────────
+#
+# QUERY_PREFIX is a manual console step that silently governs the ONLY
+# production retrieval path. The branch deliberately chose not to hard-fail on
+# a missing prefix (a hard fail would take down an otherwise-correct
+# deployment over one forgotten console step) -- but then left the tolerated
+# failure invisible: not in embedder_loaded, not in the startup line, not in
+# GET /. The golden harness evaluates runtime.py, which always applies the
+# prefix, so the measurement apparatus could not see it either.
+#
+# The cross-check compares the effective prefix against chunks.json's OWN
+# declared query_prefix -- the authoritative statement of what the vectors in
+# that same file were built with -- not against a preset->prefix table copied
+# in from portfolio_rag.config (this module is stdlib-only by contract).
+
+
+def test_the_health_payload_reports_the_effective_and_declared_query_prefix(
+    no_stray_chunks_json,
+) -> None:
+    _write_index(no_stray_chunks_json, "e5")  # declares query_prefix "query: "
+    mod = _load_index_module()
+    mod.BUILD_INFO = {"preset": "e5"}
+    mod._embed["prefix"] = "query: "
+    mod._load_index()
+
+    payload = _health_payload(mod)
+
+    assert payload["query_prefix"] == "query: ", (
+        "a deployment that forgot the QUERY_PREFIX console step must be "
+        "distinguishable from a correct one via the health endpoint"
+    )
+    assert payload["index_query_prefix"] == "query: "
+
+
+def test_a_forgotten_query_prefix_warns_and_still_serves(no_stray_chunks_json) -> None:
+    """The operator omission this tolerates: chunks.json's vectors were built
+    with "query: " but the env var is unset. Must log loudly and keep
+    serving -- refusing here would turn one console step into a permanent
+    /chat outage, which is worse than the degraded retrieval it replaces."""
+    _write_index(no_stray_chunks_json, "e5")
+    mod = _load_index_module()
+    mod.BUILD_INFO = {"preset": "e5"}
+    mod._embed["prefix"] = ""  # operator forgot the console step
+    mod._load_index()
+    calls = _recording_log(mod)
+
+    mod._check_query_prefix()
+
+    warnings = [c for c in calls if c.get("type") == "query_prefix_unexpected"]
+    assert len(warnings) == 1, f"expected exactly one warning, got {calls!r}"
+    assert warnings[0]["effective"] == ""
+    assert warnings[0]["index_declares"] == "query: "
+    assert mod._index["matrix"] is not None, "the mismatch must never make retrieval unavailable"
+    assert _health_payload(mod)["retrieval"] is True
+
+
+def test_a_matching_query_prefix_logs_no_warning(no_stray_chunks_json) -> None:
+    _write_index(no_stray_chunks_json, "e5")
+    mod = _load_index_module()
+    mod.BUILD_INFO = {"preset": "e5"}
+    mod._embed["prefix"] = "query: "
+    mod._load_index()
+    calls = _recording_log(mod)
+
+    mod._check_query_prefix()
+
+    assert not any(c.get("type") == "query_prefix_unexpected" for c in calls), (
+        "a correct deployment must not cry wolf"
+    )
+
+
 # ── _load_embedder(): a corrupt gate file must not take the function down ──
 
 
@@ -271,6 +378,9 @@ def test_a_truncated_gate_file_degrades_instead_of_killing_the_function(no_stray
 
     mod._load_embedder()  # must not raise
 
+    assert any(c.get("type") == "embedder_loaded" and "query_prefix" in c for c in calls), (
+        "the effective QUERY_PREFIX must be logged at startup, not only applied"
+    )
     assert mod._gates["en"] is not None, "a valid en gate must still load"
     assert mod._gates["zh"] is None, "a corrupt zh gate must be absent, not half-built"
     failures = [c for c in calls if c.get("type") == "gate_load_failed"]
