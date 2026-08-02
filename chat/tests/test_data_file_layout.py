@@ -31,10 +31,11 @@ import subprocess
 
 import pytest
 
-from portfolio_rag.config import settings
+from portfolio_rag.config import MODEL_PRESETS, settings
 from portfolio_rag.loader import load_knowledge
 
 CHUNKS_E5_PATH = settings.resolve_chunks_path()
+META_PATH = settings.resolve_path(settings.meta_path)
 GATE_EN_PATH = settings.resolve_path(settings.gate_en_minilm_path)
 GATE_ZH_PATH = settings.resolve_path(settings.gate_zh_bge_path)
 CHUNKS_EN_MINILM_PATH = settings.resolve_path(settings.chunks_en_minilm_path)
@@ -114,6 +115,59 @@ def test_gate_zh_bge_json_name_matches_contents_and_carries_no_chunk_records() -
         f"knowledge/about_zh.md currently has {expected} sections -- rebuild "
         "with scripts/build_index.py"
     )
+
+
+def test_meta_json_agrees_with_the_real_chunks_and_gate_files_it_describes() -> None:
+    """meta.json is the ONE data file that is not preset-derived and that every
+    build overwrites, and chat-widget.js reads it as the sole authority for
+    which mode to run, which chunks file to fetch and what threshold to gate
+    at. Nothing compared it against the artifacts it claims to describe, so a
+    `--model minilm` build could repoint it at a corpus and a gate that are not
+    the committed ones -- flipping every visitor into light mode -- while every
+    per-file name-matches-contents test above stayed green (chunks_e5.json is
+    untouched by such a build and still says "e5").
+
+    The build-time half of this is index_builder.py's preset guard, now
+    anchored on meta.json. This is the committed-state half: whatever produced
+    chat/data/, the sidecar must describe what is actually there."""
+    meta = _load(META_PATH)
+    chunks = _load(CHUNKS_E5_PATH)
+    gate_en = _load(GATE_EN_PATH)
+
+    assert meta["model_preset"] == settings.model_preset, (
+        f"meta.json declares model_preset={meta['model_preset']!r} but this "
+        f"checkout is configured for {settings.model_preset!r} (chat/.env) -- "
+        "the widget would fetch the wrong corpus for every visitor"
+    )
+    assert meta["model_preset"] == chunks["model_preset"], (
+        "meta.json and the retrieval corpus it names disagree about which "
+        "model built them"
+    )
+    assert meta["chunks_file"] == CHUNKS_E5_PATH.name, (
+        f"meta.json points the widget at {meta['chunks_file']!r}, which is not "
+        f"the corpus this preset actually resolves to ({CHUNKS_E5_PATH.name})"
+    )
+    assert (settings.resolve_path("data") / meta["chunks_file"]).exists(), (
+        "meta.json names a chunks file that does not exist -- light mode would 404"
+    )
+    assert meta["chunk_count"] == len(chunks["chunks"])
+    assert meta["dim"] == chunks["dim"]
+    assert meta["model"] == chunks["model"]
+    assert meta["query_prefix"] == chunks["query_prefix"]
+
+    # gate_remote is what decides whether the browser runs its own gate. For a
+    # preset that delegates gating (e5), the threshold in meta.json must be the
+    # one the committed gate file was calibrated to -- not one recalibrated
+    # against the full chunk matrix by a stray self-gating build.
+    delegates = bool(MODEL_PRESETS[settings.model_preset].get("gate_model"))
+    assert meta["gate_remote"] is delegates
+    if delegates:
+        assert meta["gate_stat"] == gate_en["gate_stat"]
+        assert meta["gate_threshold"] == gate_en["gate_threshold"]
+        assert meta["gate_margin"] == gate_en["gate_margin"], (
+            "meta.json's gate numbers must come from the committed "
+            "gate_en_minilm.json, not from a differently-calibrated build"
+        )
 
 
 def test_chunks_en_minilm_json_name_matches_contents_and_carries_no_gate_fields() -> None:

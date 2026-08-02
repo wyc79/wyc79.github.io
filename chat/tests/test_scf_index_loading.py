@@ -1,6 +1,11 @@
-"""Tests for functions/tencent/index.py's _load_index() (Task 29, Important
-1's defense-in-depth half -- fix round 1 introduced it, fix round 2
-corrected its signal).
+"""Tests for functions/tencent/index.py's startup-path loading -- _load_index()
+(Task 29, Important 1's defense-in-depth half -- fix round 1 introduced it, fix
+round 2 corrected its signal) and _load_embedder()'s gate-file reads.
+
+main() calls both BEFORE binding :9000, so anything either of them raises takes
+the whole function down (every route, not just the feature that failed). The
+final whole-branch review found two ways that could happen against a corrupt or
+mis-bundled artifact; the tests at the bottom of this file pin both.
 
 build_package.py (see test_build_package.py) refuses to BUNDLE a
 mismatched-preset chunks file, but a packaged zip can also be assembled by
@@ -177,3 +182,103 @@ def test_missing_chunks_json_still_refuses_as_before(no_stray_chunks_json) -> No
 
     assert mod._index["matrix"] is None
     assert mod._index["error"] == "chunks.json not packaged"
+
+
+def test_a_zero_chunk_index_reports_itself_unavailable(no_stray_chunks_json) -> None:
+    """A chunks.json with the right preset stamp but no chunks used to load as
+    np.empty((0, 0)) -- which is NOT None, so it passed /chat's availability
+    guard and GET /'s health flag while rank_chunks returned [] for every
+    question: 200 + the canned refusal forever, the widget never falling to
+    degraded mode (200 is success), and health reporting "retrieval": true.
+
+    Reachable via chat/data/meta.json bundled as chunks.json (same
+    model_preset, no chunks) -- see
+    test_build_package.py::test_a_preset_matching_file_with_no_chunks_is_not_a_retrieval_corpus
+    for the bundling-side half of the same fix."""
+    no_stray_chunks_json.write_text(
+        json.dumps({"model_preset": "e5", "query_prefix": "query: ", "chunks": []}), encoding="utf-8"
+    )
+    mod = _load_index_module()
+    mod.BUILD_INFO = {"preset": "e5"}
+    calls = _recording_log(mod)
+
+    mod._load_index()
+
+    assert mod._index["matrix"] is None, (
+        "an empty index must be indistinguishable from a missing one at the "
+        "availability check -- both mean retrieval cannot work"
+    )
+    assert mod._index["error"] == "chunks.json has no chunks"
+    assert not any(c.get("type") == "index_loaded" for c in calls), (
+        "an empty index must not log itself as loaded"
+    )
+    assert any(c.get("type") == "index_load_failed" for c in calls)
+
+
+# ── _load_embedder(): a corrupt gate file must not take the function down ──
+
+
+_GATE_FILES = {lang: BACKEND_PATH.with_name(name) for lang, name in
+               (("en", "gate_en_minilm.json"), ("zh", "gate_zh_bge.json"))}
+
+
+@pytest.fixture()
+def no_stray_gate_json():
+    """Same discipline as no_stray_chunks_json: the gate files are build
+    artifacts written straight into the zip, never left loose in the source
+    tree. Assert none is already there, always clean up."""
+    for path in _GATE_FILES.values():
+        assert not path.exists(), (
+            f"unexpected file at {path} -- remove it before running this test"
+        )
+    yield _GATE_FILES
+    for path in _GATE_FILES.values():
+        path.unlink(missing_ok=True)
+
+
+def _write_gate(path, threshold: float = 0.2) -> None:
+    path.write_text(json.dumps({
+        "gate_stat": "top",
+        "gate_threshold": threshold,
+        "query_prefix": "",
+        "pooling": "mean",
+        "vectors": [[1.0, 0.0], [0.0, 1.0]],
+    }), encoding="utf-8")
+
+
+def test_a_truncated_gate_file_degrades_instead_of_killing_the_function(no_stray_gate_json) -> None:
+    """The JSON read of a gate file used to sit OUTSIDE its try, so a truncated
+    or malformed gate_*.json raised JSONDecodeError out of _load_embedder().
+    main() calls _load_embedder() BEFORE ThreadingHTTPServer(...).serve_forever(),
+    so that killed the process before :9000 was ever bound -- /chat, /embed,
+    /log and health all down, for a file whose only honest blast radius is "no
+    gate for this language".
+
+    A missing KEY in the same file was already caught cleanly; only the read
+    itself was on the wrong side of the try. The package is a 160-200 MB zip
+    uploaded by hand and gate_zh_bge.json is regenerated on every build and
+    unrecoverable by git, so a partial artifact is a realistic failure mode.
+
+    _load_model is stubbed: ONNX session creation is not what is under test
+    (and the model dirs are not in the source tree), and stubbing it is what
+    lets _load_embedder() get past the retrieval embedder to the gate loop."""
+    _write_gate(no_stray_gate_json["en"])
+    no_stray_gate_json["zh"].write_text('{"gate_stat": "top", "gate_thre', encoding="utf-8")
+
+    mod = _load_index_module()
+    mod._load_model = lambda dir_name: (object(), object())
+    calls = _recording_log(mod)
+
+    mod._load_embedder()  # must not raise
+
+    assert mod._gates["en"] is not None, "a valid en gate must still load"
+    assert mod._gates["zh"] is None, "a corrupt zh gate must be absent, not half-built"
+    failures = [c for c in calls if c.get("type") == "gate_load_failed"]
+    assert [c["lang"] for c in failures] == ["zh"], (
+        f"expected exactly one gate_load_failed, for zh; got {calls!r}"
+    )
+    # The whole point: with no zh gate, gate_decision falls back to cjk_bypass
+    # rather than refusing every Chinese visitor -- the documented degradation.
+    assert mod.gate_decision("你好，请介绍一下这个项目") == {
+        "pass": True, "value": None, "reason": "cjk_bypass",
+    }

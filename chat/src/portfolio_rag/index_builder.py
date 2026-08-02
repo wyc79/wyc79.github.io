@@ -153,11 +153,18 @@ def _check_en_gate_margin(gate: dict) -> None:
     reached production silently. This raises instead of warning, so it
     cannot be scrolled past in a build log.
 
-    Must be called immediately after compute_gate() returns and before ANY
-    of gate_en_minilm.json, gate_zh_bge.json, chunks_en_minilm.json,
-    roles.json or chunks_{model_preset}.json are written — a raise placed
-    after even one of those writes leaves data/ half-updated, which is worse
-    than the silent-ship bug it replaces.
+    Raising here must not leave data/ half-updated — that would be worse than
+    the silent-ship bug it replaces. This used to be an ordering RULE stated in
+    this docstring ("call before ANY of gate_en_minilm.json, gate_zh_bge.json,
+    chunks_en_minilm.json, roles.json or chunks_{model_preset}.json are
+    written"), and the rule was already broken: build_index() wrote
+    gate_en_minilm.json and then ran two more failable ONNX passes
+    (_build_zh_gate's model load + inference, and the 192-chunk degraded-corpus
+    embedding) before writing anything else. It is now a STRUCTURAL property
+    instead: build_index() accumulates every payload and flushes them in one
+    pass at the very end (see _flush_build_outputs), so no raise anywhere in
+    the build — this check, an OOM, a corrupt ONNX file — can leave a partial
+    data/. There is no ordering constraint left for a caller to honour.
 
     The floor is RAG_MIN_GATE_MARGIN (default 0.0), not a hardcoded sign
     check: +0.5% margin isn't meaningfully healthier than -0.5%, and the
@@ -179,40 +186,86 @@ def _check_en_gate_margin(gate: dict) -> None:
     )
 
 
+def _flush_build_outputs(writes: dict[Path, str], deletes: list[Path]) -> None:
+    """The build's ONE write phase. build_index() computes every payload first
+    and calls this last, so that any failure during the build — a gate margin
+    below the floor, an OOM in one of the three ONNX passes, a corrupt model
+    file — leaves data/ exactly as it was rather than half-updated. That
+    matters more than usual here because one of the outputs
+    (gate_zh_bge.json) is gitignored and unrecoverable by git.
+
+    This closes the failable-computation window, not the disk-IO one: an IO
+    error partway through the loop below can still leave a partial data/. That
+    residual would need write-to-.tmp-then-rename; it is deliberately not
+    claimed here."""
+    for path in writes:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    for path, text in writes.items():
+        path.write_text(text, encoding="utf-8")
+    for path in deletes:
+        path.unlink(missing_ok=True)
+
+
 def build_index(site_root: Path | None = None) -> dict:
     t0 = time.time()
     site_root = site_root or settings.site_root
     preset = settings.preset
 
+    # Every output this build will produce, accumulated and flushed exactly
+    # once at the end -- see _flush_build_outputs and _check_en_gate_margin's
+    # docstring. Nothing below this line touches the filesystem until then.
+    writes: dict[Path, str] = {}
+    deletes: list[Path] = []
+
     # Guard against silently rebuilding the retrieval corpus in a different
     # embedding space. gate_en_minilm.json, gate_zh_bge.json,
     # chunks_en_minilm.json and the deployed Tencent function all depend on
-    # the model_preset the committed chunks_{preset}.json was built with (see
+    # the model_preset the committed artifacts were built with (see
     # .env.example) — a mismatch here means settings.model_preset drifted
     # from that (e.g. a fresh clone missing chat/.env fell back to the
     # "minilm" default). Checked before any work is done, not after, so a
-    # refused build doesn't waste an embedding pass. Note this only catches a
-    # STALE file left at the CURRENT preset's own derived path (e.g. a
-    # leftover chunks_e5.json while settings.model_preset is still "e5" but
-    # something else about the build changed) — chunks_path being
-    # preset-derived means a genuine preset switch (e5 -> minilm) writes to a
-    # different filename entirely and never reaches this check at all, which
-    # is fine: chunks_e5.json and chunks_minilm.json coexisting is not a
-    # desync, it's two builds' outputs living side by side.
-    existing_chunks_path = settings.resolve_chunks_path()
-    if existing_chunks_path.exists() and not os.environ.get("RAG_ALLOW_PRESET_CHANGE"):
-        existing_preset = json.loads(existing_chunks_path.read_text(encoding="utf-8")).get(
-            "model_preset"
-        )
-        if existing_preset is not None and existing_preset != settings.model_preset:
-            raise ValueError(
-                f"existing chunks file at {existing_chunks_path} was built with "
-                f"model_preset={existing_preset!r}, but settings.model_preset is "
-                f"{settings.model_preset!r}. Rebuilding would desync "
-                "gate_en_minilm.json, gate_zh_bge.json, chunks_en_minilm.json "
-                "and the deployed backend. Set RAG_ALLOW_PRESET_CHANGE=1 to "
-                "rebuild anyway."
-            )
+    # refused build doesn't waste an embedding pass.
+    #
+    # ANCHORED ON meta.json, not on the chunks file alone. An earlier version
+    # checked only the chunks file and reasoned that a genuine preset switch
+    # writes to a different filename entirely, "which is fine: chunks_e5.json
+    # and chunks_minilm.json coexisting is not a desync, it's two builds'
+    # outputs living side by side." True of the chunks files. FALSE of
+    # meta.json and roles.json, which are single-valued and overwritten
+    # unconditionally by every build. Once chunks_path became preset-derived
+    # (config.py's resolve_chunks_path), a `--model minilm` build resolved to a
+    # not-yet-existing chunks_minilm.json and so SKIPPED this guard entirely,
+    # then repointed the committed meta.json to model_preset="minilm",
+    # gate_remote=false, chunks_file="chunks_minilm.json" and a gate_threshold
+    # calibrated against all 192 site chunks instead of the 55 curated
+    # about_en.md sections. _check_en_gate_margin does not stop that either:
+    # the minilm self-gate over the real 192 en chunks measures margin +2.52%,
+    # so both guards cleared. chat-widget.js reads meta.json as the sole
+    # authority for which mode to run and at what threshold, so committing that
+    # flips EVERY visitor into light mode -- a ~23 MB in-browser model download
+    # plus exactly the site-growth-coupled gate this branch exists to remove.
+    # (This supersedes Task 34 Part C's "no corruption hole" conclusion, which
+    # was reached against the chunks-file-only version of this guard.)
+    #
+    # meta.json is the right anchor precisely because it is the one file every
+    # preset always writes. The chunks file is still checked as well, for the
+    # stale-file-at-the-current-preset's-own-path case. RAG_ALLOW_PRESET_CHANGE=1
+    # remains the deliberate-switch opt-out.
+    if not os.environ.get("RAG_ALLOW_PRESET_CHANGE"):
+        for existing in (settings.resolve_path(settings.meta_path), settings.resolve_chunks_path()):
+            if not existing.exists():
+                continue
+            existing_preset = json.loads(existing.read_text(encoding="utf-8")).get("model_preset")
+            if existing_preset is not None and existing_preset != settings.model_preset:
+                raise ValueError(
+                    f"existing {existing.name} at {existing} was built with "
+                    f"model_preset={existing_preset!r}, but settings.model_preset is "
+                    f"{settings.model_preset!r}. Rebuilding would desync meta.json "
+                    "(which chat-widget.js reads to decide which mode every visitor "
+                    "runs), gate_en_minilm.json, gate_zh_bge.json, "
+                    "chunks_en_minilm.json and the deployed backend. Set "
+                    "RAG_ALLOW_PRESET_CHANGE=1 to rebuild anyway."
+                )
 
     # A multilingual retrieval model (e5) gets a DE-INTERLEAVED bilingual index:
     # clean English-only sections then clean Chinese-only sections (en first),
@@ -332,8 +385,6 @@ def build_index(site_root: Path | None = None) -> dict:
         gate_vecs = np.round(gate_vecs.astype(float), ndigits)
         gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
                             multilingual=gate_preset["multilingual"])
-        # Must run before ANY write below (gate_en_minilm.json is the very
-        # next thing written) -- see _check_en_gate_margin's docstring.
         _check_en_gate_margin(gate)
         # Symmetric with the zh line below. The en gate is unconditional (e5
         # can't self-gate), so this always prints; a negative margin only warns
@@ -363,8 +414,8 @@ def build_index(site_root: Path | None = None) -> dict:
             "gate_margin": gate["margin"],
             "vectors": gate_vecs.tolist(),
         }
-        settings.resolve_path(settings.gate_en_minilm_path).write_text(
-            json.dumps(gate_en, ensure_ascii=False), encoding="utf-8"
+        writes[settings.resolve_path(settings.gate_en_minilm_path)] = json.dumps(
+            gate_en, ensure_ascii=False
         )
 
         zh_result = _build_zh_gate(preset, ndigits)
@@ -375,7 +426,7 @@ def build_index(site_root: Path | None = None) -> dict:
             # not depend on the widget behaving correctly. See
             # _build_zh_gate's own docstring for why there is deliberately no
             # "chunks_zh_minilm.json" retrieval counterpart to pair it with.
-            gate_zh_path.write_text(json.dumps(zh_result.gate, ensure_ascii=False), encoding="utf-8")
+            writes[gate_zh_path] = json.dumps(zh_result.gate, ensure_ascii=False)
         elif zh_result.calibrated:
             # Fix round 1 review, Important 1: the OLD gate_vectors.json was
             # rewritten WHOLE on every build (one combined file, "en" and
@@ -389,15 +440,17 @@ def build_index(site_root: Path | None = None) -> dict:
             # printed above. runtime.py would load it, run_eval.py would
             # score against it, and build_package.py would bundle it into
             # the deployed zip -- shipping a gate this exact build run just
-            # decided should not exist. missing_ok=True: a machine that
-            # never had one (the common case -- gitignored, not on a fresh
-            # clone) must not raise here.
+            # decided should not exist. The unlink is queued with the writes
+            # and performed by _flush_build_outputs (missing_ok=True there: a
+            # machine that never had one -- the common case, gitignored and
+            # not on a fresh clone -- must not raise), so a later failure in
+            # this build cannot delete it and then abort.
             #
             # Guarded on zh_result.calibrated (Task 34, Part B — the previous
             # round's unconditional `else: unlink` over-fired): compute_gate()
             # genuinely ran THIS build and measured a margin that did not
             # clear, so this build has real evidence the file is stale.
-            gate_zh_path.unlink(missing_ok=True)
+            deletes.append(gate_zh_path)
         else:
             # zh_result.calibrated is False: calibration never ran this
             # build at all (bge_zh model not on this machine, chat/knowledge/
@@ -459,8 +512,8 @@ def build_index(site_root: Path | None = None) -> dict:
                 for c, vec in zip(en_chunks, en_minilm_vectors)
             ],
         }
-        settings.resolve_path(settings.chunks_en_minilm_path).write_text(
-            json.dumps(chunks_en_minilm, ensure_ascii=False), encoding="utf-8"
+        writes[settings.resolve_path(settings.chunks_en_minilm_path)] = json.dumps(
+            chunks_en_minilm, ensure_ascii=False
         )
 
         index_gate = {
@@ -502,8 +555,7 @@ def build_index(site_root: Path | None = None) -> dict:
     # Settings.resolve_chunks_path(). In production this is chunks_e5.json; a
     # light `--model minilm` build writes chunks_minilm.json.
     chunks_path = settings.resolve_chunks_path()
-    chunks_path.parent.mkdir(parents=True, exist_ok=True)
-    chunks_path.write_text(json.dumps(chunks_payload, ensure_ascii=False), encoding="utf-8")
+    writes[chunks_path] = json.dumps(chunks_payload, ensure_ascii=False)
 
     # Small metadata sidecar (Task 29 Part 1, extended Part 2): the same
     # values already computed above for chunks_payload, minus the (multi-MB)
@@ -527,14 +579,17 @@ def build_index(site_root: Path | None = None) -> dict:
         "dim": chunks_payload["dim"],
         "chunk_count": len(chunks),
     }
-    meta_path = settings.resolve_path(settings.meta_path)
-    meta_path.parent.mkdir(parents=True, exist_ok=True)
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    roles_path = settings.resolve_path(settings.roles_path)
-    roles_path.write_text(
-        json.dumps(roles_payload(), ensure_ascii=False, indent=2), encoding="utf-8"
+    writes[settings.resolve_path(settings.meta_path)] = json.dumps(
+        meta, ensure_ascii=False, indent=2
     )
+
+    writes[settings.resolve_path(settings.roles_path)] = json.dumps(
+        roles_payload(), ensure_ascii=False, indent=2
+    )
+
+    # Everything above is pure computation. This is the only line in the build
+    # that mutates data/.
+    _flush_build_outputs(writes, deletes)
 
     pages = {c["url"] for c in chunks}
     return {

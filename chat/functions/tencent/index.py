@@ -106,9 +106,13 @@ _gates: dict = {"en": None, "zh": None}
 # chunks.json, bundled from chat/data/chunks_{preset}.json next to
 # gate_en_minilm.json/gate_zh_bge.json (see build_package.py). /chat
 # retrieves from this directly instead of trusting client-sent contexts --
-# see the module docstring. matrix stays None (not an empty array) until a
-# real index loads, so callers can tell "not packaged / failed to load"
-# apart from "packaged but genuinely empty".
+# see the module docstring. matrix is None for EVERY state in which retrieval
+# cannot work (not packaged, failed to load, preset mismatch, zero chunks), so
+# the single check `_index["matrix"] is None` is a complete availability test
+# for /chat's guard and GET /'s health flag. WHICH failure it was lives in
+# _index["error"], which the health payload also reports -- an earlier version
+# distinguished "packaged but genuinely empty" by loading it as an empty
+# matrix, which is not None and therefore reported itself as working.
 _index: dict = {"matrix": None, "chunks": None, "error": None}
 
 # Mirrors chat-widget.js's TOP_K/MIN_SCORE and portfolio_rag.runtime's same
@@ -167,8 +171,20 @@ def _load_embedder() -> None:
         gate_file = Path(__file__).with_name(files[lang])
         if not gate_file.exists():
             continue
-        spec = json.loads(gate_file.read_text(encoding="utf-8"))
         try:
+            # The JSON read belongs INSIDE this try. It used to sit above it,
+            # so a truncated or malformed gate file raised JSONDecodeError out
+            # of _load_embedder() -- which main() calls BEFORE binding :9000 --
+            # and killed the whole process: /chat, /embed, /log and health all
+            # down, for a corrupt file whose only honest blast radius is "no
+            # gate for this language". A missing KEY in the same file was
+            # already caught cleanly here (gate_load_failed, service stays up),
+            # and _load_index() below has always handled JSONDecodeError
+            # correctly -- this was the one path that did not degrade.
+            # Degrading here means: en -> gate_decision() returns None (no
+            # gate); zh -> cjk_bypass, the same fallback a missing zh file
+            # already gets.
+            spec = json.loads(gate_file.read_text(encoding="utf-8"))
             tok, session = _load_model(dirs[lang])
             _gates[lang] = {
                 "tokenizer": tok,
@@ -254,12 +270,28 @@ def _load_index() -> None:
             log({"type": "index_load_failed", "error": _index["error"]})
             return
         chunks = payload.get("chunks") or []
-        matrix = (
-            np.array([c["vector"] for c in chunks], dtype=np.float32)
-            if chunks
-            else np.empty((0, 0), dtype=np.float32)
-        )
-        _index["matrix"] = matrix
+        if not chunks:
+            # "packaged but genuinely empty" has no legitimate production
+            # meaning, and it used to load as np.empty((0, 0)) -- which is not
+            # None, so it passed /chat's `_index["matrix"] is None` guard and
+            # GET /'s health flag while rank_chunks returned [] for every
+            # question. Result: HTTP 200 + the canned refusal forever, the
+            # widget never falling to degraded mode (200 is success), and
+            # health cheerfully reporting "retrieval": true. Nothing anywhere
+            # said "broken".
+            #
+            # Reachable, not hypothetical: build_package.py's
+            # chunks_preset_status() validates only model_preset, so
+            # chat/data/meta.json (which sits beside chunks_e5.json and also
+            # carries "model_preset": "e5") bundled as chunks.json used to
+            # sail through the guard that exists specifically to catch
+            # mis-bundling. That guard now also requires a non-empty chunks
+            # list; this is the load-side half of the same fix.
+            _index["error"] = "chunks.json has no chunks"
+            log({"type": "index_load_failed", "error": _index["error"],
+                 "model_preset": payload.get("model_preset")})
+            return
+        _index["matrix"] = np.array([c["vector"] for c in chunks], dtype=np.float32)
         _index["chunks"] = chunks
         log({"type": "index_loaded", "chunks": len(chunks),
              "model_preset": payload.get("model_preset")})
@@ -575,11 +607,19 @@ class Handler(BaseHTTPRequestHandler):
         if not allowed_origin(self._origin()):
             return self._json(403, {"error": "origin not allowed"})
         if self.path.split("?")[0] == "/":
+            # chunk_count + retrieval_error make the two ways retrieval can be
+            # unavailable distinguishable from outside: "not packaged" (error
+            # names the missing file), "packaged but empty" (error says so),
+            # "preset mismatch" (error names both presets). Before this, an
+            # unusable index could report "retrieval": true, so the health
+            # endpoint could not be used to check a deployment at all.
             return self._json(200, {
                 "service": "portfolio-chat",
                 "ok": True,
                 "embed": _embed["session"] is not None,
                 "retrieval": _index["matrix"] is not None,
+                "chunk_count": len(_index["chunks"] or []),
+                "retrieval_error": _index["error"],
                 "build": BUILD_INFO,
             })
         self._json(404, {"error": "not found"})

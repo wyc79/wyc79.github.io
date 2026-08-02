@@ -80,16 +80,31 @@ def chunks_preset_status(chunks_file: Path, preset_name: str) -> tuple[bool, str
     """
     if not chunks_file.exists():
         return False, None
-    chunks_preset = json.loads(chunks_file.read_text(encoding="utf-8")).get("model_preset")
-    if chunks_preset == preset_name:
-        return True, None
-    # chunks_file.name, not a path computed relative to CHAT: the caller may
-    # pass an arbitrary path (tests do, from tmp_path), which .relative_to()
-    # would raise on.
-    return False, (
-        f"{chunks_file.name} was built with model_preset={chunks_preset!r}, "
-        f"not {preset_name!r}"
-    )
+    payload = json.loads(chunks_file.read_text(encoding="utf-8"))
+    chunks_preset = payload.get("model_preset")
+    if chunks_preset != preset_name:
+        # chunks_file.name, not a path computed relative to CHAT: the caller
+        # may pass an arbitrary path (tests do, from tmp_path), which
+        # .relative_to() would raise on.
+        return False, (
+            f"{chunks_file.name} was built with model_preset={chunks_preset!r}, "
+            f"not {preset_name!r}"
+        )
+    # model_preset alone is NOT enough to identify a retrieval corpus. Every
+    # build_index.py output carries it, including chat/data/meta.json -- which
+    # sits right beside chunks_e5.json, also says "model_preset": "e5", and has
+    # no `chunks` key at all. Bundling meta.json under the name chunks.json
+    # therefore used to clear this guard, and index.py then loaded it as a
+    # zero-row matrix that reported itself as working (see _load_index there).
+    # Require what actually makes the file a retrieval corpus.
+    chunks = payload.get("chunks")
+    if not isinstance(chunks, list) or not chunks:
+        return False, (
+            f"{chunks_file.name} declares model_preset={chunks_preset!r} but carries no "
+            f"chunks -- it is not a retrieval corpus (chat/data/meta.json also carries a "
+            f"model_preset; bundling it as chunks.json would 503 /chat at best)"
+        )
+    return True, None
 
 
 def git_short_sha() -> str:
