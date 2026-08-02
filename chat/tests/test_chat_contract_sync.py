@@ -22,19 +22,14 @@ functions/tencent/index.py's validate_chat_body and sources_from_hits
 
 import importlib.util
 import json
-import shutil
-import subprocess
 
 import pytest
 
 from portfolio_rag.config import settings
+from tests._node_harness import extract_js_function, node_available, run_node_json
 
 WIDGET_PATH = settings.site_root / "scripts" / "chat-widget.js"
 BACKEND_PATH = settings.chat_root / "functions" / "tencent" / "index.py"
-
-
-def _node_available() -> bool:
-    return shutil.which("node") is not None
 
 
 def _load_backend():
@@ -44,29 +39,11 @@ def _load_backend():
     return mod
 
 
-def _extract_between_braces(src: str, fn_marker: str) -> str:
-    """Verbatim function-body extraction (same technique
-    test_retrieval_sync.py uses for scoreChunks): find fn_marker, then match
-    braces from the first '{' after it to the corresponding close."""
-    fn_start = src.index(fn_marker)
-    brace_start = src.index("{", fn_start)
-    depth, i = 0, brace_start
-    while True:
-        if src[i] == "{":
-            depth += 1
-        elif src[i] == "}":
-            depth -= 1
-            if depth == 0:
-                break
-        i += 1
-    return src[fn_start : i + 1]
-
-
 def _extract_ask_worker_request_body_literal(src: str) -> str:
     """The exact object literal askWorker passes to JSON.stringify(), pulled
     from WITHIN askWorker's own body specifically (the file has other,
     unrelated `body: JSON.stringify(...)` calls for /embed and /log)."""
-    fn_src = _extract_between_braces(src, "async function askWorker(")
+    fn_src = extract_js_function(src, "async function askWorker(")
     marker = "body: JSON.stringify("
     start = fn_src.index(marker) + len(marker)
     depth, i = 1, start  # already past the opening '('
@@ -95,31 +72,23 @@ def _widget_chat_request_body(question: str) -> dict:
         f"const body = {body_literal};\n"
         "process.stdout.write(JSON.stringify(body));\n"
     )
-    result = subprocess.run(
-        ["node", "-e", script], capture_output=True, text=True, encoding="utf-8", timeout=30
-    )
-    assert result.returncode == 0, f"node failed: {result.stderr}"
-    return json.loads(result.stdout)
+    return run_node_json(script)
 
 
 def _widget_results_from_sources(sources: list) -> list:
     """Run the widget's own resultsFromSources (extracted verbatim) in node
     against `sources`, returning what it built."""
     src = WIDGET_PATH.read_text(encoding="utf-8")
-    fn_src = _extract_between_braces(src, "function resultsFromSources(")
+    fn_src = extract_js_function(src, "function resultsFromSources(")
     script = (
         fn_src + "\n"
         "const sources = " + json.dumps(sources) + ";\n"
         "process.stdout.write(JSON.stringify(resultsFromSources(sources)));\n"
     )
-    result = subprocess.run(
-        ["node", "-e", script], capture_output=True, text=True, encoding="utf-8", timeout=30
-    )
-    assert result.returncode == 0, f"node failed: {result.stderr}"
-    return json.loads(result.stdout)
+    return run_node_json(script)
 
 
-@pytest.mark.skipif(not _node_available(), reason="node not on PATH -- cannot execute the JS copy")
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_widget_chat_request_body_passes_validate_chat_body() -> None:
     body = _widget_chat_request_body("What engine programming has he done?")
 
@@ -137,7 +106,7 @@ def test_widget_chat_request_body_passes_validate_chat_body() -> None:
     )
 
 
-@pytest.mark.skipif(not _node_available(), reason="node not on PATH -- cannot execute the JS copy")
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_widget_chat_request_body_with_no_history_still_validates() -> None:
     """A brand-new session sends history: [] (state.history starts empty) --
     must not be mistaken for a malformed/missing field."""
@@ -147,7 +116,7 @@ def test_widget_chat_request_body_with_no_history_still_validates() -> None:
     assert mod.validate_chat_body(body) is None
 
 
-@pytest.mark.skipif(not _node_available(), reason="node not on PATH -- cannot execute the JS copy")
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_sources_from_hits_fields_round_trip_through_resultsfromsources() -> None:
     """index.py's sources_from_hits() and chat-widget.js's
     resultsFromSources() are mirror-image functions across the wire (one

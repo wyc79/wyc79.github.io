@@ -76,6 +76,20 @@
   // homoglyph of the unified one and easy to mistype.)
   var CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
 
+  // Name-blind gate input: the remainder after stripping YC's name, or null
+  // when the name should be KEPT (no name mentioned at all, or what's left
+  // after stripping is just a bio-intent stub -- see BIO_STUB_RE above).
+  // Mirrors runtime.py's strip_name(). Extracted into a named function (was
+  // formerly inlined in send()) so chat/tests/test_implementation_sync.py can
+  // execute it directly instead of a second, re-typed copy of this logic.
+  function stripName(question) {
+    if (!NAME_TEST_RE.test(question)) return null;
+    var remainder = question.replace(NAME_STRIP_RE, ' ')
+      .replace(/\s+/g, ' ').trim()
+      .replace(/^[\s:;,.!?—-]+|[\s:;,.!?—-]+$/g, '');
+    return BIO_STUB_RE.test(remainder) ? null : remainder;
+  }
+
   // Gate input. When the name was stripped (off-topic detection), gate on the
   // remainder. When it was KEPT (a bio question), normalize the name to the
   // gate's own language — so a Chinese question that uses "YC", or an English
@@ -869,13 +883,7 @@
     try {
       // Name-blind gate input: strip YC's name unless the remainder is a
       // bio-intent stub (a genuine question about him).
-      var stripped = null;
-      if (NAME_TEST_RE.test(question)) {
-        var remainder = question.replace(NAME_STRIP_RE, ' ')
-          .replace(/\s+/g, ' ').trim()
-          .replace(/^[\s:;,.!?—-]+|[\s:;,.!?—-]+$/g, '');
-        if (!BIO_STUB_RE.test(remainder)) stripped = remainder;
-      }
+      var stripped = stripName(question);
 
       var record = { event: 'turn', role: state.role, question: question };
       var gateText = gateForm(question, stripped);

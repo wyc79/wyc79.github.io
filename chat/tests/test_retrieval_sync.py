@@ -58,14 +58,13 @@ separate file):
 
 import importlib.util
 import json
-import shutil
-import subprocess
 
 import numpy as np
 import pytest
 
 from portfolio_rag.config import settings
 from portfolio_rag.runtime import MIN_SCORE, TOP_K, rank_hits
+from tests._node_harness import extract_js_function, extract_js_var, node_available, run_node_json
 
 WIDGET_PATH = settings.site_root / "scripts" / "chat-widget.js"
 BACKEND_PATH = settings.chat_root / "functions" / "tencent" / "index.py"
@@ -209,36 +208,17 @@ def test_index_py_agrees_with_runtime_py() -> None:
     assert backend_results == runtime_results
 
 
-def _node_available() -> bool:
-    return shutil.which("node") is not None
-
-
 def _extract_widget_score_chunks_source() -> str:
     """Pull scoreChunks, and the TOP_K/MIN_SCORE constants it closes over,
     verbatim out of the widget source -- not retyped, so this cannot drift
     from the file it mirrors the way a reimplementation could."""
     src = WIDGET_PATH.read_text(encoding="utf-8")
-
-    def _const(name: str) -> str:
-        marker = f"var {name} = "
-        start = src.index(marker) + len(marker)
-        end = src.index(";", start)
-        return src[start:end]
-
-    fn_marker = "function scoreChunks("
-    fn_start = src.index(fn_marker)
-    brace_start = src.index("{", fn_start)
-    depth, i = 0, brace_start
-    while True:
-        if src[i] == "{":
-            depth += 1
-        elif src[i] == "}":
-            depth -= 1
-            if depth == 0:
-                break
-        i += 1
-    fn_src = src[fn_start : i + 1]
-    return f"var TOP_K = {_const('TOP_K')};\nvar MIN_SCORE = {_const('MIN_SCORE')};\n{fn_src}\n"
+    fn_src = extract_js_function(src, "function scoreChunks(")
+    return (
+        f"var TOP_K = {extract_js_var(src, 'TOP_K')};\n"
+        f"var MIN_SCORE = {extract_js_var(src, 'MIN_SCORE')};\n"
+        f"{fn_src}\n"
+    )
 
 
 def _widget_results() -> dict:
@@ -259,22 +239,18 @@ def _widget_results() -> dict:
         "}\n"
         "process.stdout.write(JSON.stringify(out));\n"
     )
-    result = subprocess.run(
-        ["node", "-e", script], capture_output=True, text=True, encoding="utf-8", timeout=30
-    )
-    assert result.returncode == 0, f"node failed: {result.stderr}"
-    raw = json.loads(result.stdout)
+    raw = run_node_json(script)
     return {name: [tuple(pair) for pair in rows] for name, rows in raw.items()}
 
 
-@pytest.mark.skipif(not _node_available(), reason="node not on PATH -- cannot execute the JS copy")
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_chat_widget_js_agrees_with_runtime_py() -> None:
     widget_results = _widget_results()
     runtime_results = _runtime_py_results()
     assert widget_results == runtime_results
 
 
-@pytest.mark.skipif(not _node_available(), reason="node not on PATH -- cannot execute the JS copy")
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_chat_widget_js_agrees_with_index_py() -> None:
     """All three, not just JS-vs-Python-mirror: the SCF backend and the
     widget must agree DIRECTLY too, since a visitor's real request is judged
