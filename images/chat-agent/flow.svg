@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 960" width="1120" height="960" role="img" aria-labelledby="ttl desc">
   <title id="ttl">Portfolio Chat Agent: information flow</title>
-  <desc id="desc">At build time three sources (every site page in English and Chinese, about_en.md, and about_zh.md) are embedded: the e5 encoder embeds all of them into the retrieval index (index.json); the MiniLM English gate embeds the English page text and about_en; the bge-small-zh Chinese gate embeds about_zh only. All are served as static JSON. Per turn: the browser sends the query to the serverless /embed endpoint which returns an e5 query vector and a relevance gate verdict; off-topic queries stop after one call. On a pass, the browser runs cosine similarity over index.json to get top-k passages, injects them into the prompt, and calls /chat which invokes the cloud LLM API. If the function is unavailable, a consent-gated in-browser MiniLM model handles retrieval locally.</desc>
+  <desc id="desc">At build time three sources (every site page in English and Chinese, about_en.md, and about_zh.md) are embedded: the e5 encoder embeds all of them into the retrieval corpus (chunks_e5.json); the MiniLM English gate embeds the English page text and about_en; the bge-small-zh Chinese gate embeds about_zh only. Only gate_en_minilm.json, chunks_en_minilm.json (an offline retrieval corpus for degraded mode), and a small meta.json are served to the browser; chunks_e5.json and the Chinese gate (gate_zh_bge.json) are bundled into the serverless function only. Per turn: the browser sends the name-normalized query to the serverless /embed endpoint, which runs the relevance gate (MiniLM for English, bge-small-zh for Chinese) and returns a pass/fail verdict; off-topic queries stop here, before any retrieval or LLM call. On a pass, the browser calls /chat with just the question; the function embeds it with e5, runs cosine similarity over its own bundled chunks_e5.json to get the top-k passages, injects them into the role prompt, and calls the LLM, returning the answer plus the source chunks that become the source cards. If the function is unavailable, a consent-gated in-browser MiniLM model handles retrieval locally over chunks_en_minilm.json, English only.</desc>
   <style>
     text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
     .bg{fill:#ffffff;}
@@ -82,18 +82,19 @@
   <text class="t-node" x="699" y="132">gate vectors · EN</text>
   <text class="t-sub"  x="699" y="149">MiniLM</text>
   <rect class="node" x="592" y="172" width="214" height="48" rx="10"/>
-  <text class="t-node" x="699" y="192">index.json</text>
-  <text class="t-sub"  x="699" y="209">retrieval index · e5</text>
+  <text class="t-node" x="699" y="192">chunks_e5.json</text>
+  <text class="t-sub"  x="699" y="209">retrieval corpus · e5</text>
   <rect class="node" x="592" y="232" width="214" height="48" rx="10"/>
   <text class="t-node" x="699" y="252">gate vectors · ZH</text>
   <text class="t-sub"  x="699" y="269">bge-zh</text>
 
-  <rect class="node" x="842" y="120" width="222" height="134" rx="12"/>
-  <text class="t-nodeL" x="862" y="152">Static assets</text>
-  <text class="t-subL"  x="862" y="176">Bundled as static JSON,</text>
-  <text class="t-subL"  x="862" y="194">served with the site and</text>
-  <text class="t-subL"  x="862" y="212">downloaded by the</text>
-  <text class="t-subL"  x="862" y="230">browser.</text>
+  <rect class="node" x="842" y="120" width="222" height="148" rx="12"/>
+  <text class="t-nodeL" x="862" y="148">Static assets</text>
+  <text class="t-subL"  x="862" y="170">Served to browser:</text>
+  <text class="t-subL"  x="862" y="188">meta.json, MiniLM gate,</text>
+  <text class="t-subL"  x="862" y="206">offline corpus</text>
+  <text class="t-subL"  x="862" y="224">Bundled in function:</text>
+  <text class="t-subL"  x="862" y="242">chunks_e5.json + both gates</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M250,130 C292,130 292,132 328,132"/>
   <path class="flow" marker-end="url(#arrow)" d="M250,140 C296,140 296,190 328,190"/>
@@ -106,12 +107,12 @@
   <path class="flow" marker-end="url(#arrow)" d="M512,196 H590"/>
   <path class="flow" marker-end="url(#arrow)" d="M512,256 H590"/>
 
-  <path class="flow" marker-end="url(#arrow)" d="M806,136 C824,136 824,164 840,164"/>
-  <path class="flow" marker-end="url(#arrow)" d="M806,196 H840"/>
-  <path class="flow" marker-end="url(#arrow)" d="M806,256 C824,256 824,212 840,212"/>
+  <path class="flow" marker-end="url(#arrow)" d="M806,136 C824,136 824,150 840,150"/>
+  <path class="flow" marker-end="url(#arrow)" d="M806,196 C824,196 824,194 840,194"/>
+  <path class="flow" marker-end="url(#arrow)" d="M806,256 C824,256 824,238 840,238"/>
 
-  <path class="flow-dash" marker-end="url(#arrow)" d="M953,254 C953,306 640,300 474,332"/>
-  <text class="t-edge" x="690" y="300">downloaded to browser</text>
+  <path class="flow-dash" marker-end="url(#arrow)" d="M950,268 C950,306 640,300 474,332"/>
+  <text class="t-edge" x="690" y="300">served to browser</text>
 
   <!-- ===================== RUNTIME ===================== -->
   <text class="t-band" x="34" y="320">RUNTIME · per turn</text>
@@ -125,57 +126,54 @@
   <text class="t-node" x="273" y="405">User query</text>
 
   <rect class="node-client" x="52" y="472" width="442" height="44" rx="10"/>
-  <text class="t-node" x="273" y="499">e5 query vector + gate verdict returned</text>
+  <text class="t-node" x="273" y="499">Gate verdict returned</text>
 
-  <rect class="node-client" x="52" y="550" width="442" height="66" rx="10"/>
-  <text class="t-node" x="273" y="577">Cosine similarity over index.json</text>
-  <text class="t-sub"  x="273" y="597">→ top-k passages · retrieval runs in the browser</text>
-
-  <rect class="node-client" x="52" y="644" width="442" height="44" rx="10"/>
-  <text class="t-node" x="273" y="671">Inject top-k passage text into the prompt</text>
+  <text class="t-sub" x="273" y="608">browser waits for the /chat response</text>
 
   <rect class="node-client" x="52" y="728" width="442" height="48" rx="10"/>
-  <text class="t-node" x="273" y="757">Render grounded answer</text>
+  <text class="t-node" x="273" y="757">Render answer + source cards</text>
 
-  <rect class="node-server" x="656" y="378" width="412" height="112" rx="10"/>
-  <text class="t-nodeL" x="676" y="406">/embed</text>
-  <text class="t-subL"  x="676" y="430">1 · run relevance gate (EN / ZH)</text>
-  <text class="t-subL"  x="676" y="448">&#160;&#160;&#160;&#160;on name-normalized text (injection-safe)</text>
-  <text class="t-subL"  x="676" y="470">2 · if it passes, embed original text (e5)</text>
+  <rect class="node-server" x="656" y="378" width="412" height="76" rx="10"/>
+  <text class="t-nodeL" x="676" y="402">/embed</text>
+  <text class="t-subL"  x="676" y="422">run relevance gate — MiniLM (EN) / bge-small-zh (ZH)</text>
+  <text class="t-subL"  x="676" y="440">on the name-normalized query</text>
 
-  <rect class="node-stop" x="656" y="510" width="256" height="42" rx="10"/>
-  <text class="t-nodeL txt-stop" x="676" y="536">off-topic → stops after 1 call</text>
+  <rect class="node-stop" x="656" y="476" width="256" height="42" rx="10"/>
+  <text class="t-nodeL txt-stop" x="676" y="502">off-topic → stops after 1 call</text>
 
-  <rect class="node-server" x="656" y="644" width="412" height="60" rx="10"/>
-  <text class="t-nodeL" x="676" y="670">/chat · call LLM</text>
-  <text class="t-subL"  x="676" y="690">with top-k contexts injected</text>
+  <rect class="node-server" x="656" y="548" width="412" height="66" rx="10"/>
+  <text class="t-nodeL" x="676" y="576">Embed query (e5) + cosine similarity</text>
+  <text class="t-subL"  x="676" y="596">chunks_e5.json → top-k above score floor</text>
 
-  <rect class="node-ext" x="760" y="728" width="308" height="48" rx="10"/>
-  <text class="t-node txt-ext" x="914" y="757">LLM · cloud API</text>
+  <rect class="node-server" x="656" y="636" width="412" height="58" rx="10"/>
+  <text class="t-nodeL" x="676" y="660">/chat · call LLM</text>
+  <text class="t-subL"  x="676" y="680">top-k passages injected into role prompt</text>
+
+  <rect class="node-ext" x="760" y="716" width="308" height="48" rx="10"/>
+  <text class="t-node txt-ext" x="914" y="745">LLM · cloud API</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M494,400 H654"/>
   <circle class="badge" cx="574" cy="386" r="11"/><text class="t-num" x="574" y="390">1</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M654,468 C560,468 588,494 496,494"/>
-  <circle class="badge" cx="574" cy="464" r="11"/><text class="t-num" x="574" y="468">2</text>
-  <text class="t-edge" x="600" y="458">gate pass</text>
+  <path class="flow" marker-end="url(#arrow)" d="M654,430 C560,430 588,494 496,494"/>
+  <circle class="badge" cx="574" cy="450" r="11"/><text class="t-num" x="574" y="454">2</text>
+  <text class="t-edge" x="600" y="444">gate pass</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M760,490 V508"/>
-  <text class="t-edge" x="768" y="504">fail</text>
+  <path class="flow" marker-end="url(#arrow)" d="M760,454 V474"/>
+  <text class="t-edge" x="768" y="470">fail</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M273,516 V548"/>
-  <circle class="badge" cx="243" cy="532" r="11"/><text class="t-num" x="243" y="536">3</text>
-  <path class="flow" marker-end="url(#arrow)" d="M273,616 V644"/>
+  <path class="flow" marker-end="url(#arrow)" d="M494,494 C580,494 580,575 654,575"/>
+  <circle class="badge" cx="574" cy="534" r="11"/><text class="t-num" x="574" y="538">3</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M494,666 H654"/>
-  <circle class="badge" cx="574" cy="652" r="11"/><text class="t-num" x="574" y="656">4</text>
+  <path class="flow" marker-end="url(#arrow)" d="M862,614 V634"/>
+  <circle class="badge" cx="892" cy="624" r="11"/><text class="t-num" x="892" y="628">4</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M862,704 V726"/>
-  <circle class="badge" cx="892" cy="712" r="11"/><text class="t-num" x="892" y="716">5</text>
+  <path class="flow" marker-end="url(#arrow)" d="M862,694 V714"/>
+  <circle class="badge" cx="892" cy="704" r="11"/><text class="t-num" x="892" y="708">5</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M760,752 C600,752 640,752 496,752"/>
-  <circle class="badge" cx="574" cy="738" r="11"/><text class="t-num" x="574" y="742">6</text>
-  <text class="t-edge" x="600" y="746">answer</text>
+  <path class="flow" marker-end="url(#arrow)" d="M760,740 C600,740 640,752 496,752"/>
+  <circle class="badge" cx="574" cy="747" r="11"/><text class="t-num" x="574" y="751">6</text>
+  <text class="t-edge" x="600" y="744">answer</text>
 
   <!-- ===================== OFFLINE FALLBACK ===================== -->
   <text class="t-band" x="34" y="838">OFFLINE FALLBACK · serverless function unavailable</text>
@@ -194,7 +192,7 @@
 
   <rect class="node" x="700" y="872" width="196" height="48" rx="10"/>
   <text class="t-node" x="798" y="894">Local retrieval</text>
-  <text class="t-sub"  x="798" y="911">over fallback_vectors.json</text>
+  <text class="t-sub"  x="798" y="911">over chunks_en_minilm.json</text>
 
   <rect class="node" x="924" y="872" width="146" height="48" rx="10"/>
   <text class="t-node" x="997" y="894">Local answer /</text>
