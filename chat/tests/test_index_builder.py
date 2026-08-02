@@ -412,3 +412,79 @@ def test_writes_meta_json_with_the_widgets_five_fields_plus_build_stamp(
     assert isinstance(meta["gate_margin"], float)
     # meta.json carries no chunks -- that's the whole point of the sidecar.
     assert "chunks" not in meta
+
+
+# --- Fix round 1 review, Important 1: a stale zh gate must not survive -----
+#
+# The OLD gate_vectors.json was rewritten WHOLE every build (one combined
+# file, "en" and "zh" keys both written together every time), so a zh gate
+# that stopped separating simply vanished from that file on the next
+# rebuild. Splitting it into its own file (gate_zh_bge.json) silently
+# dropped that "clear on rebuild" property: build_index() used to only
+# WRITE the file when _build_zh_gate returned something, never touching it
+# on the else branch -- a stale file from an earlier build (when
+# calibration DID separate) would survive untouched forever, outliving the
+# "NOT enabled" log line printed the moment calibration stopped separating.
+# runtime.py would then load it, run_eval.py would score against it, and
+# build_package.py would bundle it into the deployed zip -- shipping a
+# gate the very build that produced it decided should not exist.
+
+
+def test_build_removes_a_stale_zh_gate_file_when_calibration_does_not_separate(
+    tiny_site: Path, monkeypatch
+) -> None:
+    """Reproduces the reviewer's exact demonstration: plant a stale
+    gate_zh_bge.json (as if written by an earlier build whose calibration
+    separated), then run a build where _build_zh_gate returns None (this
+    build's calibration does NOT separate) -- the stale file must be gone
+    afterward, not silently left in place for a later consumer to trust."""
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    stale = {
+        "model": "OLD", "model_preset": "OLD", "query_prefix": "",
+        "pooling": "mean", "lang": "zh", "corpus": "knowledge/about_zh.md",
+        "gate_stat": "top", "gate_threshold": 0.4919, "gate_margin": 0.02,
+        "vectors": [[0.0]],
+    }
+    stale_path = tiny_site / "out" / "gate_zh_bge.json"
+    stale_path.write_text(json.dumps(stale), encoding="utf-8")
+    monkeypatch.setattr(index_builder, "_build_zh_gate", lambda *a, **k: None)
+
+    index_builder.build_index(site_root=tiny_site)
+
+    assert not stale_path.exists(), (
+        "a stale zh gate file must not survive a build whose own zh "
+        "calibration does not separate (index_builder.py's zh-gate "
+        "else-branch must unlink it, not leave it untouched)"
+    )
+
+
+def test_build_writes_a_fresh_zh_gate_over_a_stale_one_when_calibration_separates(
+    tiny_site: Path, monkeypatch
+) -> None:
+    """Complement to the removal case above: when THIS build's calibration
+    DOES separate, a stale file with different (old) content must be
+    overwritten with the fresh gate, not merely left alone because a file
+    already existed at that path."""
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    stale = {
+        "model": "OLD", "model_preset": "OLD", "query_prefix": "",
+        "pooling": "mean", "lang": "zh", "corpus": "knowledge/about_zh.md",
+        "gate_stat": "top", "gate_threshold": 0.4919, "gate_margin": 0.02,
+        "vectors": [[0.0]],
+    }
+    stale_path = tiny_site / "out" / "gate_zh_bge.json"
+    stale_path.write_text(json.dumps(stale), encoding="utf-8")
+    fresh_zh_gate = {
+        "model": "fresh-model", "model_preset": "bge_zh", "query_prefix": "",
+        "pooling": "cls", "lang": "zh", "corpus": "knowledge/about_zh.md",
+        "gate_stat": "top", "gate_threshold": 0.51, "gate_margin": 0.05,
+        "vectors": [[0.0, 1.0]],
+    }
+    monkeypatch.setattr(index_builder, "_build_zh_gate", lambda *a, **k: fresh_zh_gate)
+
+    index_builder.build_index(site_root=tiny_site)
+
+    written = json.loads(stale_path.read_text(encoding="utf-8"))
+    assert written == fresh_zh_gate, "a fresh separating zh gate must overwrite a stale file, not skip it"

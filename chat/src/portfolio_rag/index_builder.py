@@ -316,15 +316,31 @@ def build_index(site_root: Path | None = None) -> dict:
         )
 
         zh_gate = _build_zh_gate(preset, ndigits)
+        gate_zh_path = settings.resolve_path(settings.gate_zh_bge_path)
         if zh_gate:
             # Gitignored (settings.gate_zh_bge_path / chat/.gitignore) — the
             # ONLY enforcement that this never reaches a browser which does
             # not depend on the widget behaving correctly. See
             # _build_zh_gate's own docstring for why there is deliberately no
             # "chunks_zh_minilm.json" retrieval counterpart to pair it with.
-            settings.resolve_path(settings.gate_zh_bge_path).write_text(
-                json.dumps(zh_gate, ensure_ascii=False), encoding="utf-8"
-            )
+            gate_zh_path.write_text(json.dumps(zh_gate, ensure_ascii=False), encoding="utf-8")
+        else:
+            # Fix round 1 review, Important 1: the OLD gate_vectors.json was
+            # rewritten WHOLE on every build (one combined file, "en" and
+            # "zh" keys both written every time), so a zh gate that stopped
+            # separating simply vanished from that file the next rebuild.
+            # Splitting it into its own file made that implicit "clear on
+            # rebuild" behavior stop happening for free -- a STALE
+            # gate_zh_bge.json from an earlier build (when calibration DID
+            # separate) would otherwise survive untouched forever, silently
+            # outliving the "NOT enabled" log line _build_zh_gate just
+            # printed above. runtime.py would load it, run_eval.py would
+            # score against it, and build_package.py would bundle it into
+            # the deployed zip -- shipping a gate this exact build run just
+            # decided should not exist. missing_ok=True: a machine that
+            # never had one (the common case -- gitignored, not on a fresh
+            # clone) must not raise here.
+            gate_zh_path.unlink(missing_ok=True)
 
         # Degraded-mode RETRIEVAL corpus (Task 29 Part 2 — the actual fix for
         # chat-widget.js's degraded-mode source links, not just a rename).

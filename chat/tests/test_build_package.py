@@ -64,17 +64,30 @@ def test_missing_chunks_file_is_not_ok_with_no_reason(tmp_path: Path) -> None:
     assert reason is None, "a missing file has nothing to explain -- caller prints its own message"
 
 
-def test_chunks_source_path_matches_settings_resolve_chunks_path() -> None:
+def test_chunks_source_path_matches_settings_resolve_chunks_path(monkeypatch) -> None:
     """chunks_source_path() reproduces Settings.resolve_chunks_path()'s
     default derivation without importing portfolio_rag (this script must
-    stay stdlib-only at module scope) -- pin the two together directly so a
-    future change to either derivation is caught immediately instead of
-    silently drifting apart."""
+    stay stdlib-only at module scope) -- pin the two together by calling
+    the REAL settings.resolve_chunks_path() (with model_preset monkeypatched
+    to each preset in turn), not a re-hardcoded format string that could
+    silently stop matching the real derivation.
+
+    Fix round 1 review, Important 2: the original version of this test
+    compared against `settings.resolve_path(f"data/chunks_{preset_name}.json")`
+    -- a SECOND, independently-typed copy of the same format string, not a
+    call into resolve_chunks_path() itself. That made the test inert: the
+    reviewer proved it by monkeypatching Settings.resolve_chunks_path to a
+    different derivation (`data/{preset}/chunks.json`) and the old test kept
+    passing, because it never called the method it claimed to pin. Calling
+    the real method here is what makes that drift (build_index writes one
+    location, chunks_source_path reads another, chunks_preset_status
+    returns (False, None), the zip ships with no chunks.json, /chat 503s)
+    an immediate test failure instead of a silent divergence.
+    """
     mod = _load_build_package()
     for preset_name in ("e5", "minilm"):
-        assert mod.chunks_source_path(preset_name) == settings.resolve_path(
-            f"data/chunks_{preset_name}.json"
-        )
+        monkeypatch.setattr(settings, "model_preset", preset_name)
+        assert mod.chunks_source_path(preset_name) == settings.resolve_chunks_path()
 
 
 def test_the_real_committed_chunks_file_matches_its_own_declared_preset() -> None:
