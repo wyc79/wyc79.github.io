@@ -23,6 +23,37 @@ the file it mirrors. The index.py copy is loaded via importlib from its
 actual file on disk; its module-level imports are stdlib-only (numpy is
 deferred into function bodies), so a plain module load is safe and cheap
 here -- see functions/tencent/index.py's own module docstring.
+
+Fix round 1 review corrections (both folded into this fixture, not a
+separate file):
+
+- "floor before top-k" (the mutation the original task brief suggested for
+  proving this test bites) is a MATHEMATICAL NO-OP, not a real bug: on a
+  single descending sort, the set of candidates clearing a same-key
+  threshold is always a PREFIX of the sorted list, so `slice(K).filter(f)`
+  and `filter(f).slice(K)` produce identical output for any tie-free,
+  same-key threshold filter -- there is no valid construction where they
+  diverge. (Proof sketch: if rank K fails the floor, every rank > K has an
+  equal-or-lower score by the sort itself, so it also fails; nothing beyond
+  K can ever be "promoted" in by removing a failing candidate ahead of it.)
+  That was the task brief's error, not an implementation gap -- confirmed by
+  mutating exactly that step in both chat-widget.js and index.py: the test
+  stayed green in both directions, as it must.
+- The REAL bugs this fixture missed were two DIFFERENT ordering questions:
+  (a) tie-breaking -- np.argsort's default is not stable, so two candidates
+  with EXACTLY equal scores could rank differently than JS's
+  Array.prototype.sort (stable since ES2019, which chat-widget.js relies on
+  implicitly). Not hypothetical: chat/data/index.json holds several groups
+  of exact-duplicate chunk vectors (identical sections indexed under more
+  than one anchor/language), so ties are real fixture material, not a
+  contrived edge case. (b) floor-vs-rounding order -- both Python copies
+  compared MIN_SCORE against the 4-decimal-ROUNDED score, not the raw one,
+  so a raw score in the ~5e-5 band just under 0.18 (e.g. 0.179960) rounded
+  up to 0.1800 and incorrectly cleared the floor; chat-widget.js's
+  scoreChunks never rounds internally, so it was already correct and the
+  Python copies were the ones that had drifted. Both are now fixed in
+  runtime.py/index.py (stable sort, raw-score floor comparison) and both are
+  covered below by dedicated queries ("ties", "floor_epsilon").
 """
 
 import importlib.util
@@ -39,37 +70,79 @@ from portfolio_rag.runtime import MIN_SCORE, TOP_K, rank_hits
 WIDGET_PATH = settings.site_root / "scripts" / "chat-widget.js"
 BACKEND_PATH = settings.chat_root / "functions" / "tencent" / "index.py"
 
-# 6 chunks in 6-dimensional "one-hot" space, so chunk_i . query == query[i]
-# directly -- every score in the fixture can be chosen by hand without a real
-# embedder. The ranking functions under test only ever take a raw dot
-# product; unit-normalizing vectors is the embedder's job, not the ranker's,
-# so the fixture deliberately doesn't bother.
-CHUNK_IDS = ["c1", "c2", "c3", "c4", "c5", "c6"]
-MATRIX = np.eye(6, dtype=np.float32)
+# 9 chunks in a 7-dimensional "one-hot" space, so chunk_i . query == query[i]
+# directly for c1-c6 -- every score in the fixture can be chosen by hand
+# without a real embedder. The ranking functions under test only ever take a
+# raw dot product; unit-normalizing vectors is the embedder's job, not the
+# ranker's, so the fixture deliberately doesn't bother.
+#
+# c7, c8 and c9 are LITERAL duplicates of each other (all one-hot at dim 6)
+# -- a genuine tie under any query with a nonzero 7th component, mirroring
+# the real committed index's exact-duplicate chunk groups. c1-c6 (dims 0-5)
+# are unaffected by dim 6, so the pre-existing "floor"/"clean" queries below
+# (which set dim 6 to 0) rank exactly as before this fixture grew.
+#
+# A three-way tie, not two: np.argsort's default (introsort/quicksort) is
+# NOT guaranteed stable, but it can still happen to preserve order on a
+# SPECIFIC small array by chance (this fixture's earlier two-way-tie
+# revision did, and so did not catch the bug it was meant to catch -- a
+# false negative found only by re-testing after the fix, not trusted on
+# faith). This exact three-way-tie construction was verified directly (not
+# assumed) to make numpy's default kind disagree with kind="stable" on THIS
+# numpy build/version: default puts c8 in the 4th slot, stable puts c7.
+# Chosen deliberately, over random fuzzing, so the divergence is
+# reproducible and the fixture stays readable.
+CHUNK_IDS = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"]
+MATRIX = np.array(
+    [
+        [1, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, 0, 1],  # c7
+        [0, 0, 0, 0, 0, 0, 1],  # c8 -- exact duplicate of c7
+        [0, 0, 0, 0, 0, 0, 1],  # c9 -- exact duplicate of c7/c8
+    ],
+    dtype=np.float32,
+)
 CHUNK_META = [{"id": cid, "url": f"pages/{cid}.html", "lang": "en"} for cid in CHUNK_IDS]
 
-# Two query vectors (component i is chunk c{i+1}'s score):
+# Four query vectors (7 components: dims 0-5 score c1-c6 directly, dim 6
+# scores c7/c8/c9 identically):
 #  - "floor": the raw top-4 by score includes a 4th-place chunk (c4, score
-#    0.10) BELOW MIN_SCORE (0.18) -- exercises floor-after-top-k exactly as
-#    the brief asks: the 4th-best chunk must be dropped, leaving 3 hits, not
-#    4 and not backfilled from a lower-ranked chunk.
+#    0.10) BELOW MIN_SCORE (0.18) -- dropped, leaving 3 hits.
 #  - "clean": 4 chunks clear the floor outright, and a 5th chunk (c5, score
 #    0.22) is INDIVIDUALLY above the floor too but ranked 5th -- it must
 #    stay excluded for being outside the top-4 by rank, proving the floor
 #    does not turn into "everything above MIN_SCORE."
+#  - "ties": c1/c2/c3 (0.90/0.70/0.60) clearly outrank the c7/c8/c9 trio
+#    (structurally identical vectors, all score 0.55), but only ONE of that
+#    tied trio fits in the 4th and last top-4 slot -- which one is exactly
+#    the tie-break question. The correct, stable answer is c7 (first by
+#    original fixture order); a non-stable sort can return c8 or c9 instead
+#    (see the MATRIX comment above -- verified directly for c8 on this
+#    numpy build). This changes which chunk id comes back, not just an
+#    internal reordering of an already-agreed set.
+#  - "floor_epsilon": c4's score is 0.179960 -- strictly below MIN_SCORE
+#    (0.18) but rounds UP to 0.1800 at 4 decimal places. Exercises the
+#    floor-vs-rounding order: correct only when the comparison runs on the
+#    raw score, not the rounded one.
 QUERIES = {
-    "floor": [0.90, 0.50, 0.30, 0.10, 0.05, 0.02],
-    "clean": [0.80, 0.60, 0.40, 0.25, 0.22, 0.01],
+    "floor": [0.90, 0.50, 0.30, 0.10, 0.05, 0.02, 0.0],
+    "clean": [0.80, 0.60, 0.40, 0.25, 0.22, 0.01, 0.0],
+    "ties": [0.90, 0.70, 0.60, 0.50, 0.40, 0.10, 0.55],
+    "floor_epsilon": [0.90, 0.50, 0.30, 0.179960, 0.05, 0.01, 0.0],
 }
 
 
-def test_fixture_exercises_both_a_floor_drop_and_a_clean_top_k() -> None:
+def test_fixture_exercises_floor_drop_ties_and_floor_epsilon() -> None:
     """Sanity check on the fixture itself (using runtime.py's own rank_hits,
     the same precedent test_task_request_re_sync.py's fixture-sanity test
-    sets): if 'floor' didn't actually drop a raw top-4 candidate, or 'clean'
-    didn't actually exclude an individually-above-floor 5th candidate, the
-    agreement tests below could pass trivially without exercising the
-    ordering this test exists to check."""
+    sets): if any of these four cases didn't actually exercise what its name
+    claims, the agreement tests below could pass trivially without proving
+    anything about ordering."""
     floor = rank_hits(MATRIX, CHUNK_META, np.asarray(QUERIES["floor"], dtype=np.float32))
     assert [h.chunk_id for h in floor.hits] == ["c1", "c2", "c3"], (
         "fixture assumption: 'floor' must drop exactly the raw rank-4 "
@@ -85,6 +158,21 @@ def test_fixture_exercises_both_a_floor_drop_and_a_clean_top_k() -> None:
         "c5 clears MIN_SCORE on its own but is ranked 5th -- it must not "
         "appear just because it individually clears the floor"
     )
+
+    ties = rank_hits(MATRIX, CHUNK_META, np.asarray(QUERIES["ties"], dtype=np.float32))
+    assert [h.chunk_id for h in ties.hits] == ["c1", "c2", "c3", "c7"], (
+        "fixture assumption: 'ties' must fill its 4th (last) slot with c7 "
+        "-- the first-by-original-order member of the tied c7/c8/c9 trio "
+        "(all score 0.55, structurally identical vectors) -- not c8 or c9"
+    )
+
+    epsilon = rank_hits(MATRIX, CHUNK_META, np.asarray(QUERIES["floor_epsilon"], dtype=np.float32))
+    assert [h.chunk_id for h in epsilon.hits] == ["c1", "c2", "c3"], (
+        "fixture assumption: 'floor_epsilon' must drop c4 (raw score "
+        "0.179960 < MIN_SCORE, even though it ROUNDS UP to 0.1800) -- the "
+        "floor must compare the raw score, not round() then compare"
+    )
+    assert epsilon.dropped_by_floor == 1
 
 
 def _runtime_py_results() -> dict:

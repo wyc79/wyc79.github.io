@@ -45,6 +45,32 @@ PRESETS = {
 }
 
 
+def index_preset_status(index_file: Path, preset_name: str) -> tuple[bool, str | None]:
+    """Whether chat/data/index.json (if present) is safe to bundle for
+    `preset_name` -- i.e. was built with a matching model_preset. Factored
+    out of build_zip so it's unit-testable without needing real model/wheel
+    files (Task 29 fix round 1 review: this check used to not exist at all,
+    so a stale index.json left over from a DIFFERENT preset's build got
+    bundled unconditionally -- silently, since index.py's rank_chunks can't
+    tell "wrong embedding space" apart from "no good match" once vectors are
+    just numbers).
+
+    Returns (ok, reason). ok=True means bundle it. ok=False + reason=None
+    means the file is simply missing (nothing to explain). ok=False +
+    a reason means it exists but doesn't match -- the caller should warn
+    with that reason.
+    """
+    if not index_file.exists():
+        return False, None
+    index_preset = json.loads(index_file.read_text(encoding="utf-8")).get("model_preset")
+    if index_preset == preset_name:
+        return True, None
+    return False, (
+        f"chat/data/index.json was built with model_preset={index_preset!r}, "
+        f"not {preset_name!r}"
+    )
+
+
 def git_short_sha() -> str:
     try:
         out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
@@ -122,7 +148,7 @@ def download_wheels(py_version: str, wheel_dir: Path) -> list[Path]:
     return sorted(wheel_dir.glob("*.whl"))
 
 
-def build_zip(preset: dict, model_src: Path, wheels: list[Path], out_zip: Path,
+def build_zip(preset: dict, preset_name: str, model_src: Path, wheels: list[Path], out_zip: Path,
               gate_models: dict[str, Path] | None = None, build_info: dict | None = None) -> None:
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         # code + fresh roles fallback
@@ -150,12 +176,27 @@ def build_zip(preset: dict, model_src: Path, wheels: list[Path], out_zip: Path,
             zf.write(gate_file, "gate_vectors.json")
         # Retrieval index (Task 29): index.py loads this at startup and
         # retrieves from it directly instead of trusting client-sent
-        # contexts. Not packaged (an older zip build, or a fresh checkout
-        # with no chat/data/index.json yet) -> /chat returns 503 at runtime;
-        # see index.py's _load_index().
+        # contexts. Bundled ONLY when index_preset_status() confirms it
+        # matches the preset being packaged right now -- see that function's
+        # docstring for why this check exists. Not packaged (missing, older
+        # zip build, or a preset mismatch) -> /chat returns 503 at runtime --
+        # see index.py's _load_index(), which also independently re-checks
+        # this (defense in depth: a zip can be assembled by hand, without
+        # going through this function).
         index_file = CHAT / "data" / "index.json"
-        if index_file.exists():
+        ok, reason = index_preset_status(index_file, preset_name)
+        if ok:
             zf.write(index_file, "index.json")
+        elif reason:
+            print(
+                f"  WARNING: {reason} -- NOT bundling it. /chat will 503 "
+                f"(\"retrieval not available\") until a matching index is "
+                f"rebuilt and packaged. Run: cd chat && python "
+                f"scripts/build_index.py --model {preset_name}"
+            )
+        else:
+            print(f"  WARNING: chat/data/index.json not found -- /chat will "
+                  f"503 (\"retrieval not available\") until one is built.")
         # dependencies, extracted wheel contents at package root
         for wheel in wheels:
             with zipfile.ZipFile(wheel) as wz:
@@ -230,7 +271,7 @@ def main() -> None:
 
     out = HERE / f"tencent-function-{args.preset}.zip"
     print(f"[4/4] packaging -> {out.name} (gates: {sorted(gate_models) or 'none'})")
-    build_zip(preset, model_dir, wheels, out, gate_models, build_info)
+    build_zip(preset, args.preset, model_dir, wheels, out, gate_models, build_info)
 
     print(json.dumps({
         "build": build_info["build_id"],

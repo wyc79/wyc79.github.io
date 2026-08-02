@@ -119,23 +119,33 @@ def _hits_from_scores(scores: np.ndarray, meta: list[dict], k: int) -> Retrieval
     """Rank an already-scored candidate set: sort descending, take the top k,
     THEN drop any below MIN_SCORE. Order matters -- floor after top-k, not
     before. Shared by rank_hits (below) and Runtime.retrieve's exclude_ids
-    path (which pre-masks excluded rows to -inf before calling this)."""
-    order = np.argsort(-scores)[:k]
-    top = [
-        Hit(
-            chunk_id=meta[i]["id"],
-            url=meta[i].get("url", ""),
-            lang=meta[i].get("lang", "en"),
-            score=round(float(scores[i]), 4),
-        )
-        for i in order
-        if np.isfinite(scores[i])
+    path (which pre-masks excluded rows to -inf before calling this).
+
+    Two corrections from a cross-implementation sync-test review (Task 29
+    fix round 1), both required to actually match chat-widget.js:
+    - `kind="stable"`: np.argsort's default is NOT stable (introsort/
+      quicksort), so ties broke differently than JS's Array.prototype.sort
+      (stable since ES2019) -- the widget keeps original chunk order on
+      equal scores, so this must too. Fuzzed on the real committed index:
+      40/40 tie-heavy queries disagreed with the widget before this fix.
+    - The MIN_SCORE comparison runs on the RAW (unrounded) score, not the
+      4-decimal-rounded one -- rounding-then-comparing let scores like
+      0.179960 round up to 0.18 and clear a floor they shouldn't. The
+      widget's scoreChunks never rounds internally, so it always compared
+      raw. round() is applied only when building the returned Hit/top_score,
+      for output, never for the floor test itself.
+    """
+    order = np.argsort(-scores, kind="stable")[:k]
+    top = [(meta[i], float(scores[i])) for i in order if np.isfinite(scores[i])]
+    kept = [
+        Hit(chunk_id=m["id"], url=m.get("url", ""), lang=m.get("lang", "en"), score=round(s, 4))
+        for m, s in top
+        if s >= MIN_SCORE
     ]
-    kept = [h for h in top if h.score >= MIN_SCORE]
     return Retrieval(
         hits=tuple(kept),
         dropped_by_floor=len(top) - len(kept),
-        top_score=top[0].score if top else 0.0,
+        top_score=round(top[0][1], 4) if top else 0.0,
     )
 
 

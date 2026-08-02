@@ -190,6 +190,32 @@ def _load_index() -> None:
         import numpy as np
 
         payload = json.loads(index_file.read_text(encoding="utf-8"))
+        # Defense in depth (Task 29 fix round 1 review): build_package.py
+        # only bundles index.json when its own model_preset matches the
+        # preset it is packaging, but a zip can be assembled by hand (or by
+        # a future refactor of that script) without going through it. There
+        # is no MODEL_PRESET env var to compare against directly -- but
+        # QUERY_PREFIX already IS one, already required to be set correctly
+        # for embedding itself to work (see _load_embedder/_run_embedding),
+        # and it identifies the preset 1:1 (e5="query: ", minilm=""). index
+        # .json carries its own query_prefix from the build that produced
+        # it. A mismatch means this index's document vectors and this
+        # deployment's query vectors live in different embedding spaces --
+        # dotting them still returns plausible-looking numbers in [-1, 1],
+        # it's just meaningless, and there is no way to tell that apart from
+        # a real "nothing relevant" result once it's just floats. Refuse to
+        # load rather than silently retrieve garbage.
+        expected_prefix = env("QUERY_PREFIX", "")
+        index_prefix = payload.get("query_prefix", "")
+        if index_prefix != expected_prefix:
+            _index["error"] = (
+                f"index.json query_prefix {index_prefix!r} (model_preset="
+                f"{payload.get('model_preset')!r}) does not match this "
+                f"deployment's QUERY_PREFIX env var {expected_prefix!r} -- "
+                "refusing to load a mismatched-embedding-space index"
+            )
+            log({"type": "index_load_failed", "error": _index["error"]})
+            return
         chunks = payload.get("chunks") or []
         matrix = (
             np.array([c["vector"] for c in chunks], dtype=np.float32)
@@ -218,15 +244,26 @@ def rank_chunks(matrix, chunks: list, query_vec) -> list:
     chat/tests/test_retrieval_sync.py executes all three against one shared
     fixture and asserts they agree. Returns a list of {"chunk": <chunk
     dict>, "score": float}, highest score first.
+
+    Two corrections from a cross-implementation sync-test review (Task 29
+    fix round 1), both required to actually match chat-widget.js:
+    - `kind="stable"`: np.argsort's default is not stable, so ties broke
+      differently than JS's Array.prototype.sort (stable since ES2019),
+      which keeps original chunk order on equal scores.
+    - MIN_SCORE is compared against the RAW (unrounded) score, not the
+      4-decimal-rounded one -- rounding first let scores like 0.179960
+      round up to 0.18 and clear a floor they shouldn't. scoreChunks never
+      rounds internally, so it always compared raw. round() is applied only
+      to the returned "score", for output, never for the floor test.
     """
     import numpy as np
 
     if matrix.shape[0] == 0:
         return []
     scores = matrix @ np.asarray(query_vec, dtype=np.float32)
-    order = np.argsort(-scores)[:TOP_K]
-    top = [{"chunk": chunks[i], "score": round(float(scores[i]), 4)} for i in order]
-    return [h for h in top if h["score"] >= MIN_SCORE]
+    order = np.argsort(-scores, kind="stable")[:TOP_K]
+    top = [(chunks[i], float(scores[i])) for i in order]
+    return [{"chunk": c, "score": round(s, 4)} for c, s in top if s >= MIN_SCORE]
 
 
 def retrieve(question: str) -> list:
@@ -238,6 +275,28 @@ def retrieve(question: str) -> list:
         raise RuntimeError(_index["error"] or "index not loaded")
     query_vec = _run_embedding(_embed, question)
     return rank_chunks(_index["matrix"], _index["chunks"], query_vec)
+
+
+def sources_from_hits(hits: list) -> list:
+    """The /chat response's `sources` array: seven fields per source --
+    id, url, anchor, page_title, section_title, text, score -- exactly what
+    chat-widget.js's addSources, dedupeForDisplay and sourcesForLog read
+    (see resultsFromSources there, the mirror-image function). Do not rename
+    these keys. Pure and separate from the HTTP handler so
+    chat/tests/test_chat_contract_sync.py can call it directly without
+    spinning up a server."""
+    return [
+        {
+            "id": h["chunk"].get("id"),
+            "url": h["chunk"].get("url"),
+            "anchor": h["chunk"].get("anchor"),
+            "page_title": h["chunk"].get("page_title"),
+            "section_title": h["chunk"].get("section_title"),
+            "text": h["chunk"].get("text"),
+            "score": h["score"],
+        }
+        for h in hits
+    ]
 
 
 def _run_embedding(bundle: dict, text: str) -> "object":
@@ -639,21 +698,7 @@ class Handler(BaseHTTPRequestHandler):
                 "usage": usage,
             },
         })
-        # Seven fields per source -- exactly what chat-widget.js's addSources,
-        # dedupeForDisplay and sourcesForLog read. Do not rename them.
-        sources = [
-            {
-                "id": h["chunk"].get("id"),
-                "url": h["chunk"].get("url"),
-                "anchor": h["chunk"].get("anchor"),
-                "page_title": h["chunk"].get("page_title"),
-                "section_title": h["chunk"].get("section_title"),
-                "text": h["chunk"].get("text"),
-                "score": h["score"],
-            }
-            for h in hits
-        ]
-        self._json(200, {"answer": answer, "model": model, "rid": rid, "sources": sources})
+        self._json(200, {"answer": answer, "model": model, "rid": rid, "sources": sources_from_hits(hits)})
 
     def _log(self):
         raw = self._read_body(LIMITS["log_bytes"] + 1)
