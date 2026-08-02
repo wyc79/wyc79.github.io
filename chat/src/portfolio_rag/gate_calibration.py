@@ -43,6 +43,7 @@ _build_zh_gate's `margin <= 0` disable check) keep working unchanged.
 """
 
 import logging
+import math
 
 import numpy as np
 
@@ -162,7 +163,8 @@ OFF_TOPIC = [
 # hard (below or near the old floor) while still unambiguously asking about
 # 王元辰 -- "他平常都捣鼓些什么" (what does he usually tinker with, 0.4120),
 # "他老家是哪的，平时都在忙什么" (where's he from / what's he up to lately,
-# 0.4198), "他这一路是怎么走过来的" (how did he get to where he is, 0.4485),
+# 0.4106 -- the query that actually sets the zh floor), "他这一路是怎么走过来的"
+# (how did he get to where he is, 0.4485),
 # "他大概是什么背景" (roughly what's his background, 0.4609), "他是干嘛的"
 # (what does he do, terse/colloquial, 0.5098), "他之前是学什么的" (what did
 # he study, colloquial phrasing of an existing formal entry, 0.5485). Also
@@ -223,6 +225,38 @@ OFF_TOPIC_ZH = [
 ]
 
 GATE_STATS = ("top", "contrast", "zscore")
+
+
+def _floor_threshold(value: float) -> float:
+    """Round DOWN to 4 decimal places -- never UP, unlike round().
+
+    round(0.41065001, 4) == 0.4107, which is ABOVE the true, unrounded value.
+    If that value is `hi` itself (the zero-catch branch below) or a midpoint
+    just barely under it (the tight-margin case in the normal branch), an
+    ordinary round() can push the stored threshold past the exact on-topic
+    score that defines the floor -- so the very calibration query the policy
+    promises never to refuse would be refused at eval time, contradicting
+    the zero-false-refusal guarantee this module exists to provide. Applied
+    to BOTH threshold branches for that reason: the mistake is the same
+    shape in either place, even though only the zero-catch branch has hit it
+    in practice so far (both shipped gates currently take the other branch,
+    with headroom well above one rounding step).
+    Trade-off, accepted deliberately: in an extremely tight margin (worst
+    caught off-topic and on-topic floor within ~0.0002 of each other -- far
+    tighter than either shipped gate, which sit at multi-percent margins),
+    flooring the midpoint could in principle drop the threshold at or below
+    the off-topic value it was meant to catch, uncatching it. That is
+    strictly preferable to the alternative failure this function prevents
+    (falsely refusing a legitimate on-topic query), which is the one
+    invariant this whole policy is built around -- see the module docstring.
+    A tiny epsilon (1e-9, five orders of magnitude below the 0.00005
+    rounding granularity) absorbs ordinary floating-point representation
+    noise around exact 4dp boundaries (e.g. a value meant to be exactly
+    0.2006 sometimes stores as 0.20059999999999998) without risking a
+    meaningful upward shift.
+    """
+    floored = math.floor(value * 10_000 + 1e-9) / 10_000
+    return round(floored, 4)  # cosmetic only: floored already sits on the 4dp grid
 
 
 def stat_value(scores: np.ndarray, kind: str) -> float:
@@ -295,9 +329,9 @@ def compute_gate(
             "floor — zero false refusals, but this gate catches nothing",
             best["stat"],
         )
-        threshold = round(best["hi"], 4)
+        threshold = _floor_threshold(best["hi"])
     else:
-        threshold = round((best["lo"] + best["hi"]) / 2, 4)
+        threshold = _floor_threshold((best["lo"] + best["hi"]) / 2)
 
     logger.info(
         "gate calibration: chose stat=%s threshold=%.4f (catches %d off-topic "
