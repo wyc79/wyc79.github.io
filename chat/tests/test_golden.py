@@ -29,7 +29,20 @@ from tests.test_gate import OFF_TOPIC as GATE_TEST_OFF_TOPIC
 
 
 def _normalize(text: str) -> str:
-    return " ".join(text.lower().split()).strip(" ?？。!！,.")
+    """Exact-equality normalization for test_cases_are_disjoint_from_fit_data.
+
+    The strip set includes the full-width CJK punctuation "，、；" (the
+    long-deferred Task 8 minor). It stayed theoretical until the final
+    whole-branch review demonstrated the exploit: a held-out golden zh question
+    copied verbatim into ON_TOPIC_ZH with its trailing "？" swapped for "，"
+    left the entire suite green.
+
+    This is the SMALLER half of that fix -- widening the strip set only defeats
+    punctuation tricks, and the same review's other mutation ("Tell me: " +
+    a verbatim golden EN question) needs no punctuation trick at all. The real
+    fix is test_disjointness.py's LCS comparator now running on the
+    calibration <-> golden edge; this remains the cheap exact-match backstop."""
+    return " ".join(text.lower().split()).strip(" ?？。!！,.，、；")
 
 
 @pytest.fixture(scope="module")
@@ -188,6 +201,30 @@ _REGRESSION_METRICS = (
     "gate_pass", "hit_at_4", "refusal_easy", "refusal_adjacent", "refusal_injection",
 )
 
+# Metrics whose BASELINE value is 0, i.e. already at the floor. _find_regressions
+# flags only `got < want`, so a count baselined at 0 cannot go lower and those
+# comparisons are structurally incapable of ever failing: nothing in chat/tests/
+# fails if the zh gate lets every adjacent off-topic probe and every injection
+# through. "No metric regressed" therefore reads stronger than what it verifies,
+# which is the pattern this project has been bitten by before (a count check
+# reporting green while the property it protects sits at its floor).
+#
+# Ruling: they are DECLARED here rather than gated. An absolute floor
+# assertion ("the zh gate must refuse at least one adjacent probe") would be a
+# new, unmet requirement, not a regression guard -- the current measured state
+# is genuinely 0/4, and inventing a threshold to make it fail is not the same
+# as protecting it. Declaring the set makes the gap a pinned, reviewable fact:
+# the test below fails if a metric silently JOINS this set (a real regression
+# the gate cannot see) and equally if one LEAVES it (the zh gate improved and
+# a new baseline was taken -- at which point it becomes genuinely protected and
+# must be removed from here). Same precedent as
+# test_hit_at_4_page_only_is_not_a_regression_metric below: state the exclusion
+# behaviourally instead of leaving it silent.
+_UNPROTECTED_AT_THE_BASELINE_FLOOR = frozenset({
+    "shared/zh.refusal_adjacent",   # 0/4 -- the zh gate refuses no adjacent off-topic probe
+    "shared/zh.refusal_injection",  # 0/4 -- nor any injection probe
+})
+
 
 def _find_regressions(baseline_cells: dict, current_cells: dict) -> list[str]:
     """Pure comparison, no fixtures: kept separate from test_no_metric_regressed
@@ -329,3 +366,68 @@ def test_a_page_only_drop_alone_does_not_fail_the_regression_check() -> None:
         },
     }
     assert _find_regressions(baseline_cells, current_cells) == []
+
+
+# --- Final whole-branch review, 4.3: the comparisons the gate cannot make ---
+
+
+def test_metrics_at_their_baseline_floor_are_declared_not_silently_unprotected() -> None:
+    """Which of the regression gate's comparisons are structurally incapable
+    of failing must be a stated fact, checked against the real baseline.
+
+    Measured on the current baseline: 22 live comparisons, 28 schema-skips
+    (structurally correct -- positive cells carry no refusal_*, shared cells
+    carry no gate_pass/hit_at_4), and exactly the two below at the floor.
+
+    Fails in BOTH directions, which is what makes it a guard rather than a
+    comment: a metric that newly drops to 0 has regressed in a way
+    _find_regressions cannot report, and a metric that climbs off 0 is now
+    genuinely protected and must be struck from the list."""
+    if not BASELINE_PATH.exists():
+        pytest.skip("no baseline yet — run scripts/run_eval.py --update-baseline")
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+
+    at_floor = {
+        f"{cell}.{metric}"
+        for cell, want in baseline["cells"].items()
+        for metric in _REGRESSION_METRICS
+        if want.get(metric) == 0
+    }
+
+    assert at_floor == set(_UNPROTECTED_AT_THE_BASELINE_FLOOR), (
+        "the set of regression comparisons that cannot fire has changed.\n"
+        f"  now at the floor:      {sorted(at_floor)}\n"
+        f"  declared in this file: {sorted(_UNPROTECTED_AT_THE_BASELINE_FLOOR)}\n"
+        "A metric that JOINED the set regressed to 0 without the gate being able "
+        "to say so -- investigate before re-baselining. A metric that LEFT it is "
+        "now genuinely protected: delete it from "
+        "_UNPROTECTED_AT_THE_BASELINE_FLOOR."
+    )
+
+
+def test_a_metric_at_the_floor_genuinely_cannot_fire() -> None:
+    """Behavioural proof of the claim above, pure and synthetic: a cell whose
+    zh refusal counts are baselined at 0 reports no drop even when the current
+    run also refuses nothing. This is not an argument about the comparator's
+    code, it is the comparator's actual answer -- so if a future change ever
+    makes a zero-baselined count reportable, this test fails and
+    _UNPROTECTED_AT_THE_BASELINE_FLOOR can be retired."""
+    baseline_cells = {
+        "shared/zh": {
+            "gate_available": True, "refusal_easy": 3, "n_easy": 4,
+            "refusal_adjacent": 0, "n_adjacent": 4,
+            "refusal_injection": 0, "n_injection": 4,
+        },
+    }
+    current_cells = {
+        "shared/zh": {
+            "gate_available": True, "refusal_easy": 3, "n_easy": 4,
+            "refusal_adjacent": 0, "n_adjacent": 4,   # still refuses nothing
+            "refusal_injection": 0, "n_injection": 4,
+        },
+    }
+    assert _find_regressions(baseline_cells, current_cells) == []
+
+    # ...and the control: the one shared metric NOT at the floor does fire.
+    worse = {"shared/zh": {**current_cells["shared/zh"], "refusal_easy": 2}}
+    assert _find_regressions(baseline_cells, worse) == ["shared/zh.refusal_easy: 3 -> 2"]

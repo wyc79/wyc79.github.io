@@ -129,10 +129,24 @@ def test_mismatched_preset_refuses_to_load(no_stray_chunks_json) -> None:
     )
 
 
-def test_mismatched_index_makes_retrieval_report_unavailable(no_stray_chunks_json) -> None:
+def test_mismatched_index_makes_retrieval_report_unavailable(
+    no_stray_chunks_json, monkeypatch
+) -> None:
     """End-to-end within the module: a mismatched index must flip both the
-    GET / health flag and /chat's own availability guard -- not just leave
-    an internal error string nobody reads."""
+    GET / health flag and /chat's own availability guard -- not just leave an
+    internal error string nobody reads.
+
+    This test previously claimed exactly that and did not do it. Its body
+    called neither handler; its final line was `assert (mod._index["matrix"]
+    is not None) is False`, a re-typed copy of the production expression and
+    logically identical to the line above it. The final whole-branch review
+    proved it inert with two mutations that both stayed green (5 passed):
+    do_GET reporting `"retrieval": True` unconditionally, and _chat dropping
+    the index-availability clause from its guard. Both are live-chat failures
+    -- the first makes the health endpoint lie to whoever is checking a
+    deployment, the second lets a wrong-embedding-space index serve real
+    answers. It now drives the real do_GET and the real _chat (see
+    _StubHandler), and both mutations were re-run and are red."""
     _write_index(no_stray_chunks_json, "minilm")
     mod = _load_index_module()
     mod.BUILD_INFO = {"preset": "e5"}  # deployment expects e5
@@ -140,9 +154,25 @@ def test_mismatched_index_makes_retrieval_report_unavailable(no_stray_chunks_jso
     mod._load_index()
 
     assert mod._index["matrix"] is None
-    # This is exactly the condition do_GET's health payload and _chat's
-    # availability guard both read.
-    assert (mod._index["matrix"] is not None) is False
+    # The embedder is deliberately made AVAILABLE: _chat's guard is
+    # `_embed["session"] is None or _index["matrix"] is None`, so an absent
+    # embedder would produce the same 503 and prove nothing about the index
+    # half -- the half this test is named for.
+    mod._embed["session"] = object()
+    monkeypatch.setenv("LLM_API_KEY", "not-used-the-guard-fires-first")
+
+    assert _health_payload(mod)["retrieval"] is False, (
+        "GET / reported retrieval as available with a mismatched index -- the "
+        "health endpoint is what an operator checks after a deploy"
+    )
+    assert _health_payload(mod)["retrieval_error"] is not None
+
+    handler = _StubHandler(path="/chat")
+    mod.Handler._chat(handler)
+    assert handler.responses == [(503, {"error": "retrieval not available"})], (
+        "/chat did not 503 on a mismatched index -- a wrong-embedding-space "
+        f"index would serve real answers. Got {handler.responses!r}"
+    )
 
 
 def test_unknown_build_preset_loads_anyway_and_logs_a_warning(no_stray_chunks_json) -> None:
@@ -239,6 +269,16 @@ class _StubHandler:
 
     def _json(self, status: int, obj: dict) -> None:
         self.responses.append((status, obj))
+
+    # _chat only reaches these two if its availability guard has ALREADY let
+    # it through. They exist so that a build without that guard fails on a
+    # readable assertion (a 400 "question required" where a 503 was expected)
+    # instead of an AttributeError deep inside the handler.
+    def _ip(self) -> str:
+        return "203.0.113.7"
+
+    def _read_body(self, cap: int = 64 * 1024) -> bytes:
+        return b""
 
 
 def _health_payload(mod) -> dict:
