@@ -91,7 +91,6 @@ _embed = {"lock": threading.Lock(), "session": None, "tokenizer": None, "error":
 _gates: dict = {"en": None, "zh": None}
 
 CJK_RE = None  # compiled lazily
-TASK_REQUEST_RE = None  # compiled lazily; see gate_decision -- Task 28's second tier
 
 
 def _load_model(dir_name: str) -> tuple:
@@ -148,19 +147,11 @@ def _load_embedder() -> None:
                     "matrix": np.array(spec["vectors"], dtype=np.float32),
                     "stat": spec["gate_stat"],
                     "threshold": spec["gate_threshold"],
-                    # Task 28's second tier. None when this build's
-                    # calibration had too few TASK_REQUEST_RE-flagged
-                    # on-topic queries to place it honestly (see
-                    # gate_calibration.compute_task_gate) -- gate_decision
-                    # then falls back to "threshold" for every question,
-                    # task-shaped or not, exactly as if this key were absent.
-                    "task_threshold": spec.get("task_threshold"),
                     "prefix": spec.get("query_prefix", ""),
                     "pooling": spec.get("pooling", "mean"),
                 }
                 log({"type": "gate_loaded", "lang": lang, "stat": spec["gate_stat"],
-                     "threshold": spec["gate_threshold"],
-                     "task_threshold": spec.get("task_threshold")})
+                     "threshold": spec["gate_threshold"]})
             except Exception as err:
                 log({"type": "gate_load_failed", "lang": lang, "error": repr(err)})
 
@@ -189,54 +180,13 @@ def embed_text(text: str) -> list[float]:
 
 def gate_decision(gate_text: str) -> dict | None:
     """Language-routed off-topic gate; None when no gate is packaged."""
-    global CJK_RE, TASK_REQUEST_RE
+    global CJK_RE
     if _gates["en"] is None:
         return None
-    if CJK_RE is None or TASK_REQUEST_RE is None:
+    if CJK_RE is None:
         import re
 
-        if CJK_RE is None:
-            CJK_RE = re.compile("[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
-        if TASK_REQUEST_RE is None:
-            # Task 28's intent axis -- MUST stay byte-for-byte in sync with
-            # portfolio_rag.runtime.TASK_REQUEST_RE and chat-widget.js's copy
-            # (tests/test_task_request_re_sync.py checks all three agree).
-            # Deliberately NOT imported from portfolio_rag: this package must
-            # stay stdlib-only. Python's \w is Unicode-aware (unlike JS's
-            # ASCII-only \w), so this uses negative lookaround instead of \b
-            # for the same reason NAME_RE/BIO_STUB_RE would need to
-            # elsewhere -- see runtime.py's TASK_REQUEST_RE docstring for the
-            # full reasoning (second tier, not an override; applied to
-            # gate_text, which is already gate_form()'s output by the time it
-            # reaches this function). Explicit \uXXXX escapes for the CJK
-            # markers, per CJK_RE's homoglyph warning above.
-            TASK_REQUEST_RE = re.compile(
-                r"(?<![a-zA-Z0-9_])(?:"
-                r"give\s+me|"
-                r"write\s+(?:me|my|our|us|an|a)|"
-                r"translate|"
-                r"summarize|summarise|"
-                r"tell\s+me\s+a|"
-                r"help\s+me|"
-                r"walk\s+(?:me|us)\s+through|"
-                r"break\s+down|"
-                r"draft\s+(?:me|my|our|us)|"
-                r"compose|"
-                r"generate\s+(?:me|my|our|us)|"
-                r"build\s+(?:me|my|our|us)|"
-                r"design\s+(?:me|my|our|us)|"
-                r"create\s+(?:me|my|our|us)|"
-                r"optimi[sz]e\s+(?:me|my|our|us)|"
-                r"(?:debug|review|refactor|calculate|solve)\s+(?:me|my|our|us)|"
-                r"reply\s+as|answer\s+as|respond\s+as|"
-                r"act\s+as|pretend\s+(?:to\s+be|you're|you\s+are)|roleplay"
-                r")(?![a-zA-Z0-9_])"
-                "|\u5e2e\u6211|\u7ed9\u6211|\u9ebb\u70e6"
-                "|\u626e\u6f14|\u5047\u88c5|\u5192\u5145"
-                "|\u53e3\u543b|\u8bed\u6c14"
-                "|\u7ffb\u8bd1|\u5199\u4e00",
-                re.I,
-            )
+        CJK_RE = re.compile("[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
     if CJK_RE.search(gate_text):
         gate = _gates["zh"]
         if gate is None:
@@ -257,17 +207,7 @@ def gate_decision(gate_text: str) -> dict | None:
         value = (top - mean) / (float(np.std(scores)) + 1e-6)
     else:
         value = top
-    # Task 28's second tier: never an override -- a match just swaps in the
-    # higher task_threshold for this one decision. is_task is False whenever
-    # this gate shipped no task_threshold (too few flagged calibration
-    # queries; see gate_calibration.compute_task_gate), so this degrades to
-    # the ordinary threshold exactly as if the tier did not exist.
-    is_task = gate["task_threshold"] is not None and TASK_REQUEST_RE.search(gate_text) is not None
-    threshold = gate["task_threshold"] if is_task else gate["threshold"]
-    result = {"pass": value >= threshold, "value": round(value, 4), "lang": lang}
-    if is_task:
-        result["reason"] = "task_request"
-    return result
+    return {"pass": value >= gate["threshold"], "value": round(value, 4), "lang": lang}
 
 
 def env(key: str, default: str = "") -> str:

@@ -19,9 +19,7 @@ import numpy as np
 from portfolio_rag.chunker import chunk_text
 from portfolio_rag.config import MODEL_PRESETS, settings
 from portfolio_rag.embedder import OnnxEmbedder
-from portfolio_rag.gate_calibration import (
-    OFF_TOPIC, OFF_TOPIC_ZH, ON_TOPIC, ON_TOPIC_ZH, compute_gate, compute_task_gate,
-)
+from portfolio_rag.gate_calibration import OFF_TOPIC_ZH, ON_TOPIC_ZH, compute_gate
 from portfolio_rag.loader import load_knowledge, load_site
 from portfolio_rag.roles import roles_payload
 
@@ -58,14 +56,6 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
         return None
     logger.info("zh gate: enabled (%s >= %s, margin %.1f%%, %d sections)",
                 gate["stat"], gate["threshold"], gate["margin"] * 100, len(sections))
-    # Task 28's second (task-request) tier: same corpus/embedder/stat as the
-    # base zh gate above, restricted to the TASK_REQUEST_RE-flagged subset of
-    # ON_TOPIC_ZH/OFF_TOPIC_ZH. None (not a fabricated number) when that
-    # subset is too thin to calibrate honestly -- see
-    # gate_calibration.compute_task_gate's MIN_FLAGGED_ON_TOPIC.
-    task_gate = compute_task_gate(
-        embedder, vecs.astype(np.float32), gate["stat"], ON_TOPIC_ZH, OFF_TOPIC_ZH
-    )
     return {
         "model": zh_preset["name"],
         "model_preset": zh_model,
@@ -74,8 +64,6 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
         "gate_stat": gate["stat"],
         "gate_threshold": gate["threshold"],
         "gate_margin": gate["margin"],
-        "task_threshold": task_gate["threshold"] if task_gate else None,
-        "task_margin": task_gate["margin"] if task_gate else None,
         "vectors": vecs.tolist(),
     }
 
@@ -263,14 +251,6 @@ def build_index(site_root: Path | None = None) -> dict:
         # (compute_gate still picks a threshold just above the off-topic max).
         logger.info("en gate: enabled (%s >= %s, margin %.1f%%, %d sections)",
                     gate["stat"], gate["threshold"], gate["margin"] * 100, len(en_sections))
-        # Task 28's second (task-request) tier: same corpus/embedder/stat as
-        # the base en gate above, restricted to the TASK_REQUEST_RE-flagged
-        # subset of ON_TOPIC/OFF_TOPIC. None (not a fabricated number) when
-        # that subset is too thin to calibrate honestly -- see
-        # gate_calibration.compute_task_gate's MIN_FLAGGED_ON_TOPIC.
-        task_gate = compute_task_gate(
-            gate_embedder, gate_vecs.astype(np.float32), gate["stat"], ON_TOPIC, OFF_TOPIC
-        )
         gate_payload = {
             "en": {
                 "model": gate_preset["name"],
@@ -280,8 +260,6 @@ def build_index(site_root: Path | None = None) -> dict:
                 "gate_stat": gate["stat"],
                 "gate_threshold": gate["threshold"],
                 "gate_margin": gate["margin"],
-                "task_threshold": task_gate["threshold"] if task_gate else None,
-                "task_margin": task_gate["margin"] if task_gate else None,
                 # No chunk_ids: the corpus is no longer index.chunks (or a
                 # slice of it), so there is nothing in index.json for these
                 # vectors to positionally align with. Symmetric with
@@ -340,8 +318,6 @@ def build_index(site_root: Path | None = None) -> dict:
             "gate_stat": gate["stat"],
             "gate_threshold": gate["threshold"],
             "gate_margin": gate["margin"],
-            "task_threshold": task_gate["threshold"] if task_gate else None,
-            "task_margin": task_gate["margin"] if task_gate else None,
             "vectors": gate_vecs.tolist(),
         }
         settings.resolve_path(settings.fallback_vectors_path).write_text(
@@ -350,8 +326,6 @@ def build_index(site_root: Path | None = None) -> dict:
         index_gate = {
             "gate_remote": True, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"],
             "gate_margin": gate["margin"],
-            "task_threshold": task_gate["threshold"] if task_gate else None,
-            "task_margin": task_gate["margin"] if task_gate else None,
         }
     else:
         matrix = np.array([c["vector"] for c in chunks], dtype=np.float32)
@@ -360,18 +334,9 @@ def build_index(site_root: Path | None = None) -> dict:
         # where the retrieval model gates itself (no gate_vectors.json at
         # all -- index.json's gate_stat/threshold ARE the gate).
         _check_en_gate_margin(gate)
-        # Task 28's second tier, self-gate branch: mirrors compute_gate's own
-        # on/off defaulting immediately above (ON_TOPIC + ON_TOPIC_ZH when
-        # multilingual) so the flagged subset is drawn from the SAME
-        # calibration pool the base gate/margin above were derived from.
-        task_on = ON_TOPIC + (ON_TOPIC_ZH if preset["multilingual"] else [])
-        task_off = OFF_TOPIC + (OFF_TOPIC_ZH if preset["multilingual"] else [])
-        task_gate = compute_task_gate(embedder, matrix, gate["stat"], task_on, task_off)
         index_gate = {
             "gate_remote": False, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"],
             "gate_margin": gate["margin"],
-            "task_threshold": task_gate["threshold"] if task_gate else None,
-            "task_margin": task_gate["margin"] if task_gate else None,
         }
 
     index = {
@@ -406,7 +371,5 @@ def build_index(site_root: Path | None = None) -> dict:
         "gate_stat": gate["stat"],
         "gate_threshold": gate["threshold"],
         "gate_margin": gate["margin"],
-        "task_threshold": task_gate["threshold"] if task_gate else None,
-        "task_margin": task_gate["margin"] if task_gate else None,
         "elapsed_seconds": round(time.time() - t0, 3),
     }

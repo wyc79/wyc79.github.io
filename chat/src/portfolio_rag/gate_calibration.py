@@ -47,8 +47,6 @@ import math
 
 import numpy as np
 
-from portfolio_rag.runtime import TASK_REQUEST_RE
-
 logger = logging.getLogger(__name__)
 
 # Task 25: grown from 8/8 to 18/16 (en) and 18/16 (zh). With 8 queries a
@@ -124,49 +122,6 @@ ON_TOPIC = [
     "what's his deal",
     "give me the short version of his background",
     "summarise his engine work for me",
-    # Task 28: the two task-phrased entries above were the ONLY entries
-    # runtime.TASK_REQUEST_RE flagged in this set (2/24) -- far too thin to
-    # place a second (task_threshold) similarity floor on honestly (see
-    # gate_calibration.compute_task_gate's MIN_FLAGGED_ON_TOPIC and the
-    # task-28 report for the measured count). These four are additional
-    # genuinely task-phrased, genuinely on-topic queries, each using a
-    # DIFFERENT trigger phrase ("walk me through", "help me", "write me",
-    # "break down ... for me") rather than four more variations on "give
-    # me"/"summarise". Checked disjoint from about_en.md via
-    # tests/test_disjointness.py before landing here.
-    #
-    # Task 28 REVIEW finding (still true after the four above landed):
-    # measured, all four score 0.48-0.57 against the current 55-section
-    # about_en.md corpus (minilm) -- comfortably ABOVE "give me the short
-    # version of his background" (0.3015, still the minimum of the six).
-    # They add topical breadth, not floor evidence: the go/no-go count check
-    # (2->6) passed while its actual PURPOSE -- corroborating whether 0.3015
-    # is a real floor or a one-query fluke -- did not, the exact "one bad
-    # draw decides everything" failure Task 25/27 already name for the full
-    # calibration sets. Measured a further ~18 candidates, deliberately
-    # generic/oblique in the same register as this project's OTHER accepted
-    # low scorers ("resume highlights" 0.2078, "CV summary" 0.2248, "what's
-    # his deal" 0.3269 -- colloquial, not technical-vocabulary-dense, is
-    # what scores low here) rather than built to hit a target number, and
-    # kept four that landed BELOW 0.3015 while still ABOVE 0.2078 (the
-    # overall on-topic floor across ALL of ON_TOPIC, flagged or not) --
-    # staying above that second line matters: a candidate scoring under it
-    # would become the new overall minimum and move the BASE en gate's own
-    # threshold (0.2006), which this task's brief requires stay put. Four
-    # different trigger markers again (give me / walk me through / write me
-    # / break down ... for me), not four variants of one phrase:
-    # "give me the rundown on him" (0.2253), "walk me through his deal real
-    # quick" (0.2391), "write me a one-liner on him" (0.2557), "break down
-    # who he is for me" (0.2706). All four checked disjoint from
-    # about_en.md via tests/test_disjointness.py before landing.
-    "walk me through his engine programming background",
-    "help me understand his research background",
-    "write me a quick summary of his shipped games",
-    "break down his combat design experience for me",
-    "give me the rundown on him",
-    "walk me through his deal real quick",
-    "write me a one-liner on him",
-    "break down who he is for me",
 ]
 
 # All additions are "easy" (unambiguously unrelated), matching the original
@@ -249,18 +204,6 @@ ON_TOPIC_ZH = [
     "他之前是学什么的",
     "帮我用几句话总结一下王元辰的背景",
     "麻烦简单讲讲王元辰的引擎开发经历",
-    # Task 28: same discipline note as ON_TOPIC's four additions above --
-    # the two entries directly above were the only ones runtime.
-    # TASK_REQUEST_RE flagged in this set (2/26), also too thin. These four
-    # spread across three different trigger markers (给我/帮我/麻烦) rather
-    # than repeating one, and are, per this project's standing zh-authoring
-    # rule, authored natively in Chinese first (never translated from an
-    # English draft) and name him as 王元辰, never "YC". Checked disjoint
-    # from about_zh.md via tests/test_disjointness.py before landing here.
-    "给我讲讲他都做过哪些战斗设计工作",
-    "能不能帮我理一理他用过哪些游戏引擎",
-    "麻烦帮我介绍一下他的科研背景",
-    "帮我总结一下他发表过的论文",
 ]
 OFF_TOPIC_ZH = [
     "给我讲个笑话",
@@ -328,37 +271,6 @@ def stat_value(scores: np.ndarray, kind: str) -> float:
     raise ValueError(f"unknown gate stat {kind!r}")
 
 
-def _derive_threshold(on_vals: list[float], off_vals: list[float]) -> dict:
-    """The zero-false-refusal midpoint policy (Task 27), for ONE fixed
-    statistic's already-computed values -- factored out of compute_gate's
-    per-stat loop so compute_task_gate (Task 28) can apply the IDENTICAL
-    policy to a different (TASK_REQUEST_RE-flagged subset) on/off pair
-    without duplicating the arithmetic or, worse, drifting from it. See the
-    module docstring for the policy itself; this function is pure statistics
-    over already-computed stat values, no embedding or corpus concerns.
-
-    `hi` = min(on_vals) is the floor the threshold may never cross (so no
-    on-topic value in `on_vals` is ever refused). Off-topic values strictly
-    below `hi` are "caught"; the threshold is the midpoint of [highest
-    caught, hi], or `hi` itself when nothing is caught (still zero false
-    refusals, zero measured benefit -- the same "does not separate" signal
-    as compute_gate's own zero-catch case).
-    """
-    hi = min(on_vals)
-    spread = max(on_vals + off_vals) - min(on_vals + off_vals) + 1e-9
-    caught = [v for v in off_vals if v < hi]
-    lo = max(caught) if caught else max(off_vals)
-    margin = (hi - lo) / spread
-    threshold = _floor_threshold(hi if not caught else (lo + hi) / 2)
-    return {
-        "threshold": threshold,
-        "margin": margin,
-        "lo": lo,
-        "hi": hi,
-        "n_caught": len(caught),
-    }
-
-
 def compute_gate(
     embedder,
     matrix: np.ndarray,
@@ -388,14 +300,23 @@ def compute_gate(
     for kind in GATE_STATS:
         on_vals = [stat_value(s, kind) for s in on_scores]
         off_vals = [stat_value(s, kind) for s in off_scores]
-        d = _derive_threshold(on_vals, off_vals)
-        margin = d["margin"]  # relative, comparable across stats
+        hi = min(on_vals)
+        spread = max(on_vals + off_vals) - min(on_vals + off_vals) + 1e-9
+        caught = [v for v in off_vals if v < hi]
+        # lo is the highest off-topic value this stat can actually catch
+        # without crossing hi. When nothing is caught, lo falls back to the
+        # true off-topic max, which sits at or above hi by construction (that
+        # is exactly what "caught" being empty means) -- margin comes out
+        # <= 0, the same signal a non-separating stat produced under the old
+        # policy, so downstream guards need no change.
+        lo = max(caught) if caught else max(off_vals)
+        margin = (hi - lo) / spread  # relative, comparable across stats
         logger.info(
             "gate calibration [%s]: on-topic floor %.3f | off-topic caught %d/%d "
             "(highest caught %.3f) | rel margin %.1f%%",
-            kind, d["hi"], d["n_caught"], len(off_vals), d["lo"], margin * 100,
+            kind, hi, len(caught), len(off_vals), lo, margin * 100,
         )
-        candidate = {"stat": kind, **d}
+        candidate = {"stat": kind, "lo": lo, "hi": hi, "margin": margin, "n_caught": len(caught)}
         if best is None or (candidate["n_caught"], candidate["margin"]) > (
             best["n_caught"], best["margin"]
         ):
@@ -408,7 +329,9 @@ def compute_gate(
             "floor — zero false refusals, but this gate catches nothing",
             best["stat"],
         )
-    threshold = best["threshold"]
+        threshold = _floor_threshold(best["hi"])
+    else:
+        threshold = _floor_threshold((best["lo"] + best["hi"]) / 2)
 
     logger.info(
         "gate calibration: chose stat=%s threshold=%.4f (catches %d off-topic "
@@ -425,86 +348,4 @@ def compute_gate(
         "margin": round(best["margin"], 4),
         "lo": round(best["lo"], 4),
         "hi": round(best["hi"], 4),
-    }
-
-
-# Task 28's go/no-go discipline, encoded as an actual build-time guard rather
-# than a one-off measurement someone has to remember to re-check: fewer than
-# this many TASK_REQUEST_RE-flagged on-topic calibration queries and
-# compute_task_gate refuses to derive a second threshold at all. Below this
-# floor, min(flagged-on) -- the ceiling the whole zero-false-refusal policy
-# is built on -- is set by one or two individual draws rather than a real
-# distribution, exactly the "one bad draw decides everything" risk Task 25's
-# module comment (above) already warns about for the FULL calibration sets,
-# now reapplied to a thinner subset. 4 mirrors Task 27's own bar for calling
-# a floor "corroborated" (see this file's "Task 27 audit" comment on
-# ON_TOPIC): not a cited statistical minimum, a chosen floor with the same
-# justification already accepted elsewhere in this module. Below it, the
-# honest outcome is None -- "do not ship the second tier for this language"
-# -- not a threshold quietly derived from whatever happens to be flagged.
-MIN_FLAGGED_ON_TOPIC = 4
-
-
-def compute_task_gate(
-    embedder, matrix: np.ndarray, stat: str, on: list[str], off: list[str]
-) -> dict | None:
-    """Second-tier (task-request) threshold for one language's gate (Task 28).
-
-    Same corpus, same embedder, same STAT as the base gate `stat` names --
-    only the THRESHOLD differs between the two tiers (see Runtime.gate:
-    `threshold = bundle.task_threshold if TASK_REQUEST_RE.search(text) else
-    bundle.threshold`). `on`/`off` are the FULL calibration lists (e.g.
-    ON_TOPIC/OFF_TOPIC or ON_TOPIC_ZH/OFF_TOPIC_ZH) -- this function restricts
-    them to the TASK_REQUEST_RE-flagged subset itself, then applies the
-    identical zero-false-refusal midpoint policy (_derive_threshold) that
-    compute_gate applies to the full sets: a task-phrased on-topic
-    calibration query must never be refused by this policy's own
-    construction, exactly like a plain on-topic query never is under
-    compute_gate.
-
-    Returns None when the flagged on-topic subset is too thin to place a
-    threshold honestly (see MIN_FLAGGED_ON_TOPIC) -- the discipline this
-    task's brief demands: a threshold set from one or two points is not a
-    calibration, it is a guess wearing calibration's clothes. None means "do
-    not ship the second tier for this language"; every caller (Runtime.gate
-    via _GateBundle.judge) treats a bundle with no task_threshold exactly as
-    if this tier did not exist, so this is a silent, safe degrade, never a
-    crash or a fabricated number.
-    """
-    flagged_on = [q for q in on if TASK_REQUEST_RE.search(q)]
-    flagged_off = [q for q in off if TASK_REQUEST_RE.search(q)]
-    if len(flagged_on) < MIN_FLAGGED_ON_TOPIC:
-        logger.warning(
-            "task gate: only %d task-phrased on-topic calibration quer%s flagged "
-            "(need >= %d) -- not enough evidence to place a second threshold "
-            "honestly; shipping without the intent tier for this gate",
-            len(flagged_on), "y" if len(flagged_on) == 1 else "ies", MIN_FLAGGED_ON_TOPIC,
-        )
-        return None
-
-    on_vals = [stat_value(matrix @ embedder.embed_query(q), stat) for q in flagged_on]
-    if flagged_off:
-        off_vals = [stat_value(matrix @ embedder.embed_query(q), stat) for q in flagged_off]
-        d = _derive_threshold(on_vals, off_vals)
-    else:
-        # No flagged off-topic evidence at all: still zero-false-refusal
-        # (pinned to the flagged on-topic floor), zero measured benefit --
-        # mirrors compute_gate's own zero-catch branch above.
-        hi = min(on_vals)
-        d = {"threshold": _floor_threshold(hi), "margin": 0.0, "lo": None, "hi": hi, "n_caught": 0}
-
-    logger.info(
-        "task gate [%s]: flagged on-topic floor %.3f | flagged off-topic caught %d/%d "
-        "| threshold=%.4f (n_flagged_on=%d, n_flagged_off=%d)",
-        stat, d["hi"], d["n_caught"], len(flagged_off), d["threshold"],
-        len(flagged_on), len(flagged_off),
-    )
-    return {
-        "threshold": d["threshold"],
-        "margin": round(d["margin"], 4),
-        "lo": None if d["lo"] is None else round(d["lo"], 4),
-        "hi": round(d["hi"], 4),
-        "n_caught": d["n_caught"],
-        "n_flagged_on": len(flagged_on),
-        "n_flagged_off": len(flagged_off),
     }

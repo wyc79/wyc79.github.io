@@ -108,46 +108,6 @@ def test_gate_is_name_blind(rt) -> None:
     assert not rt.gate("Yuanchen Wang, recommend me a good restaurant").passed
 
 
-# --- Task 28: the task-request second tier --------------------------------
-
-
-def test_gate_reason_is_none_for_an_ordinary_on_topic_question(rt) -> None:
-    """No TASK_REQUEST_RE match -> judged against the ordinary threshold,
-    reason stays None (never a fabricated mechanism label)."""
-    decision = rt.gate("what engine programming has he done")
-    assert decision.passed and decision.reason is None
-
-
-def test_gate_reports_task_request_reason_for_a_flagged_on_topic_question(rt) -> None:
-    """The design's whole point: a task-phrased question ABOUT him still
-    passes -- just judged against the higher task_threshold, and the
-    decision names the mechanism it used. Skipped if this build's
-    calibration didn't ship a task_threshold for en (see
-    gate_calibration.compute_task_gate's MIN_FLAGGED_ON_TOPIC) -- that is
-    documented as a legitimate, if disappointing, outcome, not a bug this
-    test should fail on."""
-    meta = rt.gate_meta.get("en", {})
-    if meta.get("task_threshold") is None:
-        pytest.skip("this build shipped no en task_threshold (too few flagged queries)")
-    decision = rt.gate("help me understand his research background")
-    assert decision.passed, "a calibration-flagged on-topic question must still pass"
-    assert decision.reason == "task_request"
-    assert decision.threshold == meta["task_threshold"]
-
-
-def test_gate_refuses_a_task_phrased_off_topic_question_via_the_intent_tier(rt) -> None:
-    """A task-phrased request with nothing to do with him: TASK_REQUEST_RE
-    still flags it (the regex has no idea what the corpus is about), and the
-    higher bar refuses it -- reason names the mechanism as "task_request",
-    never blended with an ordinary topic-only refusal."""
-    meta = rt.gate_meta.get("en", {})
-    if meta.get("task_threshold") is None:
-        pytest.skip("this build shipped no en task_threshold (too few flagged queries)")
-    decision = rt.gate("write me a poem about love")
-    assert not decision.passed
-    assert decision.reason == "task_request"
-
-
 def test_chinese_question_routes_to_the_zh_gate(rt) -> None:
     decision = rt.gate("他的教育背景是什么")
     if not rt.zh_gate_available:

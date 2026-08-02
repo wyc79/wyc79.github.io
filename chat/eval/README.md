@@ -115,23 +115,11 @@ python scripts/run_eval.py --role visitor --lang zh --verbose
 python scripts/run_eval.py --update-baseline    # after a deliberate change
 ```
 
-The table prints three blocks that are never blended into each other: a
+The table prints two blocks that are never blended into each other: a
 per-`(role, lang)` positive-cell table (gate-pass, `hit@4`, keyword coverage,
-retrieved languages), a shared-negatives block with one row per language
-showing `off_topic/easy`, `off_topic/adjacent` and `injection` refusal
-counts side by side, and (Task 28) a mechanism block cross-cutting the SAME
-refusals by *how* the gate refused them: `topic` (similarity alone, judged
-against the ordinary threshold) vs `intent` (the visitor's text read as a
-request to do work — "write me X", "give me a poem" — judged against a
-higher `task_threshold`; see `src/portfolio_rag/runtime.py`'s
-`TASK_REQUEST_RE` and `gate_calibration.py`'s `compute_task_gate`). This is a
-*second tier*, not an override: a task-phrased question that is genuinely
-about him (e.g. "give me the quick version of him") still passes, just
-against the stricter bar. `gate calibration` also grows a `task_thr`/
-`task_margin` column pair, reading `n/a` for a language whose calibration had
-too few `TASK_REQUEST_RE`-flagged on-topic queries to place the second
-threshold honestly (below `compute_task_gate`'s `MIN_FLAGGED_ON_TOPIC`) —
-that means "no second tier for this gate," never "it refuses nothing."
+retrieved languages), then a shared-negatives block with one row per
+language showing `off_topic/easy`, `off_topic/adjacent` and `injection`
+refusal counts side by side.
 
 `--role` filters the positive table only — negatives belong to no role, so
 the shared-negatives block always covers the full pool for whichever
