@@ -11,6 +11,18 @@ and data/roles.json -- all committed to the repo and served by GitHub Pages.
 data/gate_zh_bge.json (gitignored, only when its calibration separates) and
 data/chunks_en_minilm.json (committed, the widget's degraded-mode retrieval
 corpus) -- see chat/README.md's file-layout table.
+
+data/gate_zh_bge.json can also be REMOVED by this run, not just written: if
+this build's own zh calibration ran and did not separate on-/off-topic
+(margin <= 0), any existing file is deleted as stale -- runtime.py,
+run_eval.py and the deployed Tencent package must never trust a gate this
+exact build decided should not exist. That deletion is conditioned on
+calibration having actually RUN this build, not merely on the file existing
+or the model being absent: a machine simply missing the bge_zh model (e.g.
+a fresh clone -- chat/models/ is gitignored) leaves an existing gate file
+untouched instead, since this run had no evidence about it either way. See
+portfolio_rag.index_builder._build_zh_gate's docstring for the full set of
+reasons the gate can be skipped and which ones delete vs. preserve.
 """
 
 import argparse
