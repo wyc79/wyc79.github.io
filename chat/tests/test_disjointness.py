@@ -14,33 +14,50 @@ exactly the shape of collision measured (elsewhere in this project) to
 inflate a score by about +0.2. And nothing at all previously compared either
 query set against the corpus. This file adds that comparison for both.
 
-Comparator: character-level longest common substring (LCS) -- checked both
-on the whole normalized query and on each of its coarse clauses (split on
-commas/coordinating conjunctions/full-width CJK punctuation; see
-_split_clauses) -- not word tokenization. Word tokenization is ASCII-shaped
-(split on whitespace) and is blind to Chinese, which has no word-boundary
-spaces -- exactly the mistake that produced a false-clean disjointness
-result earlier in this project (see gate_calibration.py's module comment).
-Character LCS needs no tokenizer and works identically on Latin and CJK text.
+Comparator: character-level longest common substring (LCS), not word
+tokenization. Word/whitespace tokenization is ASCII-shaped and is blind to
+Chinese, which has no word-boundary spaces -- exactly the mistake that
+produced a false-clean disjointness result earlier in this project (see
+gate_calibration.py's module comment). Character LCS needs no tokenizer and
+works identically on Latin and CJK text. The DP directly maximizes
+EFFECTIVE (CJK-weighted, see loader._effective_length) length, not raw
+character count -- see _lcs_effective's docstring for why raw-length-first
+is an outright wrong answer, not just a cosmetic tie-break, whenever a
+shorter, CJK-dense candidate substring competes with a longer, Latin-only one.
 
-**Known, deliberately-not-closed gap:** LCS (whole-string or per-clause)
-only ever finds a CONTIGUOUS, in-order span. A query built by reordering
-WHOLE CLAUSES relative to each other is caught (the per-clause check exists
-for exactly this; see test_checker_flags_a_clause_reordered_paraphrase_*
-below). A query that reorders WORDS WITHIN a clause -- an active/passive
-swap, subject/object inversion, "X does Y" turned into "was Y done by X" --
-is not, because that scrambles the contiguous run itself, not just its
-position in the sentence. This was checked, not assumed: an order-invariant
-character/word n-gram bag-overlap signal was tried as a fix and rejected --
-it scores an ALREADY-ACCEPTED calibration query ("grapple traversal
-mechanic", a shared technical term) as high as or higher than a genuine
-word-reordered paraphrase at every n-gram size tried (4/5/6/8/10 chars, and
-word 1/2/3-grams), so no single threshold separates "reworded reuse" from
-"a shared domain term in an independently-phrased on-topic question" --
-see task-26-report.md for the full experiment and numbers. Word-level
-paraphrase detection needs semantic (embedding) similarity, not a surface-
-text statistic, and stays a human-review responsibility when authoring new
-calibration/golden entries -- see
+**Known, deliberately-not-closed gap:** LCS only ever finds a CONTIGUOUS,
+in-order span. A paraphrase that reorders clauses or swaps word order
+within a clause (active/passive, subject/object inversion, "X does Y"
+turned into "was Y done by X") is not caught, because reordering breaks the
+contiguous run itself -- there is no shape of "checked in a different
+order" that rescues it, only genuine semantic (embedding) comparison would.
+This was checked, not assumed, and closing it was attempted twice:
+
+1. A per-clause LCS variant (split the query on clause boundaries, check
+   each clause against the body independently) was implemented, then proven
+   INERT and removed: a clause is always a contiguous substring of the whole
+   query, so any common substring a clause can find is already a common
+   substring the whole-string search finds too -- per-clause LCS can never
+   exceed whole-string LCS, by construction. Confirmed empirically: replaying
+   the two "clause-reordered, now caught" examples that motivated it through
+   plain whole-string LCS gave IDENTICAL scores (64.0 and 40.0) -- both were
+   already caught before the per-clause code existed, because each example's
+   matching clause happened to be internally undisturbed by the reordering
+   and so was already a contiguous run findable by the whole-string search
+   alone. The per-clause machinery added computation and a false claim of
+   coverage, not capability, and was removed.
+2. An order-invariant character/word n-gram bag-overlap signal was tried
+   instead and also rejected: it scores an ALREADY-ACCEPTED calibration
+   query ("grapple traversal mechanic", a shared technical term) as high as
+   or higher than a genuine word-reordered paraphrase at every n-gram size
+   tried (4/5/6/8/10 chars, and word 1/2/3-grams), so no single threshold
+   separates "reworded reuse" from "a shared domain term in an
+   independently-phrased on-topic question" -- see task-26-report.md for
+   the full experiment and numbers.
+
+Word- and clause-level paraphrase detection needs semantic (embedding)
+similarity, not a surface-text statistic, and stays a human-review
+responsibility when authoring new calibration/golden entries -- see
 test_checker_still_misses_a_word_reordered_paraphrase_* below, which pins
 this down as a known limitation rather than leaving it undocumented.
 
@@ -64,14 +81,12 @@ raw-character ones, while still behaving as if Latin and CJK had different
 cutoffs -- the effective-length weighting *is* what makes them different.
 """
 
-import re
-
 import pytest
 
 from portfolio_rag.config import settings
 from portfolio_rag.evaluation import GOLDEN_PATH, load_cases
 from portfolio_rag.gate_calibration import OFF_TOPIC, OFF_TOPIC_ZH, ON_TOPIC, ON_TOPIC_ZH
-from portfolio_rag.loader import _effective_length, load_knowledge
+from portfolio_rag.loader import _CJK_RE, _CJK_WEIGHT, _effective_length, load_knowledge
 
 KNOWLEDGE_DIR = settings.chat_root / "knowledge"
 
@@ -80,53 +95,55 @@ def _normalize(text: str) -> str:
     return " ".join(text.lower().split())
 
 
-# Coarse clause boundaries: commas/semicolons/colons/question marks (Latin
-# and full-width CJK forms) plus a short list of English coordinating
-# conjunctions -- deliberately not a real parser, just enough to ask "do
-# these two clauses of the query show up in a DIFFERENT order in the body."
-# A clause moved earlier or later in a sentence breaks the ONE contiguous
-# run a whole-string LCS could otherwise find spanning it and whatever now
-# sits next to it -- checking each clause against the body separately
-# recovers that. This does NOT reorder anything WITHIN a clause (see the
-# module docstring's "known gap" section): word-level reordering inside one
-# clause is a different, harder problem this file does not attempt to solve.
-_CLAUSE_SPLIT = re.compile(r",|;|:|\?|，|；|：|？|、| and | but | or | while | whether ")
-_MIN_CLAUSE_LEN = 6  # below this, a clause's own length caps LCS well under
-# either threshold regardless of match quality -- purely a cheap skip for
-# fragments (a trailing article, a lone "and") too short to ever matter, not
-# a safety mechanism (LCS is bounded by the shorter string's length, so a
-# threshold as low as this changes zero pass/fail outcomes; verified in
-# task-26-report.md's clause-mode sweep against the full real dataset).
+def _char_weight(ch: str) -> float:
+    """loader._effective_length's CJK weighting, applied per character."""
+    return _CJK_WEIGHT if _CJK_RE.match(ch) else 1.0
 
 
-def _split_clauses(text: str) -> list[str]:
-    return [p for p in (s.strip() for s in _CLAUSE_SPLIT.split(text)) if len(p) >= _MIN_CLAUSE_LEN]
-
-
-def _lcs(a: str, b: str) -> str:
-    """Longest common (contiguous) substring of a and b.
+def _lcs_effective(a: str, b: str) -> tuple[float, str]:
+    """Longest common (contiguous) substring of a and b, by EFFECTIVE length.
 
     Standard O(len(a) * len(b)) time, O(len(b)) space DP -- only the running
     row is kept since only the best cell's value (and its text) is needed,
     not the full table. Corpus bodies here are short (well under 300 chars,
     see the survey in task-26-report.md), so this is fast; there is no need
     for a suffix-automaton or other sub-quadratic approach at this scale.
+
+    Maximizes EFFECTIVE length (loader._effective_length's CJK weighting)
+    directly in the DP, rather than finding the RAW-longest substring first
+    and weighting it afterward. That two-step version is not just a cosmetic
+    tie-break difference, it is an outright wrong answer whenever a SHORTER,
+    CJK-dense candidate (higher effective length) competes with a LONGER,
+    Latin-only candidate (lower effective length) for the same match: raw-
+    length-first always picks the longer one, even when the shorter one is
+    the more informationally significant match. Concretely: two disjoint
+    candidate substrings "abcde" (raw 5, effective 5.0) and "一二三" (raw 3,
+    effective 7.5) -- a raw-length-first search reports "abcde" (wrong, lower
+    effective length); this function reports "一二三" (right). Confirmed by a
+    review of this task, which traced 234/3180 golden-ZH pairs' small score
+    deltas (max +3.0 effective) under an earlier per-clause variant to
+    exactly this bug rather than to the variant's own (nonexistent, see the
+    module docstring) reordering capability.
     """
     if not a or not b:
-        return ""
-    prev = [0] * (len(b) + 1)
-    best_len = 0
+        return 0.0, ""
+    prev_eff = [0.0] * (len(b) + 1)
+    prev_len = [0] * (len(b) + 1)
+    best_eff = 0.0
     best_end = 0  # end index in `a` of the best match found so far
+    best_len = 0  # its RAW length, needed to slice the substring back out
     for i, ca in enumerate(a, start=1):
-        curr = [0] * (len(b) + 1)
+        curr_eff = [0.0] * (len(b) + 1)
+        curr_len = [0] * (len(b) + 1)
+        weight = _char_weight(ca)
         for j, cb in enumerate(b, start=1):
             if ca == cb:
-                curr[j] = prev[j - 1] + 1
-                if curr[j] > best_len:
-                    best_len = curr[j]
-                    best_end = i
-        prev = curr
-    return a[best_end - best_len : best_end]
+                curr_eff[j] = prev_eff[j - 1] + weight
+                curr_len[j] = prev_len[j - 1] + 1
+                if curr_eff[j] > best_eff:
+                    best_eff, best_end, best_len = curr_eff[j], i, curr_len[j]
+        prev_eff, prev_len = curr_eff, curr_len
+    return best_eff, a[best_end - best_len : best_end]
 
 
 # --- threshold ---------------------------------------------------------
@@ -165,37 +182,23 @@ _ABS_EFFECTIVE_THRESHOLD = 30
 # already behaves correctly for both scripts without further adjustment.
 _RATIO_THRESHOLD = 0.8
 
-# Both thresholds were re-verified after _overlap grew clause-level checking
-# (see _split_clauses above): the per-clause candidates NEVER raised any of
-# the four legitimate-maxima figures above (calibration EN 18, calibration
-# ZH 20, golden EN 25, golden ZH 17.5, all unchanged from the whole-string-
-# only version) across the full real dataset -- clause splitting only adds
-# sensitivity to a query whose clauses appear in a DIFFERENT order than the
-# body, which none of the current, already-accepted queries do.
+# Both thresholds were re-verified after _lcs_effective replaced the earlier
+# raw-length-then-weight two-step (see its docstring for the bug that fix
+# closes): re-surveying all four categories against the corrected,
+# effective-length-maximizing DP reproduced the exact same four maxima
+# (calibration EN 18.0, calibration ZH 20.0, golden EN 25.0, golden ZH 17.5)
+# -- the bug did not happen to affect any of these four TOP entries, only
+# some lower-ranked ones further down each survey. Both thresholds still
+# hold with the same headroom reported above.
 
 
 def _overlap(query: str, body: str) -> tuple[float, float, str]:
-    """(effective LCS length, ratio of query's effective length, matched text).
-
-    Checks the whole normalized query AND each of its clauses (see
-    _split_clauses) against the body, keeping whichever candidate produces
-    the LARGEST effective LCS. The ratio's denominator is always the WHOLE
-    query's effective length, never a clause's -- a short clause matched
-    almost entirely is only suspicious relative to the full question it came
-    from, not relative to itself (a clause-scoped denominator would inflate
-    the ratio for short clauses purely because they're short, independent of
-    whether they're actually a large share of the query).
-    """
+    """(effective LCS length, ratio of query's effective length, matched text)."""
     nq = _normalize(query)
     nb = _normalize(body)
     eff_query = _effective_length(nq) or 1.0
-    best_eff, best_ratio, best_shared = 0.0, 0.0, ""
-    for candidate in (nq, *_split_clauses(nq)):
-        shared = _lcs(candidate, nb)
-        eff_shared = _effective_length(shared)
-        if eff_shared > best_eff:
-            best_eff, best_ratio, best_shared = eff_shared, eff_shared / eff_query, shared
-    return best_eff, best_ratio, best_shared
+    eff_shared, shared = _lcs_effective(nq, nb)
+    return eff_shared, eff_shared / eff_query, shared
 
 
 def _find_collisions(queries, sections) -> list[dict]:
@@ -289,66 +292,22 @@ def test_checker_does_not_flag_a_bare_shared_proper_noun_chinese() -> None:
     assert not collisions, f"false positive on a shared-term-only pair (ZH): {collisions}"
 
 
-def test_checker_flags_a_clause_reordered_paraphrase_english() -> None:
-    """A code-review round on this task planted 5 realistic paraphrases
-    (clause-reordered / active-passive-swapped / statement->question) built
-    from real corpus sentences and showed plain whole-string LCS misses all
-    of them (12.0-26.0 effective length, both under the 30 threshold) --
-    because swapping two whole clauses breaks the ONE contiguous run a
-    whole-string search could otherwise find. This is the case _split_clauses
-    exists to close: each clause is checked against the body on its own, so
-    a clause that kept its internal wording but moved to a different
-    position in the sentence is still found."""
-    body = (
-        "For this site's chat widget, nearest-neighbor search over site "
-        "content happens entirely in the visitor's browser against a static "
-        "index file; only the query embedding and the relevance-gate check "
-        "happen through a small server function."
-    )
-    # The two clauses of `body` above, reordered and reframed as a question --
-    # same facts, same wording per clause, different sentence-level order.
-    clause_reordered_paraphrase = (
-        "Does the relevance-gate check happen through a small server "
-        "function, while nearest-neighbor search happens entirely in the "
-        "visitor's browser?"
-    )
-    collisions = _find_collisions([clause_reordered_paraphrase], [("planted-en-reorder", body)])
-    assert collisions, "checker failed to catch a clause-reordered paraphrase (EN)"
-    assert collisions[0]["eff_len"] >= _ABS_EFFECTIVE_THRESHOLD
-
-
-def test_checker_flags_a_clause_reordered_paraphrase_chinese() -> None:
-    """Chinese counterpart of the EN clause-reorder test above -- clause
-    boundaries here are full-width punctuation (，), not English
-    conjunctions, exercising the other half of _CLAUSE_SPLIT."""
-    body = (
-        "在那个五人团队做的自动微分工具里，王元辰实现了前向模式引擎的核心部分："
-        "通过运算符重载让对偶数在加减乘除等复合表达式里正确传播，从而在运行时"
-        "算出精确导数，而不用手动套链式法则。"
-    )
-    clause_reordered_paraphrase = (
-        "通过运算符重载让对偶数正确传播，是王元辰在那个五人团队做的自动微分工具里"
-        "实现的前向模式引擎核心部分吗？"
-    )
-    collisions = _find_collisions([clause_reordered_paraphrase], [("planted-zh-reorder", body)])
-    assert collisions, "checker failed to catch a clause-reordered paraphrase (ZH)"
-    assert collisions[0]["eff_len"] >= _ABS_EFFECTIVE_THRESHOLD
-
-
 def test_checker_still_misses_a_word_reordered_paraphrase_a_known_limitation_english() -> None:
     """Documents, rather than silently leaves undiscovered, the comparator's
-    real remaining limit: an active/passive (word-order) swap WITHIN one
-    clause scrambles the contiguous run itself, not just its position in the
-    sentence, so neither whole-string nor per-clause LCS catches it (measured
-    here: 28.0 effective length / 0.34 ratio, both under threshold). An
-    order-invariant character/n-gram-bag alternative was tried and rejected
-    for this (see the module docstring and task-26-report.md): it scores the
-    ALREADY-ACCEPTED calibration query "grapple traversal mechanic" (a shared
-    technical term, not reuse) as high as or higher than this very
-    paraphrase, so no threshold on that signal separates the two cases. If a
-    future change closes this gap, update this assertion (and the module
-    docstring's "known gap" section) to describe the new capability instead
-    of quietly deleting it."""
+    real limit: an active/passive (word-order) swap scrambles the
+    contiguous run LCS depends on, so it is not caught (measured here: 28.0
+    effective length / 0.34 ratio, both under threshold). Two fixes were
+    tried and rejected for this -- see the module docstring: (1) a per-
+    clause LCS variant, proven mathematically inert (a clause is always a
+    substring of the whole query, so it can never find a longer match than
+    the whole-string search already would) and removed; (2) an order-
+    invariant character/n-gram-bag signal, which scores the ALREADY-ACCEPTED
+    calibration query "grapple traversal mechanic" (a shared technical term,
+    not reuse) as high as or higher than this very paraphrase, so no
+    threshold on that signal separates the two cases. If a future change
+    closes this gap, update this assertion (and the module docstring's
+    "known gap" section) to describe the new capability instead of quietly
+    deleting it."""
     body = (
         "He designed and implemented grapple traversal as a core movement "
         "mechanic in Cemented Dreams."
@@ -366,9 +325,9 @@ def test_checker_still_misses_a_word_reordered_paraphrase_a_known_limitation_eng
 
 def test_checker_still_misses_a_word_reordered_paraphrase_a_known_limitation_chinese() -> None:
     """Chinese counterpart: a subject/predicate inversion turning a
-    statement into a question, same words, different order within the
-    clause (measured: 22.5 effective length / 0.30 ratio, both under
-    threshold). See the English version above for the full reasoning."""
+    statement into a question, same words, different order (measured: 22.5
+    effective length / 0.30 ratio, both under threshold). See the English
+    version above for the full reasoning."""
     body = "他是一名游戏开发者，正在南加州大学攻读计算机科学硕士（游戏开发方向）。"
     word_reordered_paraphrase = "游戏开发方向的计算机科学硕士，是他正在南加州大学攻读的学位吗？"
     collisions = _find_collisions([word_reordered_paraphrase], [("planted-zh-wordswap", body)])
