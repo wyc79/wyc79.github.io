@@ -29,8 +29,23 @@
   // indexes: raw top-score >= 0.22 (the MiniLM calibration).
   var OFFTOPIC_GATE = 0.22;
 
-  function gateThreshold() {
-    return (state.index && state.index.gate_threshold) || OFFTOPIC_GATE;
+  // Second-tier threshold (task 28): `src` carries {gate_threshold,
+  // task_threshold} from either state.index (local self-gate) or
+  // fallback_vectors.json (degraded mode) -- same policy, two possible
+  // sources. task_threshold null/undefined means this build's
+  // calibration had too few TASK_REQUEST_RE-flagged on-topic queries to
+  // place a second threshold honestly (see gate_calibration.py's
+  // compute_task_gate) -- falls back to the base threshold exactly as if
+  // the question were never flagged.
+  function taskAwareThreshold(src, text) {
+    if (src && src.task_threshold != null && text != null && TASK_REQUEST_RE.test(text)) {
+      return src.task_threshold;
+    }
+    return (src && src.gate_threshold) || OFFTOPIC_GATE;
+  }
+
+  function gateThreshold(text) {
+    return taskAwareThreshold(state.index, text);
   }
 
   function statValue(stats, kind) {
@@ -66,6 +81,25 @@
   // language. (Explicit \u escapes: the literal compat-range start char is a
   // homoglyph of the unified one and easy to mistype.)
   var CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
+
+  // Task 28 -- the INTENT axis, orthogonal to topic (see
+  // chat/src/portfolio_rag/runtime.py's TASK_REQUEST_RE docstring for the
+  // full reasoning; mirrored here in JS terms, and again in
+  // functions/tencent/index.py -- see tests/test_task_request_re_sync.py,
+  // which exists because BIO_STUB_RE has already drifted between these
+  // implementations twice). Distinguishes a REQUEST FOR WORK ("write me a
+  // poem") from a QUESTION ABOUT HIM (topic similarity handles that axis;
+  // this one does not) -- applied to gateForm()'s OUTPUT, never the raw
+  // question, so the name is already stripped/normalized by the time this
+  // runs. NOT an override: a match raises the bar (task_threshold) rather
+  // than refusing outright, so a task-phrased ON-TOPIC question ("give me
+  // the quick version of him") still passes if it clears the higher bar --
+  // see chat/src/portfolio_rag/gate_calibration.py's compute_task_gate.
+  // JS's \b is ASCII-only (unlike Python's Unicode-aware \w), which is
+  // exactly the semantics wanted for the English alternatives below -- no
+  // lookaround needed here, unlike NAME_TEST_RE/BIO_STUB_RE above. Explicit
+  // \u escapes for the CJK markers, per CJK_RE's homoglyph warning.
+  var TASK_REQUEST_RE = /\b(?:give\s+me|write\s+(?:me|my|our|us|an|a)|translate|summarize|summarise|tell\s+me\s+a|help\s+me|walk\s+(?:me|us)\s+through|break\s+down|draft\s+(?:me|my|our|us)|compose|generate\s+(?:me|my|our|us)|build\s+(?:me|my|our|us)|design\s+(?:me|my|our|us)|create\s+(?:me|my|our|us)|optimi[sz]e\s+(?:me|my|our|us)|(?:debug|review|refactor|calculate|solve)\s+(?:me|my|our|us)|reply\s+as|answer\s+as|respond\s+as|act\s+as|pretend\s+(?:to\s+be|you're|you\s+are)|roleplay)\b|\u5e2e\u6211|\u7ed9\u6211|\u9ebb\u70e6|\u626e\u6f14|\u5047\u88c5|\u5192\u5145|\u53e3\u543b|\u8bed\u6c14|\u7ffb\u8bd1|\u5199\u4e00/i;
 
   // Gate input. When the name was stripped (off-topic detection), gate on the
   // remainder. When it was KEPT (a bio question), normalize the name to the
@@ -531,11 +565,12 @@
         return out.data;
       };
       var retrieved = retrieveFallback(fb, await embedFb(question));
+      var degradedGateText = stripped || question;
       var gateScore = stripped
         ? statValue(retrieveFallback(fb, await embedFb(stripped)).stats, fb.gate_stat || 'top')
         : statValue(retrieved.stats, fb.gate_stat || 'top');
       thinking.classList.remove('ycchat-dots');
-      if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
+      if (gateScore < taskAwareThreshold(fb, degradedGateText)) {
         thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
         pushLog({ type: 'bot', text: thinking.textContent });
@@ -832,11 +867,17 @@
       } else if (state.index.gate_remote) {
         record.gate = { remote: true, unavailable: true };
       } else {
+        var localGateText = stripped || question;
         var gateScore = stripped
           ? gateValue(retrieve((await embedQuery(stripped, stripped)).vector).stats)
           : gateValue(retrieved.stats);
-        if (stripped) record.gate = { stripped: stripped, score: +gateScore.toFixed(3) };
-        refused = gateScore < gateThreshold();
+        if (stripped) {
+          record.gate = {
+            stripped: stripped, score: +gateScore.toFixed(3),
+            reason: TASK_REQUEST_RE.test(localGateText) ? 'task_request' : undefined,
+          };
+        }
+        refused = gateScore < gateThreshold(localGateText);
       }
       if (refused) {
         record.mode = 'off_topic_refused';
