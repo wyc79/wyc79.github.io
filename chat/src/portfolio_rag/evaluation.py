@@ -177,6 +177,13 @@ class CaseResult:
     # see aggregate()'s hit_at_4_page_only and _find_regressions in
     # tests/test_golden.py, which deliberately does not compare it.
     hit_page_only: bool | None = None
+    # Task 28: GateDecision.reason, carried through so aggregate() can break
+    # refusals out by MECHANISM -- "refused as off-topic" (reason is None,
+    # judged against the ordinary threshold) vs "refused because it read as
+    # a request to do work" (reason == "task_request", judged against the
+    # higher task_threshold) -- never blended, same standing rule as
+    # adjacency (easy vs adjacent) above.
+    reason: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -223,6 +230,7 @@ def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
         retrieved_langs=dict(Counter(h.lang for h in retrieval.hits)),
         dropped_by_floor=retrieval.dropped_by_floor,
         hit_page_only=hit_page_only,
+        reason=decision.reason,
     )
 
 
@@ -277,6 +285,25 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
                     "refusal_adjacent": 0, "n_adjacent": 0,
                     "refusal_injection": 0, "n_injection": 0,
                     "gate_available": True,
+                    # Task 28: refusal MECHANISM, orthogonal to the adjacency
+                    # buckets above and never blended with them or with each
+                    # other -- "refused as off-topic" (topic) and "refused
+                    # because it read as a request to do work" (intent) have
+                    # different fixes, same standing rule as easy/adjacent.
+                    # refusal_<bucket>_topic + refusal_<bucket>_intent ==
+                    # refusal_<bucket> always (every refusal used exactly one
+                    # mechanism); n_<bucket>_intent is how many of that
+                    # bucket's cases TASK_REQUEST_RE flagged at all (refused
+                    # or not) -- n_<bucket> - n_<bucket>_intent is the topic
+                    # count. Diagnostic, not wired into
+                    # tests/test_golden.py's _REGRESSION_METRICS (same
+                    # treatment as hit_at_4_page_only/gate_margin).
+                    "refusal_easy_topic": 0, "refusal_easy_intent": 0,
+                    "n_easy_intent": 0,
+                    "refusal_adjacent_topic": 0, "refusal_adjacent_intent": 0,
+                    "n_adjacent_intent": 0,
+                    "refusal_injection_topic": 0, "refusal_injection_intent": 0,
+                    "n_injection_intent": 0,
                 },
             )
             cell["n_negative"] += 1
@@ -290,6 +317,12 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             refusal_key, n_key = f"refusal_{bucket}", f"n_{bucket}"
             cell[refusal_key] = cell.get(refusal_key, 0) + int(not r.gate_passed)
             cell[n_key] = cell.get(n_key, 0) + 1
+            mech = "intent" if r.reason == "task_request" else "topic"
+            mech_key = f"refusal_{bucket}_{mech}"
+            cell[mech_key] = cell.get(mech_key, 0) + int(not r.gate_passed)
+            if mech == "intent":
+                intent_n_key = f"n_{bucket}_intent"
+                cell[intent_n_key] = cell.get(intent_n_key, 0) + 1
         # A cjk_bypass decision means there is no zh gate; the gate columns for
         # that cell are unmeasured rather than perfect.
         if not r.gate_available or r.gate_value is None and r.case.lang == "zh":

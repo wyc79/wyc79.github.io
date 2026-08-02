@@ -52,6 +52,82 @@ BIO_STUB_RE = re.compile(
 # carries the same warning). The string is NOT raw, so Python reads them.
 CJK_RE = re.compile("[\\u3040-\\u30ff\\u3400-\\u9fff\\uf900-\\ufaff]")
 
+# Task 28 -- the INTENT axis, orthogonal to topic. Finding V measured that no
+# threshold separates "about game design in general" from "about HIS game
+# design work" on similarity alone (see gate_calibration.py's module comment
+# on adjacent probes). Intent is a different axis entirely: "write me some
+# Python code" and "what languages does he know" differ by SPEECH ACT, not
+# topic -- one asks the assistant to perform work, the other asks about the
+# person -- and cosine similarity is blind to that distinction, which is
+# exactly why the gate leaks it.
+#
+# This is deliberately NOT a hard refuse. A first attempt at that produced a
+# false positive on a real question (visitor-en-01: "What about Yuanchen
+# Wang -- could you give me the quick version before pointing me toward
+# whatever's worth clicking on first?") -- a legitimate question phrased as a
+# request. So a match here does not refuse outright; it raises the bar
+# (bundle.task_threshold, a HIGHER similarity floor than the ordinary
+# bundle.threshold -- see Runtime.gate and gate_calibration.compute_task_gate)
+# for whatever text remains after gate_form's name handling. "Give me the
+# quick version of him" clears that higher bar; "give me a poem" does not,
+# because it isn't about him at all -- similarity does that job, same as
+# always, just at a stricter cutoff.
+#
+# Applied to gate_form()'s OUTPUT, never the raw question (see Runtime.gate):
+# by the time this runs the name is already stripped or normalized, so "YC,
+# write me an essay" is judged on "write me an essay" alone.
+#
+# Over-flagging a genuine on-topic query is safe by construction:
+# compute_task_gate's zero-false-refusal policy guarantees every FLAGGED
+# on-topic calibration query still clears its own (flagged-subset) floor --
+# gaining this tier can only narrow what a task-shaped NEGATIVE can get away
+# with, never falsely refuse a task-shaped calibration positive. Under-
+# flagging (missing a real request, or a visitor who rephrases around this
+# list -- "I'd love a poem about love") is the accepted residual risk: this
+# is defence-in-depth, not a classifier, and the LLM system prompt is the
+# backstop (see roles.py's BASE_SYSTEM_PROMPT).
+#
+# Duplicated in scripts/chat-widget.js and functions/tencent/index.py -- the
+# latter must stay stdlib-only, so it cannot import this module. BIO_STUB_RE
+# has already drifted between those two implementations twice in this
+# project's history (once as a literal alternation typo, once as a \w
+# Unicode/ASCII mismatch) -- see tests/test_task_request_re_sync.py, which
+# exists so a fourth synchronized regex does not repeat that silently. JS's
+# \b is ASCII-only (unlike Python's Unicode-aware \w), so the JS copy uses
+# plain \b for the English alternatives with no lookaround needed; the
+# Python copy below uses the same negative-lookaround style as NAME_RE/
+# BIO_STUB_RE above for exactly the reason those do. Explicit \uXXXX escapes
+# for the CJK markers, per CJK_RE's homoglyph warning above.
+TASK_REQUEST_RE = re.compile(
+    r"(?<![a-zA-Z0-9_])(?:"
+    r"give\s+me|"
+    r"write\s+(?:me|my|our|us|an|a)|"
+    r"translate|"
+    r"summarize|summarise|"
+    r"tell\s+me\s+a|"
+    r"help\s+me|"
+    r"walk\s+(?:me|us)\s+through|"
+    r"break\s+down|"
+    r"draft\s+(?:me|my|our|us)|"
+    r"compose|"
+    r"generate\s+(?:me|my|our|us)|"
+    r"build\s+(?:me|my|our|us)|"
+    r"design\s+(?:me|my|our|us)|"
+    r"create\s+(?:me|my|our|us)|"
+    r"optimi[sz]e\s+(?:me|my|our|us)|"
+    r"(?:debug|review|refactor|calculate|solve)\s+(?:me|my|our|us)|"
+    r"reply\s+as|answer\s+as|respond\s+as|"
+    r"act\s+as|pretend\s+(?:to\s+be|you're|you\s+are)|roleplay"
+    r")(?![a-zA-Z0-9_])"
+    # bangwo (help me) | geiwo (give me) | mafan (please/mind)
+    "|\u5e2e\u6211|\u7ed9\u6211|\u9ebb\u70e6"
+    # banyan (roleplay) | jiazhuang (pretend) | maochong (impersonate)
+    "|\u626e\u6f14|\u5047\u88c5|\u5192\u5145"
+    "|\u53e3\u543b|\u8bed\u6c14"  # kouwen (in someone's voice) | yuqi (tone)
+    "|\u7ffb\u8bd1|\u5199\u4e00",  # fanyi (translate) | xieyi (write a/an ...)
+    re.I,
+)
+
 _WS_RE = re.compile(r"\s+")
 _EDGE_PUNCT_RE = re.compile(r"^[\s:;,.!?—-]+|[\s:;,.!?—-]+$")
 
@@ -149,11 +225,29 @@ class _GateBundle:
         # (index_builder.py) ever writes this key.
         margin = spec.get("gate_margin")
         self.margin = None if margin is None else float(margin)
+        # Task 28's second tier. None means this build's calibration had too
+        # few TASK_REQUEST_RE-flagged on-topic queries to place a second
+        # threshold honestly (gate_calibration.compute_task_gate's
+        # MIN_FLAGGED_ON_TOPIC floor) -- judge() then falls back to the base
+        # threshold for every question, task-shaped or not, exactly as if
+        # this tier did not exist. Never a fabricated 0.0/None-as-zero.
+        task_threshold = spec.get("task_threshold")
+        self.task_threshold = None if task_threshold is None else float(task_threshold)
+        task_margin = spec.get("task_margin")
+        self.task_margin = None if task_margin is None else float(task_margin)
 
-    def judge(self, text: str) -> tuple[bool, float]:
+    def judge(self, text: str) -> tuple[bool, float, bool]:
+        """Returns (passed, value, is_task_tier) -- is_task_tier is True only
+        when TASK_REQUEST_RE matched AND this bundle actually ships a
+        task_threshold (see the None case above); it is what Runtime.gate
+        reports as reason="task_request", and what evaluation.py uses to
+        report refusals broken out by mechanism (topic vs intent) rather
+        than blending them."""
         scores = self.matrix @ self.embedder.embed_query(text)
         value = _stat_value(scores, self.stat)
-        return value >= self.threshold, round(value, 4)
+        is_task_tier = self.task_threshold is not None and TASK_REQUEST_RE.search(text) is not None
+        threshold = self.task_threshold if is_task_tier else self.threshold
+        return value >= threshold, round(value, 4), is_task_tier
 
 
 class Runtime:
@@ -198,7 +292,10 @@ class Runtime:
     @property
     def gate_meta(self) -> dict:
         return {
-            lang: {"stat": bundle.stat, "threshold": bundle.threshold, "margin": bundle.margin}
+            lang: {
+                "stat": bundle.stat, "threshold": bundle.threshold, "margin": bundle.margin,
+                "task_threshold": bundle.task_threshold, "task_margin": bundle.task_margin,
+            }
             for lang, bundle in self._gates.items()
             if bundle is not None
         }
@@ -379,8 +476,12 @@ class Runtime:
             bundle, lang = self._gates.get("en"), "en"
             if bundle is None:
                 return GateDecision(False, False, None, "en", None, reason="no_en_gate")
-        passed, value = bundle.judge(text)
-        return GateDecision(True, passed, value, lang, bundle.threshold)
+        passed, value, is_task_tier = bundle.judge(text)
+        threshold = bundle.task_threshold if is_task_tier else bundle.threshold
+        return GateDecision(
+            True, passed, value, lang, threshold,
+            reason="task_request" if is_task_tier else None,
+        )
 
 
 def load_runtime() -> Runtime:

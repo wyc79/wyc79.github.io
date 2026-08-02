@@ -45,6 +45,16 @@ def main() -> None:
         f"{stats['index_kb']:>10}{stats['gate_threshold']:>8}{stats['elapsed_seconds']:>9.3f}"
     )
     print(f"off-topic gate: {stats['gate_stat']} >= {stats['gate_threshold']}")
+    # Task 28's second (task-request) tier -- None means this build's
+    # calibration had too few TASK_REQUEST_RE-flagged on-topic queries to
+    # place it honestly (gate_calibration.compute_task_gate); reported
+    # plainly rather than silently omitted, since "not shipped" and "shipped
+    # at X" are both facts worth seeing in the build log.
+    if stats["task_threshold"] is not None:
+        print(f"task-request gate: {stats['gate_stat']} >= {stats['task_threshold']} "
+              f"(margin {stats['task_margin']:+.1%})")
+    else:
+        print("task-request gate: not shipped (too few flagged on-topic calibration queries)")
 
 
 if __name__ == "__main__":
