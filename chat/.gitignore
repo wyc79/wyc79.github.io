@@ -16,9 +16,14 @@ functions/tencent/_wheels/
 functions/tencent/tencent-function-*.zip
 # build artifact normally only ever inside the zip above; test_scf_index_loading.py
 # writes a temporary one here and always removes it, but belt-and-braces
-functions/tencent/index.json
+functions/tencent/chunks.json
 models/Xenova/bge-small-zh-v1.5/
-data/gate_vectors.json
+# Chinese off-topic gate vectors (Task 29 Part 2). MUST NEVER be served to a
+# browser -- MiniLM (the only in-browser model) cannot embed Chinese at all,
+# so gitignoring this is the enforcement that does not depend on
+# scripts/chat-widget.js behaving correctly. Unrecoverable by git, same as
+# gate_vectors.json (this file's predecessor) was.
+data/gate_zh_bge.json
 
 # scratch area for files Claude cannot delete remotely - safe to delete manually
 _to_delete/

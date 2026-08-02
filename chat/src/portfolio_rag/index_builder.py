@@ -1,9 +1,14 @@
-"""Write path of the pipeline: site HTML → chunks → vectors → data/index.json.
+"""Write path of the pipeline: site HTML → chunks → vectors →
+data/chunks_{model_preset}.json (+ data/gate_en_minilm.json,
+data/gate_zh_bge.json, data/chunks_en_minilm.json for a preset that
+delegates gating -- see Settings.resolve_chunks_path).
 
-The output is a static file served by GitHub Pages; the browser widget
-fetches it once and does retrieval (dot product over normalized vectors)
-entirely client-side. Chunk ids are deterministic ({url}#{anchor}:{i}) so
-rebuilds are stable diffs.
+The outputs are static files served by GitHub Pages; normal mode's retrieval
+happens server-side (Task 29 Part 1), and the browser widget fetches a
+chunks file itself only for light mode or the degraded-mode fallback, doing
+retrieval (dot product over normalized vectors) client-side in that case.
+Chunk ids are deterministic ({url}#{anchor}:{i}) so rebuilds are stable
+diffs.
 """
 
 import json
@@ -32,7 +37,22 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
     """Chinese first-pass gate: bge-zh over the hand-written
     knowledge/about_zh.md corpus. Evidence-gated — only enabled if calibration
     on the zh query sets actually separates (otherwise the backend keeps the
-    CJK bypass). Set RAG_ZH_GATE_FORCE=1 to write it despite overlap (testing)."""
+    CJK bypass). Set RAG_ZH_GATE_FORCE=1 to write it despite overlap (testing).
+
+    Returned (never written here — the caller writes it to
+    settings.gate_zh_bge_path, gitignored, see config.py) as a dict, never a
+    None-then-write: the caller decides whether to write it at all. There is
+    deliberately no "chunks_zh_minilm" retrieval counterpart to pair with
+    this gate the way chunks_en_minilm.json pairs with the en gate. MiniLM —
+    the ONLY model this project ever ships to the browser — cannot embed
+    Chinese at all, and the widget already handles CJK questions in degraded
+    mode by showing `degradedCJK` plus static page links (the SUGGESTED_PAGES
+    list in scripts/chat-widget.js), never by attempting local Chinese
+    retrieval. A symmetric-looking "chunks_zh_minilm.json" is the tempting
+    mistake someone will eventually reach for BECAUSE gate_en_minilm.json has
+    a retrieval counterpart and this file looks like it "should" too — it
+    should not, and building one would silently violate the "no Chinese
+    degraded mode" contract with no error to catch it."""
     zh_model = preset.get("gate_model_zh")
     if not zh_model:
         return None
@@ -61,6 +81,8 @@ def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
         "model_preset": zh_model,
         "query_prefix": zh_preset["query_prefix"],
         "pooling": zh_preset.get("pooling", "mean"),
+        "lang": "zh",
+        "corpus": "knowledge/about_zh.md",
         "gate_stat": gate["stat"],
         "gate_threshold": gate["threshold"],
         "gate_margin": gate["margin"],
@@ -80,9 +102,10 @@ def _check_en_gate_margin(gate: dict) -> None:
     cannot be scrolled past in a build log.
 
     Must be called immediately after compute_gate() returns and before ANY
-    of gate_vectors.json, fallback_vectors.json, roles.json or index.json
-    are written — a raise placed after even one of those writes leaves
-    data/ half-updated, which is worse than the silent-ship bug it replaces.
+    of gate_en_minilm.json, gate_zh_bge.json, chunks_en_minilm.json,
+    roles.json or chunks_{model_preset}.json are written — a raise placed
+    after even one of those writes leaves data/ half-updated, which is worse
+    than the silent-ship bug it replaces.
 
     The floor is RAG_MIN_GATE_MARGIN (default 0.0), not a hardcoded sign
     check: +0.5% margin isn't meaningfully healthier than -0.5%, and the
@@ -109,25 +132,34 @@ def build_index(site_root: Path | None = None) -> dict:
     site_root = site_root or settings.site_root
     preset = settings.preset
 
-    # Guard against silently rebuilding the index in a different embedding
-    # space. gate_vectors.json, fallback_vectors.json and the deployed
-    # Tencent function all depend on the model_preset the committed
-    # index.json was built with (see .env.example) — a mismatch here means
-    # settings.model_preset drifted from that (e.g. a fresh clone missing
-    # chat/.env fell back to the "minilm" default). Checked before any work
-    # is done, not after, so a refused build doesn't waste an embedding pass.
-    existing_index_path = settings.resolve_path(settings.index_path)
-    if existing_index_path.exists() and not os.environ.get("RAG_ALLOW_PRESET_CHANGE"):
-        existing_preset = json.loads(existing_index_path.read_text(encoding="utf-8")).get(
+    # Guard against silently rebuilding the retrieval corpus in a different
+    # embedding space. gate_en_minilm.json, gate_zh_bge.json,
+    # chunks_en_minilm.json and the deployed Tencent function all depend on
+    # the model_preset the committed chunks_{preset}.json was built with (see
+    # .env.example) — a mismatch here means settings.model_preset drifted
+    # from that (e.g. a fresh clone missing chat/.env fell back to the
+    # "minilm" default). Checked before any work is done, not after, so a
+    # refused build doesn't waste an embedding pass. Note this only catches a
+    # STALE file left at the CURRENT preset's own derived path (e.g. a
+    # leftover chunks_e5.json while settings.model_preset is still "e5" but
+    # something else about the build changed) — chunks_path being
+    # preset-derived means a genuine preset switch (e5 -> minilm) writes to a
+    # different filename entirely and never reaches this check at all, which
+    # is fine: chunks_e5.json and chunks_minilm.json coexisting is not a
+    # desync, it's two builds' outputs living side by side.
+    existing_chunks_path = settings.resolve_chunks_path()
+    if existing_chunks_path.exists() and not os.environ.get("RAG_ALLOW_PRESET_CHANGE"):
+        existing_preset = json.loads(existing_chunks_path.read_text(encoding="utf-8")).get(
             "model_preset"
         )
         if existing_preset is not None and existing_preset != settings.model_preset:
             raise ValueError(
-                f"existing index at {existing_index_path} was built with "
+                f"existing chunks file at {existing_chunks_path} was built with "
                 f"model_preset={existing_preset!r}, but settings.model_preset is "
                 f"{settings.model_preset!r}. Rebuilding would desync "
-                "gate_vectors.json, fallback_vectors.json and the deployed "
-                "backend. Set RAG_ALLOW_PRESET_CHANGE=1 to rebuild anyway."
+                "gate_en_minilm.json, gate_zh_bge.json, chunks_en_minilm.json "
+                "and the deployed backend. Set RAG_ALLOW_PRESET_CHANGE=1 to "
+                "rebuild anyway."
             )
 
     # A multilingual retrieval model (e5) gets a DE-INTERLEAVED bilingual index:
@@ -191,7 +223,8 @@ def build_index(site_root: Path | None = None) -> dict:
     # is the same failure mode runtime.py's index-declares-its-own-model fix
     # exists to avoid (see the comment above Runtime's embedder resolution) —
     # apply the same fix here, where it matters even more: this is what
-    # produces the vectors actually written to the committed index.json.
+    # produces the vectors actually written to the committed
+    # chunks_{model_preset}.json.
     embedder = OnnxEmbedder.from_preset(
         preset, settings.resolve_path(preset["dir"]), settings.embedding_max_tokens
     )
@@ -200,10 +233,14 @@ def build_index(site_root: Path | None = None) -> dict:
     for chunk, vector in zip(chunks, vectors):
         chunk["vector"] = [round(float(v), ndigits) for v in vector]
 
-    # Off-topic gate. If the preset delegates gating to another model (e5
-    # can't separate on/off-topic), embed the chunks AGAIN with the gate
-    # model and write data/gate_vectors.json for the backend; otherwise
-    # calibrate the retrieval model itself for the widget's local gate.
+    # Off-topic gate (Task 29 Part 2: "one file, one job" — this whole branch
+    # writes THREE separate single-purpose files instead of the old
+    # gate_vectors.json+fallback_vectors.json pair that conflated a gate
+    # corpus with a retrieval corpus, which is why Task 24 silently broke
+    # degraded-mode source links). If the preset delegates gating to another
+    # model (e5 can't separate on/off-topic), embed the gate corpus AGAIN
+    # with the gate model; otherwise calibrate the retrieval model itself for
+    # the widget's local gate.
     gate_model = preset.get("gate_model")
     if gate_model:
         gate_preset = MODEL_PRESETS[gate_model]
@@ -243,7 +280,7 @@ def build_index(site_root: Path | None = None) -> dict:
         gate_vecs = np.round(gate_vecs.astype(float), ndigits)
         gate = compute_gate(gate_embedder, gate_vecs.astype(np.float32),
                             multilingual=gate_preset["multilingual"])
-        # Must run before ANY write below (gate_vectors.json is the very
+        # Must run before ANY write below (gate_en_minilm.json is the very
         # next thing written) -- see _check_en_gate_margin's docstring.
         _check_en_gate_margin(gate)
         # Symmetric with the zh line below. The en gate is unconditional (e5
@@ -251,78 +288,90 @@ def build_index(site_root: Path | None = None) -> dict:
         # (compute_gate still picks a threshold just above the off-topic max).
         logger.info("en gate: enabled (%s >= %s, margin %.1f%%, %d sections)",
                     gate["stat"], gate["threshold"], gate["margin"] * 100, len(en_sections))
-        gate_payload = {
-            "en": {
-                "model": gate_preset["name"],
-                "model_preset": gate_model,
-                "query_prefix": gate_preset["query_prefix"],
-                "pooling": gate_preset.get("pooling", "mean"),
-                "gate_stat": gate["stat"],
-                "gate_threshold": gate["threshold"],
-                "gate_margin": gate["margin"],
-                # No chunk_ids: the corpus is no longer index.chunks (or a
-                # slice of it), so there is nothing in index.json for these
-                # vectors to positionally align with. Symmetric with
-                # _build_zh_gate's payload, which never had this field either.
-                "vectors": gate_vecs.tolist(),
-            }
-        }
-        zh_gate = _build_zh_gate(preset, ndigits)
-        if zh_gate:
-            gate_payload["zh"] = zh_gate
-        gate_path = settings.resolve_path(settings.gate_vectors_path)
-        gate_path.write_text(json.dumps(gate_payload, ensure_ascii=False), encoding="utf-8")
-
-        # Published fallback for the widget's degraded mode (backend down):
-        # a MiniLM copy of the SAME en gate corpus vectors written to
-        # gate_vectors.json above (gate_vecs, not a fresh embedding pass) —
-        # gate_margin rides along too, and fallback_vectors.json (unlike
-        # gate_vectors.json) IS committed to git, so it's the only copy of
-        # the en margin most clones/CI ever see.
-        #
-        # Task 24 decision: before this change, en gate corpus == the index's
-        # English chunk prefix, so these vectors were coincidentally order-
-        # aligned with index.chunks — the widget's degraded-mode retrieval
-        # (scripts/chat-widget.js:retrieveFallback) piggybacked on that
-        # alignment to map fb.vectors[i] to state.index.chunks[i] and show
-        # source links, not just to gate. Now that the gate corpus is the
-        # curated ~55-section knowledge/about_en.md (not a slice of
-        # index.chunks), that positional mapping is meaningless — vector i is
-        # a curated section, chunk i is whatever the i-th chunk of the full
-        # rebuilt index happens to be, and the two have no relationship.
-        #
-        # Chosen anyway: fallback_vectors.json mirrors gate_vectors.json's en
-        # entry (this is literally what the code already did — gate_vecs is
-        # reused as-is) because its primary, tested, documented role is the
-        # GATE (the widget computes gateScore from it before ever using it
-        # for retrieval; runtime.py's load_runtime() only ever reads it as a
-        # gate bundle). That keeps the gate DECISION consistent between
-        # normal mode (gate_vectors.json) and degraded mode (this file) —
-        # a question that would be refused with the backend up is refused
-        # the same way with it down, which is the property that actually
-        # matters for the off-topic gate's job.
-        #
-        # Consequence, not silently absorbed: chat-widget.js's degraded-mode
-        # "addSources"/source-link recommendation (the retrieval half of
-        # retrieveFallback, distinct from its gate-score half) now maps each
-        # curated-corpus vector to an unrelated chunk by accident of index
-        # position. There is no committed test coverage for that JS path, and
-        # fixing it well needs either a second, retrieval-shaped fallback
-        # corpus or chunk_ids that let the widget look up real chunks instead
-        # of trusting position — both bigger than this task's scope (rebuild
-        # the gate, not redesign degraded-mode retrieval). Flagged for a
-        # follow-up task rather than fixed here.
-        fallback = {
+        # gate_*.json keys ("one file, one job" -- Task 29 Part 2 spec §2.2):
+        # model, model_preset, query_prefix, pooling, lang, corpus, gate_stat,
+        # gate_threshold, gate_margin, vectors. No chunk ids, no chunk text,
+        # no retrieval fields -- a gate corpus is not a retrieval corpus, and
+        # conflating the two (the old gate_vectors.json / fallback_vectors.json
+        # pair) is the exact bug this file split exists to prevent. This is
+        # now the ONLY copy of the en gate (replaces both gate_vectors.json's
+        # "en" entry and the fallback_vectors.json duplicate the widget's
+        # degraded mode used to read for its gate decision), and it is
+        # COMMITTED — e5 can never self-gate, so this file must always exist,
+        # unlike gate_zh_bge.json below.
+        gate_en = {
             "model": gate_preset["name"],
+            "model_preset": gate_model,
             "query_prefix": gate_preset["query_prefix"],
+            "pooling": gate_preset.get("pooling", "mean"),
+            "lang": "en",
+            "corpus": "knowledge/about_en.md",
             "gate_stat": gate["stat"],
             "gate_threshold": gate["threshold"],
             "gate_margin": gate["margin"],
             "vectors": gate_vecs.tolist(),
         }
-        settings.resolve_path(settings.fallback_vectors_path).write_text(
-            json.dumps(fallback, ensure_ascii=False), encoding="utf-8"
+        settings.resolve_path(settings.gate_en_minilm_path).write_text(
+            json.dumps(gate_en, ensure_ascii=False), encoding="utf-8"
         )
+
+        zh_gate = _build_zh_gate(preset, ndigits)
+        if zh_gate:
+            # Gitignored (settings.gate_zh_bge_path / chat/.gitignore) — the
+            # ONLY enforcement that this never reaches a browser which does
+            # not depend on the widget behaving correctly. See
+            # _build_zh_gate's own docstring for why there is deliberately no
+            # "chunks_zh_minilm.json" retrieval counterpart to pair it with.
+            settings.resolve_path(settings.gate_zh_bge_path).write_text(
+                json.dumps(zh_gate, ensure_ascii=False), encoding="utf-8"
+            )
+
+        # Degraded-mode RETRIEVAL corpus (Task 29 Part 2 — the actual fix for
+        # chat-widget.js's degraded-mode source links, not just a rename).
+        # Task 24 broke those links by pointing the gate at a curated
+        # 55-section corpus that no longer order-aligned with the full
+        # chunk index, while chat-widget.js's retrieveFallback kept mapping
+        # fb.vectors[i] -> state.index.chunks[i] positionally -- once the
+        # gate corpus and the chunk index diverged in size/order, that
+        # mapping named an unrelated chunk, so the links were suppressed
+        # rather than shown wrong. The fix is to give degraded mode its own
+        # real, retrieval-shaped corpus instead of repurposing the gate's:
+        # the SAME 192 English chunks as this build's own lang=="en" entries
+        # -- same ids, same order, same text (filtered from `chunks`, not
+        # rebuilt, so tests/test_data_file_layout.py's alignment check holds
+        # by construction) -- re-embedded with MiniLM (reusing gate_embedder,
+        # not a fresh model load). chat-widget.js's retrieveFallback resolves
+        # each result from THIS array's own chunk records, never by
+        # borrowing a position from gate_en_minilm.json or state.chunks.
+        # NOT "all pages": 137 page chunks + 55 curated about_en chunks --
+        # populating it with pages alone would take degraded-mode hit@4 from
+        # 90/96 to 59/96 (measured; see
+        # .superpowers/sdd/EVAL_PLAN/task-29b-brief.md §1).
+        en_chunks = [c for c in chunks if c.get("lang") == "en"]
+        if en_chunks:
+            en_minilm_vectors = gate_embedder.embed_documents([c["text"] for c in en_chunks])
+        else:
+            en_minilm_vectors = np.empty((0, 0), dtype=np.float32)
+        chunks_en_minilm = {
+            "schema_version": SCHEMA_VERSION,
+            "model": gate_preset["name"],
+            "model_preset": gate_model,
+            "query_prefix": gate_preset["query_prefix"],
+            "pooling": gate_preset.get("pooling", "mean"),
+            "dim": int(en_minilm_vectors.shape[1]) if en_chunks else 0,
+            "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "chunk_size": settings.chunk_size,
+            "chunk_overlap": settings.chunk_overlap,
+            "chunks": [
+                {**{k: v for k, v in c.items() if k != "vector"},
+                 "vector": [round(float(v), ndigits) for v in vec]}
+                for c, vec in zip(en_chunks, en_minilm_vectors)
+            ],
+        }
+        settings.resolve_path(settings.chunks_en_minilm_path).write_text(
+            json.dumps(chunks_en_minilm, ensure_ascii=False), encoding="utf-8"
+        )
+
         index_gate = {
             "gate_remote": True, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"],
             "gate_margin": gate["margin"],
@@ -331,21 +380,26 @@ def build_index(site_root: Path | None = None) -> dict:
         matrix = np.array([c["vector"] for c in chunks], dtype=np.float32)
         gate = compute_gate(embedder, matrix, multilingual=preset["multilingual"])
         # Same guard, same "before any write" placement, for the branch
-        # where the retrieval model gates itself (no gate_vectors.json at
-        # all -- index.json's gate_stat/threshold ARE the gate).
+        # where the retrieval model gates itself (no gate_en_minilm.json at
+        # all -- chunks_{model_preset}.json's OWN gate_stat/threshold, folded
+        # into meta.json below, ARE the gate).
         _check_en_gate_margin(gate)
         index_gate = {
             "gate_remote": False, "gate_stat": gate["stat"], "gate_threshold": gate["threshold"],
             "gate_margin": gate["margin"],
         }
 
-    index = {
+    # chunks_*.json keys ("one file, one job" -- Task 29 Part 2 spec §2.2):
+    # schema_version, model, model_preset, query_prefix, pooling, dim,
+    # built_at, chunk_size, chunk_overlap, chunks. No gate fields, no
+    # "multilingual" flag -- gate thresholds live in the gate files and in
+    # meta.json below, not duplicated here.
+    chunks_payload = {
         "schema_version": SCHEMA_VERSION,
         "model": preset["name"],
         "model_preset": settings.model_preset,
         "query_prefix": preset["query_prefix"],
-        "multilingual": preset["multilingual"],
-        **index_gate,
+        "pooling": preset.get("pooling", "mean"),
         "dim": int(vectors.shape[1]) if len(chunks) else 0,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "chunk_size": settings.chunk_size,
@@ -353,26 +407,33 @@ def build_index(site_root: Path | None = None) -> dict:
         "chunks": chunks,
     }
 
-    index_path = settings.resolve_path(settings.index_path)
-    index_path.parent.mkdir(parents=True, exist_ok=True)
-    index_path.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+    # Filename is DERIVED from model_preset, not hardcoded -- see
+    # Settings.resolve_chunks_path(). In production this is chunks_e5.json; a
+    # light `--model minilm` build writes chunks_minilm.json.
+    chunks_path = settings.resolve_chunks_path()
+    chunks_path.parent.mkdir(parents=True, exist_ok=True)
+    chunks_path.write_text(json.dumps(chunks_payload, ensure_ascii=False), encoding="utf-8")
 
-    # Small metadata sidecar (Task 29): the same values already computed
-    # above for index.json, minus the (multi-MB) chunks array. The widget
-    # fetches this on every load instead of the full index, and fetches
-    # index.json itself only when it actually needs the chunk vectors
-    # (light mode / degraded mode) -- see chat-widget.js's loadCore.
+    # Small metadata sidecar (Task 29 Part 1, extended Part 2): the same
+    # values already computed above for chunks_payload, minus the (multi-MB)
+    # chunks array, plus chunks_file (Part 2) naming the retrieval corpus so
+    # the widget's light mode can fetch the right file without inferring a
+    # name from `model` itself -- see chat-widget.js's loadCore. Degraded
+    # mode never reads chunks_file: it always fetches chunks_en_minilm.json
+    # by its fixed name, regardless of what preset built this meta.json --
+    # see chat-widget.js's retrieveFallback.
     meta = {
-        "schema_version": index["schema_version"],
-        "model": index["model"],
-        "model_preset": index["model_preset"],
-        "query_prefix": index["query_prefix"],
-        "gate_remote": index["gate_remote"],
-        "gate_stat": index["gate_stat"],
-        "gate_threshold": index["gate_threshold"],
-        "gate_margin": index["gate_margin"],
-        "built_at": index["built_at"],
-        "dim": index["dim"],
+        "schema_version": chunks_payload["schema_version"],
+        "model": chunks_payload["model"],
+        "model_preset": chunks_payload["model_preset"],
+        "query_prefix": chunks_payload["query_prefix"],
+        "chunks_file": chunks_path.name,
+        "gate_remote": index_gate["gate_remote"],
+        "gate_stat": index_gate["gate_stat"],
+        "gate_threshold": index_gate["gate_threshold"],
+        "gate_margin": index_gate["gate_margin"],
+        "built_at": chunks_payload["built_at"],
+        "dim": chunks_payload["dim"],
         "chunk_count": len(chunks),
     }
     meta_path = settings.resolve_path(settings.meta_path)
@@ -389,7 +450,7 @@ def build_index(site_root: Path | None = None) -> dict:
         "pages": len(pages),
         "sections": len(tagged),
         "chunks": len(chunks),
-        "index_kb": round(index_path.stat().st_size / 1024, 1),
+        "chunks_kb": round(chunks_path.stat().st_size / 1024, 1),
         "gate_stat": gate["stat"],
         "gate_threshold": gate["threshold"],
         "gate_margin": gate["margin"],

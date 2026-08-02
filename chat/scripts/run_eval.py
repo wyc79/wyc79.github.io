@@ -162,11 +162,11 @@ def main() -> int:
 
     rt = load_runtime()
     if not rt.retrieval_available:
-        print("retrieval model missing (see index.json model_preset) -- "
+        print("retrieval model missing (see the chunks file's model_preset) -- "
               "cannot evaluate", file=sys.stderr)
         return 2
     if not rt.zh_gate_available:
-        print("note: no zh gate (data/gate_vectors.json absent) -- Chinese gate "
+        print("note: no zh gate (data/gate_zh_bge.json absent) -- Chinese gate "
               "metrics report n/a. Chinese hit@4 is unaffected.", file=sys.stderr)
     stale_headings = rt.stale_knowledge_headings
     if stale_headings:
@@ -174,9 +174,10 @@ def main() -> int:
         more = f" (+{len(stale_headings) - 5} more)" if len(stale_headings) > 5 else ""
         print(
             f"note: {len(stale_headings)} knowledge-corpus heading(s) baked into "
-            "data/index.json no longer match chat/knowledge/about_*.md on disk -- "
-            "hit@4(pg) may be understating the real page-only number (see "
-            f"Runtime.stale_knowledge_headings). Rebuild the index. Stale: {shown}{more}",
+            "the committed chunks file no longer match chat/knowledge/about_*.md "
+            "on disk -- hit@4(pg) may be understating the real page-only number "
+            f"(see Runtime.stale_knowledge_headings). Rebuild the index. "
+            f"Stale: {shown}{more}",
             file=sys.stderr,
         )
 

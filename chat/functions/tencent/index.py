@@ -11,7 +11,7 @@ Same contract and guarantees as the Cloudflare worker:
   POST /log   client-side event record -> 204
   GET  /      health
 - Origin allowlist, size caps on every field.
-- Retrieval (Task 29): /chat retrieves from its own bundled data/index.json —
+- Retrieval (Task 29): /chat retrieves from its own bundled chunks.json —
   the client no longer sends contexts (a `contexts` field on an old cached
   widget is ignored outright, logged as client_contexts_ignored, never used
   to build the prompt). Retrieval returning nothing -> canned refusal, no LLM
@@ -20,6 +20,12 @@ Same contract and guarantees as the Cloudflare worker:
 - Role prompts come from the site's roles.json (client sends a role id only);
   a bundled roles.json copy is the fallback if github.io is unreachable from
   the function's region.
+- Bundled data (Task 29 Part 2 file split — see chat/README.md): chunks.json
+  (the retrieval corpus, packaged from chat/data/chunks_{preset}.json),
+  gate_en_minilm.json and gate_zh_bge.json (the per-language off-topic gate
+  vectors, packaged from the identically-named chat/data/ files). Each is a
+  single-purpose file — a gate file carries no chunk records, chunks.json
+  carries no gate fields — mirroring the split on the chat/data/ side.
 - Every turn logged as JSON (SCF 日志查询), keyed by a short human-scannable
   request id (rid) + hashed session (sid). /chat logs the exact LLM input
   (system_head + clipped chunks with ids/scores + messages) and output
@@ -85,22 +91,24 @@ _rate_lock = threading.Lock()
 # If MODEL_DIR exists in the package (an ONNX sentence-embedding model, e.g.
 # Xenova/multilingual-e5-small), POST /embed serves query vectors. Without it
 # /embed returns 503 and the widget falls back to its in-browser model.
-# If GATE_MODEL_DIR + gate_vectors.json are also packaged, /embed additionally
-# answers the off-topic gate with the GATE model (MiniLM: e5 can't separate
-# on/off-topic — its cosines compress into one band).
+# If GATE_MODEL_DIR + gate_en_minilm.json are also packaged, /embed
+# additionally answers the off-topic gate with the GATE model (MiniLM: e5
+# can't separate on/off-topic — its cosines compress into one band).
 _embed = {"lock": threading.Lock(), "session": None, "tokenizer": None, "error": None,
           "prefix": "", "pooling": "mean"}
-# Two gate bundles: "en" (MiniLM vs the chunk vectors) and optionally "zh"
-# (bge-zh vs the hand-written knowledge/about_zh.md corpus). CJK queries use zh when
-# available, otherwise bypass to the LLM-prompt guard.
+# Two gate bundles: "en" (MiniLM vs knowledge/about_en.md, packaged from
+# gate_en_minilm.json) and optionally "zh" (bge-zh vs knowledge/about_zh.md,
+# packaged from gate_zh_bge.json when it's present -- see build_package.py).
+# CJK queries use zh when available, otherwise bypass to the LLM-prompt guard.
 _gates: dict = {"en": None, "zh": None}
 
 # ── retrieval (Task 29) ────────────────────────────────────────────────────
-# data/index.json, bundled into the zip next to gate_vectors.json (see
-# build_package.py). /chat retrieves from this directly instead of trusting
-# client-sent contexts -- see the module docstring. matrix stays None (not an
-# empty array) until a real index loads, so callers can tell "not packaged /
-# failed to load" apart from "packaged but genuinely empty".
+# chunks.json, bundled from chat/data/chunks_{preset}.json next to
+# gate_en_minilm.json/gate_zh_bge.json (see build_package.py). /chat
+# retrieves from this directly instead of trusting client-sent contexts --
+# see the module docstring. matrix stays None (not an empty array) until a
+# real index loads, so callers can tell "not packaged / failed to load"
+# apart from "packaged but genuinely empty".
 _index: dict = {"matrix": None, "chunks": None, "error": None}
 
 # Mirrors chat-widget.js's TOP_K/MIN_SCORE and portfolio_rag.runtime's same
@@ -148,42 +156,51 @@ def _load_embedder() -> None:
         log({"type": "embedder_load_failed", "error": repr(err)})
         return
 
-    gate_file = Path(__file__).parent / "gate_vectors.json"
-    if gate_file.exists():
-        import numpy as np
+    # Task 29 Part 2: one gate file per language (gate_en_minilm.json,
+    # gate_zh_bge.json), each already a complete gate spec on its own -- no
+    # more combined gate_vectors.json with per-language keys to unpack.
+    import numpy as np
 
-        payload = json.loads(gate_file.read_text(encoding="utf-8"))
-        dirs = {"en": env("GATE_MODEL_DIR", "gate_model"), "zh": env("GATE_MODEL_ZH_DIR", "gate_model_zh")}
-        for lang in ("en", "zh"):
-            spec = payload.get(lang)
-            if not spec:
-                continue
-            try:
-                tok, session = _load_model(dirs[lang])
-                _gates[lang] = {
-                    "tokenizer": tok,
-                    "session": session,
-                    "matrix": np.array(spec["vectors"], dtype=np.float32),
-                    "stat": spec["gate_stat"],
-                    "threshold": spec["gate_threshold"],
-                    "prefix": spec.get("query_prefix", ""),
-                    "pooling": spec.get("pooling", "mean"),
-                }
-                log({"type": "gate_loaded", "lang": lang, "stat": spec["gate_stat"],
-                     "threshold": spec["gate_threshold"]})
-            except Exception as err:
-                log({"type": "gate_load_failed", "lang": lang, "error": repr(err)})
+    dirs = {"en": env("GATE_MODEL_DIR", "gate_model"), "zh": env("GATE_MODEL_ZH_DIR", "gate_model_zh")}
+    files = {"en": "gate_en_minilm.json", "zh": "gate_zh_bge.json"}
+    for lang in ("en", "zh"):
+        gate_file = Path(__file__).with_name(files[lang])
+        if not gate_file.exists():
+            continue
+        spec = json.loads(gate_file.read_text(encoding="utf-8"))
+        try:
+            tok, session = _load_model(dirs[lang])
+            _gates[lang] = {
+                "tokenizer": tok,
+                "session": session,
+                "matrix": np.array(spec["vectors"], dtype=np.float32),
+                "stat": spec["gate_stat"],
+                "threshold": spec["gate_threshold"],
+                "prefix": spec.get("query_prefix", ""),
+                "pooling": spec.get("pooling", "mean"),
+            }
+            log({"type": "gate_loaded", "lang": lang, "stat": spec["gate_stat"],
+                 "threshold": spec["gate_threshold"]})
+        except Exception as err:
+            log({"type": "gate_load_failed", "lang": lang, "error": repr(err)})
 
 
 def _load_index() -> None:
-    """Load the bundled retrieval index (Task 29). Same "before binding the
+    """Load the bundled retrieval corpus (Task 29). Same "before binding the
     port" window as _load_embedder() -- see main(). Leaves _index["matrix"]
     None (not an empty matrix) on any failure, which /chat's availability
     check treats as "retrieval not available" (503), never as a silent
-    fall-through to client-sent contexts (see the module docstring)."""
-    index_file = Path(__file__).with_name("index.json")
+    fall-through to client-sent contexts (see the module docstring).
+
+    chunks.json is the zip-internal name for whatever chat/data/
+    chunks_{preset}.json build_package.py bundled for this package (Task 29
+    Part 2 renamed the chat/data/ source from index.json; the zip's own
+    internal filename is a packaging detail decoupled from that, chosen to
+    match -- so a `grep -rn "index.json"` sweep for the retired name finds
+    nothing here or anywhere else in the repo)."""
+    index_file = Path(__file__).with_name("chunks.json")
     if not index_file.exists():
-        _index["error"] = "index.json not packaged"
+        _index["error"] = "chunks.json not packaged"
         log({"type": "index_load_failed", "error": _index["error"]})
         return
     try:
@@ -191,8 +208,8 @@ def _load_index() -> None:
 
         payload = json.loads(index_file.read_text(encoding="utf-8"))
         # Defense in depth (Task 29 fix round 1 review): build_package.py
-        # only bundles index.json when its own model_preset matches the
-        # preset it is packaging (index_preset_status()), but a zip can be
+        # only bundles chunks.json when its own model_preset matches the
+        # preset it is packaging (chunks_preset_status()), but a zip can be
         # assembled by hand (or by a future refactor of that script)
         # without going through it. Compare against BUILD_INFO["preset"] --
         # the SAME string build_package.py's make_build_info() stamped into
@@ -226,11 +243,11 @@ def _load_index() -> None:
                 "type": "index_preset_unverifiable",
                 "index_model_preset": index_preset,
                 "warning": "build_info.json has no usable 'preset' -- cannot verify "
-                           "index.json matches the packaged retrieval model; loading anyway",
+                           "chunks.json matches the packaged retrieval model; loading anyway",
             })
         elif index_preset != build_preset:
             _index["error"] = (
-                f"index.json model_preset {index_preset!r} does not match this "
+                f"chunks.json model_preset {index_preset!r} does not match this "
                 f"package's build_info.json preset {build_preset!r} -- refusing "
                 "to load a mismatched-embedding-space index"
             )

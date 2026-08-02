@@ -10,9 +10,10 @@ statistics:
   contrast — max minus corpus mean (peak height above background)
   zscore   — (max - mean) / std   (scale-free peak sharpness)
 
-The chosen statistic + threshold ship in index.json (gate_stat,
-gate_threshold); the widget and tests/test_gate.py implement the same three
-statistics — keep them in sync.
+The chosen statistic + threshold ship in meta.json (gate_stat,
+gate_threshold) and, for a preset that delegates gating, in
+gate_en_minilm.json/gate_zh_bge.json too; the widget and tests/test_gate.py
+implement the same three statistics — keep them in sync.
 
 Task 27: replaced the earlier "widest relative margin" policy, which picked
 whichever statistic maximized (min(on) - max(off)) / spread and, whenever

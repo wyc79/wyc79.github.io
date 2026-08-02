@@ -287,8 +287,9 @@ class Runtime:
         about_<lang>.md files still agree on heading text.
 
         They do not always. The CHUNKS are frozen at build time: page_title/
-        section_title is whatever heading text was on disk when index.json
-        was last written. The heading SET this is compared against, by
+        section_title is whatever heading text was on disk when
+        chunks_{model_preset}.json was last written. The heading SET this is
+        compared against, by
         contrast, is read from the CURRENT about_<lang>.md files on every
         call (via load_knowledge, the same parser index_builder.py uses) --
         not a snapshot from that same build. A heading rename or removal with
@@ -388,7 +389,7 @@ class Runtime:
         if self._embedder is None:
             raise RuntimeError(
                 f"retrieval unavailable: the model directory {self._model_dir} "
-                f"declared by index.json (model_preset="
+                f"declared by the chunks file (model_preset="
                 f"{self._index.get('model_preset')!r}) is not present — it is "
                 "gitignored, so a fresh clone must download it before evaluating"
             )
@@ -418,39 +419,29 @@ class Runtime:
 
 
 def load_runtime() -> Runtime:
-    """Load index + gate bundles + retrieval embedder, degrading explicitly."""
-    index = json.loads(
-        settings.resolve_path(settings.index_path).read_text(encoding="utf-8")
-    )
+    """Load the chunks file + gate bundles + retrieval embedder, degrading
+    explicitly. Task 29 Part 2: gate_en_minilm.json is committed (e5 can
+    never self-gate), so unlike before the split, there is no
+    fallback-file branch for the en gate — it is simply always present.
+    gate_zh_bge.json is gitignored and is the one that goes missing on a
+    fresh clone; its absence is reported (zh_gate_available == False),
+    never silently scored as 0."""
+    index = json.loads(settings.resolve_chunks_path().read_text(encoding="utf-8"))
 
     gates: dict = {"en": None, "zh": None}
-    gate_path = settings.resolve_path(settings.gate_vectors_path)
-    if gate_path.exists():
-        payload = json.loads(gate_path.read_text(encoding="utf-8"))
-        for lang in ("en", "zh"):
-            spec = payload.get(lang)
-            if spec:
-                gates[lang] = _GateBundle(spec["model_preset"], spec)
-    else:
-        # gate_vectors.json is gitignored. fallback_vectors.json IS committed
-        # and carries the same MiniLM vectors + stat + threshold, so the en
-        # gate always survives. There is no committed zh equivalent.
-        fallback = settings.resolve_path(settings.fallback_vectors_path)
-        if fallback.exists():
-            fallback_spec = json.loads(fallback.read_text(encoding="utf-8"))
-            gates["en"] = _GateBundle(
-                # fallback_vectors.json records no model identity today, so
-                # "minilm" is the documented default. Read the key if a future
-                # build starts writing it, rather than silently mismatching the
-                # way the settings-based embedder lookup did.
-                fallback_spec.get("model_preset", "minilm"),
-                fallback_spec,
-            )
+    gate_en_path = settings.resolve_path(settings.gate_en_minilm_path)
+    if gate_en_path.exists():
+        spec = json.loads(gate_en_path.read_text(encoding="utf-8"))
+        gates["en"] = _GateBundle(spec["model_preset"], spec)
+    gate_zh_path = settings.resolve_path(settings.gate_zh_bge_path)
+    if gate_zh_path.exists():
+        spec = json.loads(gate_zh_path.read_text(encoding="utf-8"))
+        gates["zh"] = _GateBundle(spec["model_preset"], spec)
 
-    # The INDEX declares which model built it — not settings, and not a
+    # The CHUNKS FILE declares which model built it — not settings, and not a
     # hardcoded preset. settings.model_preset defaults to "minilm" while the
-    # committed index.json was built with e5, so resolving from settings would
-    # dot MiniLM query vectors against e5 chunk vectors and return
+    # committed chunks_e5.json was built with e5, so resolving from settings
+    # would dot MiniLM query vectors against e5 chunk vectors and return
     # plausible-looking garbage (measured: top score ~0.10 instead of ~0.86).
     # get_embedder()'s module-level cache is shared with the other test modules,
     # so build a dedicated instance rather than reusing it.
