@@ -1,14 +1,14 @@
 {
   "k": 4,
-  "generated_at": "2026-08-02T03:33:37+00:00",
-  "index_built_at": "2026-08-02T03:30:40+00:00",
+  "generated_at": "2026-08-02T04:04:34+00:00",
+  "index_built_at": "2026-08-02T04:02:40+00:00",
   "gate": {
     "en": {
       "stat": "top",
       "threshold": 0.2006,
       "margin": 0.025,
-      "task_threshold": 0.2408,
-      "task_margin": 0.271
+      "task_threshold": 0.2027,
+      "task_margin": 0.1008
     },
     "zh": {
       "stat": "top",

@@ -565,7 +565,11 @@
         return out.data;
       };
       var retrieved = retrieveFallback(fb, await embedFb(question));
-      var degradedGateText = stripped || question;
+      // gateForm(), not the `stripped || question` shortcut -- same fix,
+      // same reasoning as the local self-gate branch in send() above. CJK
+      // is already ruled out by the caller (degradedTurn bypasses to
+      // degradedCJK before this function runs), so this is even safer here.
+      var degradedGateText = gateForm(question, stripped);
       var gateScore = stripped
         ? statValue(retrieveFallback(fb, await embedFb(stripped)).stats, fb.gate_stat || 'top')
         : statValue(retrieved.stats, fb.gate_stat || 'top');
@@ -867,7 +871,15 @@
       } else if (state.index.gate_remote) {
         record.gate = { remote: true, unavailable: true };
       } else {
-        var localGateText = stripped || question;
+        // gateForm(), not the `stripped || question` shortcut: this is what
+        // the remote path already sends as gate_text (line ~848) and what
+        // the other two implementations judge TASK_REQUEST_RE against. The
+        // two differ only in the narrow cross-script name-KEPT case (a
+        // bio-stub naming him in the OTHER script than this index's
+        // language) -- functionally near-identical for this monolingual
+        // (minilm, English-only) branch today, but using the real function
+        // removes a latent divergence rather than relying on that "near".
+        var localGateText = gateForm(question, stripped);
         var gateScore = stripped
           ? gateValue(retrieve((await embedQuery(stripped, stripped)).vector).stats)
           : gateValue(retrieved.stats);
