@@ -1,6 +1,6 @@
 # Golden set — held-out evaluation for the chat agent
 
-`golden.jsonl` is **measurement**, not corpus. It never enters `data/index.json`.
+`golden.jsonl` is **measurement**, not corpus. It never enters `data/chunks_e5.json`.
 Editing it changes only what the score says.
 
 For consolidated findings from running this harness against the current
@@ -12,8 +12,10 @@ sections into the index, so editing them changes what the agent knows and how it
 answers. Both `about_en.md` and `about_zh.md` additionally *are* their
 language's gate matrix — `about_en.md`'s 55 sections are the English gate's
 on-topic corpus (wired since Task 24), and `about_zh.md`'s sections are
-calibrated the same way on every build, though no Chinese gate currently ships
-from this repo's own artifacts (see Known Limits below).
+calibrated the same way on every build; whether a Chinese gate ships from this
+repo's own artifacts depends on whether that calibration currently separates
+(see Known Limits below — it has flipped between builds before, so check
+`data/gate_zh_bge.json`'s own `gate_margin` rather than trusting a claim here).
 
 ## Format
 
@@ -164,28 +166,36 @@ are always compared strictly.
   at its pre-fix value: recomputed against the current 53-section corpus
   (read-only, matching `_build_zh_gate`'s own calibration call), stat `top`,
   threshold `0.5273`, off-topic max `0.5169` vs on-topic min `0.5153` — margin
-  **-0.49%**, still not separating, so `build_index` correctly does **not**
-  ship a zh gate today — every CJK question takes the name-blind `cjk_bypass`
-  path instead. The pre-floor-fix figure this section used to report
+  **-0.49%**, still not separating at THAT point, so `build_index` correctly
+  did **not** ship a zh gate at that measurement — every CJK question took the
+  name-blind `cjk_bypass` path instead. **Superseded (Task 29 Part 2 rebuild):**
+  the current `data/gate_zh_bge.json` DOES separate (stat `top`, threshold
+  `0.3979`, margin **+5.9%**, 53 sections) — read the live number from that
+  file's own `gate_margin` rather than trusting either figure quoted here,
+  since this has flipped between separating and not across multiple rebuilds
+  as `about_zh.md` grew and the calibration/floor logic changed. The
+  pre-floor-fix figure this section used to report
   (22-section corpus, off-topic max 0.517 vs on-topic min 0.515, margin
   -0.4%) is superseded by the above, not the current state. An even earlier
   corpus version did calibrate, at threshold 0.4919 against an on-topic floor
   of 0.492 — essentially zero margin — and held-out Chinese positives still
   failed it at a real rate; that same 0.4919 threshold is, as of this
   writing, what the currently *deployed* backend still runs live (it bundles
-  its own, older `gate_vectors.json` — see `../README.md`'s "Deploying a
-  backend" section). Neither local state (no gate) nor the deployed state
-  (a live, marginal gate) is a defect in the golden cases; both are the
-  finding.
-- `data/gate_vectors.json` is gitignored, and even when present it may hold no
-  `"zh"` key (see above) — either way a machine without a working zh gate
+  its own, older gate vectors from a zip built before Task 29 Part 2's file
+  split — see `../README.md`'s "Deploying a
+  backend" section). Neither local state (no gate, or now a marginal one) nor
+  the deployed state (a live, differently-marginal gate) is a defect in the
+  golden cases; both are the finding.
+- `data/gate_zh_bge.json` is gitignored, and may simply be absent on a fresh
+  clone that hasn't rebuilt — either way a machine without a working zh gate
   reports the Chinese gate columns as `n/a`, never as `0%`. Chinese `hit@4`
   still runs — retrieval does not depend on the gate.
 - Only the gate and retrieval are scored. Answer quality and role emphasis need
   the LLM and are deliberately out of scope; the `role` field is carried on
   every case so that tier can be added without re-authoring.
 - **This harness is deterministic.** Repeated runs against the same
-  `data/index.json` + `data/gate_vectors.json` produce bit-identical results —
+  `data/chunks_e5.json` + `data/gate_en_minilm.json`/`data/gate_zh_bge.json`
+  produce bit-identical results —
   dot products of fixed vectors don't drift between runs. If numbers ever
   appear to "shift" between two runs, suspect a mutated artifact (see
   `tests/conftest.py`'s guard), not measurement noise.
