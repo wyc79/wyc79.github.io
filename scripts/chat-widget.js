@@ -1008,9 +1008,35 @@
           await degradedTurn(question, stripped, thinking, record);
           return;
         }
+        record.rid = resp.rid || undefined; // server /chat log id, for correlation
+        // /chat's `refused` field (Task 29): the function's own retrieval
+        // found nothing above MIN_SCORE, so it answered 200 with a canned
+        // refusal and never called the LLM. askWorker's return comment has
+        // always declared this field; nothing read it, so the visitor got
+        // index.py's REFUSAL -- a hardcoded ENGLISH string -- even with
+        // lang() === 'zh', with no starters and no page links (a dead end),
+        // and record.mode stayed 'llm' so neither GA nor the transcript
+        // could tell a refusal from an answer. This is the same situation
+        // degraded mode already handles honestly (degradedNoSources +
+        // addPageLinks); handle it here the way the client-side gate
+        // refusal below does, in the visitor's own language.
+        if (resp.refused) {
+          record.mode = 'off_topic_refused';
+          // Distinguishes this from the client-side gate refusal, which
+          // never reaches the backend at all. The server logged its own
+          // chat_refused line under the same rid.
+          record.refused_by = 'server_retrieval_empty';
+          thinking.classList.remove('ycchat-dots');
+          thinking.textContent = t('refused');
+          addStarters(state.roles.roles[state.role]);
+          pushLog({ type: 'bot', text: thinking.textContent });
+          pushLog({ type: 'starters' });
+          record.answer = thinking.textContent;
+          logTurn(record);
+          return;
+        }
         results = resultsFromSources(resp.sources);
         record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
-        record.rid = resp.rid || undefined; // server /chat log id, for correlation
         // The UI renders plain text; strip stray markdown emphasis the LLM
         // may emit despite the prompt (e.g. **Prime Engine**).
         answer = resp.answer.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#+\s+/gm, '');

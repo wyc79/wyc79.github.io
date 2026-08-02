@@ -557,6 +557,20 @@ REFUSAL = (
 )
 
 
+def refusal_response(rid: str) -> dict:
+    """/chat's 200 body for "retrieval returned nothing": the canned REFUSAL,
+    `refused: True`, and an empty sources list.
+
+    `refused` is load-bearing on the client. chat-widget.js's send() keys its
+    own LOCALIZED refusal off this field and only renders REFUSAL's English
+    text if the field goes missing -- which is exactly what happened while the
+    widget declared the field and never read it (a zh visitor got English, with
+    no starters and no way forward). Pure and separate from the handler, like
+    sources_from_hits, so chat/tests/test_chat_contract_sync.py can assert on
+    the real shape rather than a retyped copy of it."""
+    return {"answer": REFUSAL, "refused": True, "rid": rid, "sources": []}
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -716,7 +730,7 @@ class Handler(BaseHTTPRequestHandler):
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
                 "client_contexts_ignored": client_contexts_ignored,
             })
-            return self._json(200, {"answer": REFUSAL, "refused": True, "rid": rid, "sources": []})
+            return self._json(200, refusal_response(rid))
 
         roles_data = load_roles()
         role = roles_data["roles"].get(body.get("role")) or roles_data["roles"][roles_data["default_role"]]
