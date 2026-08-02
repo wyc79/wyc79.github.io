@@ -465,6 +465,24 @@ diagnostic, not a pass/fail gate, mirroring how `gate_margin` is already
 treated) — a future task should judge whether page-only retrieval quality
 itself needs work, now that it is visible rather than blended away.
 
+**Update (Task 33):** `aiagent-en-03`/`aiagent-zh-03` (the degraded-mode
+fallback question — "What happens to the chat feature if the backend
+embedding service is unreachable?") are a fresh instance of this exact
+pattern, found and deliberately left as-is rather than "fixed." Task 33
+restored `pages/chat-agent.html`'s exact page-side phrasing ("retrieval
+locally" / "本地完成检索") after an earlier rewrite in the same task had
+accidentally paraphrased it away — so the *page* is factually corroborated
+again, and reads correctly. But in practice both cases still score their
+keywords **exclusively** from the curated `about_en.md`/`about_zh.md`
+fallback section, because the page's own matching paragraph does not reach
+the real top-4 for these specific queries. The textual goal (the page states
+the true fact, in the words the golden case looks for) is met; the
+retrieval-corroboration goal this finding is about is only partly realized.
+Read "restored page-side corroboration" in the Task 33 report as meaning
+exactly that and no more — these two cases did not stop scoring off the
+corpus, and nobody should expect `hit@4(pg)` to reflect the restoration
+without the page's own chunk actually reaching top-4.
+
 ### M — The adjacency axis quantifies the gate's headline failure mode
 
 Measured en gate values against the live threshold 0.2536 (reviewer-verified
@@ -661,6 +679,64 @@ by detected script. Across all 8 cells the current build shows a clean
 `en:48` / `zh:48` — 384 retrieved chunks, zero cross-language drift — which is
 the evidence that the single mixed-language e5 index does not need splitting
 by language. e5 separates them without help.
+
+### O — A 0.0001-margin near-tie flipped one Chinese case after Task 33's page corrections — verified, not a retrieval degradation
+
+**Status: verified near-tie, accepted, not fixed.** Task 33 corrected
+`pages/chat-agent.html` and `chat/knowledge/about_{en,zh}.md`, which still
+claimed retrieval happens in the visitor's browser after Task 29 had moved
+it server-side. That correction legitimately moved two golden-set numbers
+(`hit@4` 90/96 → 89/96, `keywords` 132/179 → 131/179), traced to exactly one
+case: `combat-zh-03` ("策划能不能自己调参数，不用每次找程序？", wants
+`pages/cemented-dreams.html`, keyword "Blueprint").
+
+Computed twice, independently — once while fixing it, once by a re-reviewer
+who reconstructed the pre-edit index from
+`git show 0422d0b:chat/data/chunks_e5.json` and recomputed from scratch
+rather than trusting the first pass — with matching results both times:
+
+```
+pages/chat-agent.html#sec1:zh:1        0.8577 -> 0.8586   (rose after the page rewrite)
+pages/cemented-dreams.html#sec7:zh:0   0.8585 -> 0.8585   (correct chunk, curated; held still)
+gap: 0.0001
+```
+
+`chat-agent.html#sec1:zh:1` is the tail of the corrected "Thin client"
+paragraph running into the head of the flow-diagram caption under the same
+`<h4>` (no intervening heading), `chunk_size=800`/`overlap=100`. Both
+paragraphs are accurate as rewritten — the collision with this specific,
+unrelated Chinese combat-design question is coincidental, not a symptom of
+bad content. The correct chunk is still retrieved, at rank 5 instead of
+rank 4, one place outside `top_k=4`.
+
+**Why not fixed:** the only two available levers are a `chat/src/` chunking
+change (out of scope for a documentation-driven page correction) or
+rewording the caption specifically to win a 0.0001 similarity contest
+against an unrelated query — which is exactly the metric-gaming pattern
+`eval/README.md` rule 1's disjointness tests exist to catch elsewhere on
+this project (it has fired twice before; see that rule). Doing it by hand
+here would be the same defect, not a fix for it.
+
+**Risk, named explicitly:** a 0.0001 gap is coin-flip noise. It happened to
+land in the regression direction this time and was caught, explained twice
+independently, and only baked into the baseline after explicit user
+ratification with the evidence in hand. The same coincidence landing the
+other way on some future rebuild would silently *improve* a number for no
+real reason — and small single-case swings like this, left unexamined, are
+exactly how a baseline ratchets downward over time without anyone deciding
+it should. Treat any future single-case swing at this margin with the same
+scrutiny this one got, not as routine noise to re-baseline on sight.
+
+**Coupled cost, same root cause:** `chat/knowledge/about_en.md` is
+simultaneously retrieval corpus and the English gate's calibration corpus
+(Finding N above; `eval/README.md`'s Known Limits). Correcting its stale
+"browser-side retrieval" section moved the EN gate: threshold `0.2006` →
+`0.2029`, margin `+2.5%` → `+1.7%`. Still comfortably positive — verified
+against all 48 English golden positives, not sampled: 0 refused at the new
+threshold — but this is the concrete, measured cost of editing that file:
+any wording change to `about_en.md` moves the gate boundary as directly as
+an explicit threshold edit would, not just retrieval. Worth knowing before
+the next person edits that corpus for an unrelated reason.
 
 ---
 
