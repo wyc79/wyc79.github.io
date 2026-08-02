@@ -274,7 +274,7 @@ No test-artifact corruption occurred during this measurement:
 above and the 3 named failures are historical, from 2026-07-31, before Task
 17 landed the `RAG_MODEL_PRESET` build guard and pinned the 3
 MiniLM-assumption tests to an explicit preset. Current test suite, run the
-same way, from `chat/`: **191 passed, 0 skipped**. (An earlier revision of
+same way, from `chat/`: **194 passed, 0 skipped**. (An earlier revision of
 this note said "105 passed, 1 skipped" and was never refreshed through Tasks
 26-34 or the final review's fix wave. The former single skip no longer fires
 now that a Chinese gate is locally available.) Verified this session;

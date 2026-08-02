@@ -162,9 +162,17 @@ def _check_en_gate_margin(gate: dict) -> None:
     (_build_zh_gate's model load + inference, and the 192-chunk degraded-corpus
     embedding) before writing anything else. It is now a STRUCTURAL property
     instead: build_index() accumulates every payload and flushes them in one
-    pass at the very end (see _flush_build_outputs), so no raise anywhere in
-    the build — this check, an OOM, a corrupt ONNX file — can leave a partial
-    data/. There is no ordering constraint left for a caller to honour.
+    pass at the very end (see _flush_build_outputs), so no raise from the
+    build's COMPUTATION phase — this check, an OOM, a corrupt ONNX file — can
+    leave a partial data/. There is no ordering constraint left for a caller
+    to honour.
+
+    Scope, stated precisely because this comment is load-bearing: that covers
+    everything up to the flush, which is every failable computation in the
+    build. It does NOT cover the flush itself — an IO error partway through
+    _flush_build_outputs's write loop can still leave data/ half-updated, and
+    that function's own docstring says so. Closing the remaining window needs
+    write-to-.tmp-then-rename and is deliberately not claimed here.
 
     The floor is RAG_MIN_GATE_MARGIN (default 0.0), not a hardcoded sign
     check: +0.5% margin isn't meaningfully healthier than -0.5%, and the

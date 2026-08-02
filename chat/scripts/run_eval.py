@@ -174,10 +174,10 @@ def main() -> int:
 
     if args.role:
         # Negatives carry no role (SHARED_ROLE) -- --role filters positive
-        # cells only. Applying it to negatives too would show a "shared"
-        # block that is not actually the shared pool, just whatever fraction
-        # of it happens to still carry this role in the not-yet-migrated
-        # dataset, which is worse than not filtering at all.
+        # cells only. Applying it to negatives too would print a "shared"
+        # block that is not the shared pool at all, just the slice of it the
+        # filter happened to keep, under a heading that says otherwise --
+        # worse than not filtering it.
         print(f"note: --role={args.role} filters positive cells only; negatives have no "
               "role and the shared block below always covers the full pool for the "
               "selected language(s).", file=sys.stderr)

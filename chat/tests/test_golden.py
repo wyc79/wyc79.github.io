@@ -140,10 +140,11 @@ def test_positive_cells_have_the_right_composition(cases) -> None:
 def test_shared_negative_pool_has_the_right_composition(cases) -> None:
     """Negatives share ONE pool per language, keyed by SHARED_ROLE, split by
     off_topic's adjacency (easy/adjacent) plus injection. An off_topic case
-    with no valid adjacency buckets under 'off_topic_' + whatever it carries
-    (including '' on a not-yet-migrated case), which cannot match
-    NEGATIVES_PER_LANG and so surfaces as a failure instead of silently
-    miscounting."""
+    with no valid adjacency buckets under 'off_topic_' + whatever it carries,
+    which cannot match NEGATIVES_PER_LANG and so surfaces as a failure instead
+    of silently miscounting. (load_cases now rejects that case outright, so
+    this is the second line of defence rather than the first -- it still fires
+    on a case constructed directly in a test, bypassing the loader.)"""
     by_lang: dict[str, Counter] = {}
     for c in cases:
         if c.type == "positive":

@@ -14,9 +14,14 @@ node_modules/
 models/Xenova/multilingual-e5-small/
 functions/tencent/_wheels/
 functions/tencent/tencent-function-*.zip
-# build artifact normally only ever inside the zip above; test_scf_index_loading.py
-# writes a temporary one here and always removes it, but belt-and-braces
+# build artifacts normally only ever inside the zip above; test_scf_index_loading.py
+# writes temporary ones here and always removes them, but belt-and-braces.
+# gate_zh_bge.json especially: the data/ copy is gitignored below precisely so a
+# Chinese gate can never reach a browser, and a stray committed copy under
+# functions/ would defeat that with no test to catch it.
 functions/tencent/chunks.json
+functions/tencent/gate_en_minilm.json
+functions/tencent/gate_zh_bge.json
 models/Xenova/bge-small-zh-v1.5/
 # Chinese off-topic gate vectors (Task 29 Part 2). MUST NEVER be served to a
 # browser -- MiniLM (the only in-browser model) cannot embed Chinese at all,
