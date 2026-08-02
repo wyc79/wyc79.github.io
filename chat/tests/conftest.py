@@ -26,6 +26,7 @@ _CHAT_ROOT = Path(__file__).resolve().parents[1]
 # this watch list — see task-18-report.md for the full reasoning.
 _WATCHED_FILES = [
     _CHAT_ROOT / "data" / "index.json",
+    _CHAT_ROOT / "data" / "meta.json",
     _CHAT_ROOT / "data" / "gate_vectors.json",
     _CHAT_ROOT / "data" / "fallback_vectors.json",
     _CHAT_ROOT / "data" / "eval_baseline.json",

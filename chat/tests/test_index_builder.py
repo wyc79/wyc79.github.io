@@ -28,20 +28,21 @@ def tiny_site(tmp_path: Path, monkeypatch) -> Path:
     out.mkdir()
     monkeypatch.setattr(settings, "index_path", str(out / "index.json"))
     monkeypatch.setattr(settings, "roles_path", str(out / "roles.json"))
+    monkeypatch.setattr(settings, "meta_path", str(out / "meta.json"))
     monkeypatch.setattr(settings, "gate_vectors_path", str(out / "gate_vectors.json"))
     monkeypatch.setattr(settings, "fallback_vectors_path", str(out / "fallback_vectors.json"))
     return tmp_path
 
 
 def test_tiny_site_fixture_confines_all_build_outputs_to_tmp_path(tiny_site: Path) -> None:
-    # build_index() can write to four settings-driven paths. If any of them
+    # build_index() can write to five settings-driven paths. If any of them
     # isn't patched onto tmp_path, a build under this fixture writes through
     # to the real, gitignored, hand-calibrated files under chat/data/ and
     # destroys them irrecoverably. Check this WITHOUT calling build_index —
     # a test that runs the unfixed build and diffs the real files before/after
     # would destroy the data on every failure, which is exactly the bug this
     # guards against.
-    for field in ("index_path", "roles_path", "gate_vectors_path", "fallback_vectors_path"):
+    for field in ("index_path", "roles_path", "meta_path", "gate_vectors_path", "fallback_vectors_path"):
         resolved = settings.resolve_path(getattr(settings, field))
         assert resolved.is_relative_to(tiny_site), (
             f"settings.{field} resolves to {resolved}, outside the tiny_site "
@@ -336,3 +337,33 @@ def test_writes_roles_json_for_widget_and_worker(tiny_site: Path, monkeypatch) -
     assert roles["default_role"] in roles["roles"]
     for role in roles["roles"].values():
         assert role["label"] and role["system_prompt"] and role["starters"]
+
+
+# --- Task 29: meta.json sidecar --------------------------------------------
+
+
+def test_writes_meta_json_with_the_widgets_five_fields_plus_build_stamp(
+    tiny_site: Path, monkeypatch
+) -> None:
+    # meta.json is what chat-widget.js now fetches on every load instead of
+    # the multi-MB index.json -- it must carry every field the widget used to
+    # read off state.index (gate_threshold, gate_stat, gate_remote, model,
+    # query_prefix) plus enough to identify the build (schema_version,
+    # model_preset, built_at, dim, chunk_count) without the chunks array
+    # itself. Ambient settings.model_preset is "e5" (chat/.env).
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    index_builder.build_index(site_root=tiny_site)
+    index = json.loads((tiny_site / "out" / "index.json").read_text(encoding="utf-8"))
+    meta = json.loads((tiny_site / "out" / "meta.json").read_text(encoding="utf-8"))
+
+    assert set(meta) == {
+        "schema_version", "model", "model_preset", "query_prefix", "gate_remote",
+        "gate_stat", "gate_threshold", "gate_margin", "built_at", "dim", "chunk_count",
+    }
+    for field in ("schema_version", "model", "model_preset", "query_prefix",
+                  "gate_remote", "gate_stat", "gate_threshold", "gate_margin",
+                  "built_at", "dim"):
+        assert meta[field] == index[field], f"meta.{field} does not match index.json"
+    assert meta["chunk_count"] == len(index["chunks"])
+    # meta.json carries no chunks -- that's the whole point of the sidecar.
+    assert "chunks" not in meta

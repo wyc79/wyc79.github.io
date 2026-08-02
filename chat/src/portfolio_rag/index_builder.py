@@ -357,6 +357,28 @@ def build_index(site_root: Path | None = None) -> dict:
     index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
 
+    # Small metadata sidecar (Task 29): the same values already computed
+    # above for index.json, minus the (multi-MB) chunks array. The widget
+    # fetches this on every load instead of the full index, and fetches
+    # index.json itself only when it actually needs the chunk vectors
+    # (light mode / degraded mode) -- see chat-widget.js's loadCore.
+    meta = {
+        "schema_version": index["schema_version"],
+        "model": index["model"],
+        "model_preset": index["model_preset"],
+        "query_prefix": index["query_prefix"],
+        "gate_remote": index["gate_remote"],
+        "gate_stat": index["gate_stat"],
+        "gate_threshold": index["gate_threshold"],
+        "gate_margin": index["gate_margin"],
+        "built_at": index["built_at"],
+        "dim": index["dim"],
+        "chunk_count": len(chunks),
+    }
+    meta_path = settings.resolve_path(settings.meta_path)
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
     roles_path = settings.resolve_path(settings.roles_path)
     roles_path.write_text(
         json.dumps(roles_payload(), ensure_ascii=False, indent=2), encoding="utf-8"

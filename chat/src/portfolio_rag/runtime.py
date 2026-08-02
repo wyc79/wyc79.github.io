@@ -115,6 +115,47 @@ class GateDecision:
     reason: str | None = None
 
 
+def _hits_from_scores(scores: np.ndarray, meta: list[dict], k: int) -> Retrieval:
+    """Rank an already-scored candidate set: sort descending, take the top k,
+    THEN drop any below MIN_SCORE. Order matters -- floor after top-k, not
+    before. Shared by rank_hits (below) and Runtime.retrieve's exclude_ids
+    path (which pre-masks excluded rows to -inf before calling this)."""
+    order = np.argsort(-scores)[:k]
+    top = [
+        Hit(
+            chunk_id=meta[i]["id"],
+            url=meta[i].get("url", ""),
+            lang=meta[i].get("lang", "en"),
+            score=round(float(scores[i]), 4),
+        )
+        for i in order
+        if np.isfinite(scores[i])
+    ]
+    kept = [h for h in top if h.score >= MIN_SCORE]
+    return Retrieval(
+        hits=tuple(kept),
+        dropped_by_floor=len(top) - len(kept),
+        top_score=top[0].score if top else 0.0,
+    )
+
+
+def rank_hits(matrix: np.ndarray, meta: list[dict], query_vec: np.ndarray, k: int = TOP_K) -> Retrieval:
+    """Pure ranking function: score every chunk row by dot product against
+    query_vec (all vectors are unit-normalized, so this is cosine), sort
+    descending, take the top k, then drop any below MIN_SCORE.
+
+    Deliberately takes a precomputed query vector rather than embedding a
+    question itself, so it can run without an ONNX model. Mirrored, with the
+    same two constants (TOP_K/MIN_SCORE) and the same floor-after-top-k
+    order, by chat-widget.js's scoreChunks and functions/tencent/index.py's
+    rank_chunks -- chat/tests/test_retrieval_sync.py executes all three
+    against one shared fixture and asserts they agree.
+    """
+    if matrix.shape[0] == 0:
+        return Retrieval(hits=(), dropped_by_floor=0, top_score=0.0)
+    return _hits_from_scores(matrix @ query_vec, meta, k)
+
+
 def _stat_value(scores: np.ndarray, kind: str) -> float:
     """Mirrors gate_calibration.stat_value and the widget's statValue()."""
     top = float(np.max(scores))
@@ -347,24 +388,7 @@ class Runtime:
             if rows:
                 scores = scores.copy()
                 scores[rows] = -np.inf
-        order = np.argsort(-scores)[:k]
-        chunks = self._index["chunks"]
-        top = [
-            Hit(
-                chunk_id=chunks[i]["id"],
-                url=chunks[i]["url"],
-                lang=chunks[i].get("lang", "en"),
-                score=round(float(scores[i]), 4),
-            )
-            for i in order
-            if np.isfinite(scores[i])
-        ]
-        kept = [h for h in top if h.score >= MIN_SCORE]
-        return Retrieval(
-            hits=tuple(kept),
-            dropped_by_floor=len(top) - len(kept),
-            top_score=top[0].score if top else 0.0,
-        )
+        return _hits_from_scores(scores, self._index["chunks"], k)
 
     def gate(self, question: str) -> GateDecision:
         text = gate_form(question)

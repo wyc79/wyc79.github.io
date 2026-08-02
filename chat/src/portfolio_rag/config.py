@@ -59,6 +59,11 @@ class Settings(BaseSettings):
 
     index_path: str = "data/index.json"
     roles_path: str = "data/roles.json"
+    # Small metadata sidecar (Task 29): the fields the widget used to read off
+    # index.json (gate_threshold, gate_stat, gate_remote, model, query_prefix)
+    # so it can load ~1KB instead of the multi-MB chunk index on every visit
+    # when it doesn't need the chunks themselves (normal mode, backend up).
+    meta_path: str = "data/meta.json"
     gate_vectors_path: str = "data/gate_vectors.json"
     # Published (committed) MiniLM copy of the chunk vectors: the widget's
     # degraded mode retrieves against these locally when the backend that an
