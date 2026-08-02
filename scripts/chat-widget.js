@@ -531,9 +531,17 @@
         return out.data;
       };
       var retrieved = retrieveFallback(fb, await embedFb(question));
-      var gateScore = stripped
-        ? statValue(retrieveFallback(fb, await embedFb(stripped)).stats, fb.gate_stat || 'top')
-        : statValue(retrieved.stats, fb.gate_stat || 'top');
+      // Gate on gateForm()'s output, not on `stripped ? stripped : question`.
+      // Those differ when the name was KEPT (a bio question): gateForm then
+      // normalizes the name to the gate corpus's own language, which the raw
+      // question does not. runtime.py and functions/tencent/index.py both gate
+      // on gateForm's output, so the shortcut was a silent third divergence —
+      // the same class as BIO_STUB_RE's, which has already drifted twice.
+      var degradedGateText = gateForm(question, stripped);
+      var gateScore = statValue(
+        retrieveFallback(fb, await embedFb(degradedGateText)).stats,
+        fb.gate_stat || 'top'
+      );
       thinking.classList.remove('ycchat-dots');
       if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
         thinking.textContent = t('refused');
@@ -832,9 +840,14 @@
       } else if (state.index.gate_remote) {
         record.gate = { remote: true, unavailable: true };
       } else {
-        var gateScore = stripped
-          ? gateValue(retrieve((await embedQuery(stripped, stripped)).vector).stats)
-          : gateValue(retrieved.stats);
+        // Same fix as the degraded branch above: gate on gateForm()'s output,
+        // which normalizes a KEPT name to the gate corpus's language. The old
+        // `stripped ? stripped : question` shortcut skipped that normalization
+        // and diverged from runtime.py / functions/tencent/index.py.
+        var localGateText = gateForm(question, stripped);
+        var gateScore = gateValue(
+          retrieve((await embedQuery(localGateText, localGateText)).vector).stats
+        );
         if (stripped) record.gate = { stripped: stripped, score: +gateScore.toFixed(3) };
         refused = gateScore < gateThreshold();
       }
