@@ -14,6 +14,9 @@ node_modules/
 models/Xenova/multilingual-e5-small/
 functions/tencent/_wheels/
 functions/tencent/tencent-function-*.zip
+# build artifact normally only ever inside the zip above; test_scf_index_loading.py
+# writes a temporary one here and always removes it, but belt-and-braces
+functions/tencent/index.json
 models/Xenova/bge-small-zh-v1.5/
 data/gate_vectors.json
 

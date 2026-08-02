@@ -192,27 +192,47 @@ def _load_index() -> None:
         payload = json.loads(index_file.read_text(encoding="utf-8"))
         # Defense in depth (Task 29 fix round 1 review): build_package.py
         # only bundles index.json when its own model_preset matches the
-        # preset it is packaging, but a zip can be assembled by hand (or by
-        # a future refactor of that script) without going through it. There
-        # is no MODEL_PRESET env var to compare against directly -- but
-        # QUERY_PREFIX already IS one, already required to be set correctly
-        # for embedding itself to work (see _load_embedder/_run_embedding),
-        # and it identifies the preset 1:1 (e5="query: ", minilm=""). index
-        # .json carries its own query_prefix from the build that produced
-        # it. A mismatch means this index's document vectors and this
-        # deployment's query vectors live in different embedding spaces --
-        # dotting them still returns plausible-looking numbers in [-1, 1],
-        # it's just meaningless, and there is no way to tell that apart from
-        # a real "nothing relevant" result once it's just floats. Refuse to
-        # load rather than silently retrieve garbage.
-        expected_prefix = env("QUERY_PREFIX", "")
-        index_prefix = payload.get("query_prefix", "")
-        if index_prefix != expected_prefix:
+        # preset it is packaging (index_preset_status()), but a zip can be
+        # assembled by hand (or by a future refactor of that script)
+        # without going through it. Compare against BUILD_INFO["preset"] --
+        # the SAME string build_package.py's make_build_info() stamped into
+        # build_info.json when it packaged THIS zip (see the module-level
+        # BUILD_INFO load above). An exact, in-package identity check, no
+        # environment variable involved and nothing an operator can forget
+        # to set.
+        #
+        # Fix round 1 originally compared against the QUERY_PREFIX env var
+        # instead (fix round 2 review, Important): that conflated two very
+        # different failure classes under one all-or-nothing refusal --
+        # "wrong preset entirely" (a real bug, and already fully caught at
+        # the bundling side regardless of this check) versus "correct
+        # preset, forgotten QUERY_PREFIX console step" (an operator
+        # omission that used to be a silent retrieval-quality degradation
+        # and would, under that check, become a permanent /chat 503 for an
+        # otherwise-correctly-built deployment -- worse than what it
+        # replaced). BUILD_INFO["preset"] has no such false-positive mode:
+        # it says nothing about what env vars are configured.
+        build_preset = BUILD_INFO.get("preset")
+        index_preset = payload.get("model_preset")
+        if build_preset is None:
+            # An old or hand-assembled zip with no usable preset stamp in
+            # build_info.json. An UNKNOWN signal is not evidence of a
+            # mismatch -- the bundling side already guarantees the match
+            # for anything build_package.py itself produced, and refusing
+            # here on absence alone would recreate the exact "correct
+            # deployment, missing config -> total outage" trap this fix
+            # exists to avoid. Log loudly and load anyway.
+            log({
+                "type": "index_preset_unverifiable",
+                "index_model_preset": index_preset,
+                "warning": "build_info.json has no usable 'preset' -- cannot verify "
+                           "index.json matches the packaged retrieval model; loading anyway",
+            })
+        elif index_preset != build_preset:
             _index["error"] = (
-                f"index.json query_prefix {index_prefix!r} (model_preset="
-                f"{payload.get('model_preset')!r}) does not match this "
-                f"deployment's QUERY_PREFIX env var {expected_prefix!r} -- "
-                "refusing to load a mismatched-embedding-space index"
+                f"index.json model_preset {index_preset!r} does not match this "
+                f"package's build_info.json preset {build_preset!r} -- refusing "
+                "to load a mismatched-embedding-space index"
             )
             log({"type": "index_load_failed", "error": _index["error"]})
             return
