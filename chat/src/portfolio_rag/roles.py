@@ -1,8 +1,8 @@
 """Visitor roles (personas), the single source of truth.
 
 Build writes these to data/roles.json, which both the chat widget (role
-picker UI) and the Cloudflare Worker (system prompt) read — the client only
-ever sends a role *id*, never prompt text, so prompts can't be injected
+picker UI) and the Tencent SCF function (system prompt) read — the client
+only ever sends a role *id*, never prompt text, so prompts can't be injected
 through the role field.
 """
 

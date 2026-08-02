@@ -8,7 +8,6 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 node_modules/
-.wrangler/
 
 # large multilingual model fetched by functions/tencent/build_package.py — never commit
 models/Xenova/multilingual-e5-small/
