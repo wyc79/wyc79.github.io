@@ -19,7 +19,9 @@ tencent-function-<preset>.zip.
 After building: if you built the function (--function), upload the zip and redeploy it
 FIRST — the widget's /chat sends no `contexts`, and an old deployed function 400s
 without it. Only then git add/commit/push the data/ files (and knowledge/, roles, etc.
-if you changed them) and publish the site.
+if you changed them) and publish the site. The Next: block this script prints at the
+end carries the same instruction plus what going out of order actually costs; that
+block is the canonical statement — keep this paragraph in step with it.
 """
 
 import argparse
@@ -70,13 +72,21 @@ def main() -> None:
     print("Next:")
     if args.function:
         # Order is load-bearing (Task 29): the widget's /chat sends no
-        # `contexts`, and the OLD deployed function 400s without it, so
-        # publishing the site before the function catches up breaks live
-        # chat for every visitor until the function is redeployed. Function
-        # first, always.
+        # `contexts`, and the OLD deployed function 400s without it. Stated
+        # precisely, because an overstated load-bearing comment is the kind
+        # that gets discovered to be wrong and then distrusted wholesale --
+        # this one used to say the wrong order "breaks live chat for every
+        # visitor", and it does not. askWorker throws on the 400, send()
+        # catches it and routes to degradedTurn, so the visitor gets the
+        # offline-search consent prompt rather than a broken widget. The
+        # conclusion is unchanged and still strictly better: function first,
+        # always. Only the cost is different -- every visitor loses the LLM
+        # answer and gets the offline path until the function catches up.
         print(f"  1. Upload {zipname} to the SCF console and redeploy the function FIRST "
               "-- an old function 400s on /chat's contexts-free request.")
         print("  2. THEN git add/commit/push the data/ files (chunks/meta/gate/roles) and publish the site.")
+        print("     Out of order, every visitor loses the LLM answer and falls to the widget's")
+        print("     offline search path (a ~23 MB in-browser model) until the function catches up.")
     else:
         print("  - git add/commit/push the data/ files (chunks/meta/gate/roles)")
         print("  - run with --function when you also need to redeploy the backend")

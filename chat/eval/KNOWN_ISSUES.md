@@ -60,7 +60,21 @@ Every gate number in this document — English threshold `0.2006`, margin
 `+2.5%`, `48/48*` gate-pass, `easy 4/4`/`adjacent 1/4`/`injection 1/4`, "no
 Chinese gate on this machine" — describes `chat/data/gate_vectors.json` on
 disk in this repo. It does **not** describe the backend visitors actually
-hit. `chat/functions/tencent/index.py` never reads
+hit.
+
+**Superseded (final whole-branch review) — the local-state figures in the
+paragraph above, not the local-vs-deployed point it makes.** The
+local-vs-deployed gap is still real and still open. But the enumerated
+figures predate the Task 29 Part 2 file split and the zh-gate-deletion fix,
+and this was the one stale block in this file carrying no such note. Current
+local artifacts: the gate lives in `data/gate_en_minilm.json` (English) and
+`data/gate_zh_bge.json` (Chinese), not `gate_vectors.json`; the English
+threshold/margin are unchanged at `0.2006` / `+2.5%`; **there IS a separating
+Chinese gate on this machine** (`top`, threshold `0.3979`, margin `+5.9%`, 53
+sections), so `run_eval.py` reports **gate 96/96**, not `48/48*` with four
+`n/a` cells. Shared negatives now read en `4/4 · 1/4 · 1/4`, zh
+`3/4 · 0/4 · 0/4`. See `eval/README.md`'s Known Limits, which was updated for
+this and is the authority. `chat/functions/tencent/index.py` never reads
 `chat/data/gate_vectors.json`; it reads its own copy, bundled at
 `functions/tencent/tencent-function-e5.zip` by
 `functions/tencent/build_package.py`, and that zip is untouched by this
@@ -256,14 +270,16 @@ No test-artifact corruption occurred during this measurement:
 `git status --short chat/data/` is clean after the full suite run, and
 `tests/conftest.py`'s content-hash guard (Task 18) did not fire.
 
-**Superseded (final whole-branch review):** the 75/3/1 count above and the 3
-named failures are historical, from 2026-07-31, before Task 17 landed the
-`RAG_MODEL_PRESET` build guard and pinned the 3 MiniLM-assumption tests to an
-explicit preset. Current test suite, run the same way, from `chat/`:
-**105 passed, 1 skipped** (the 1 skip is intentional — see the Minor findings
-in the final review; it is not one of the 3 failures below, which no longer
-exist). Verified this session; `git status --short chat/data/` stayed clean
-and the conftest guard did not fire.
+**Superseded (final whole-branch review, second pass):** the 75/3/1 count
+above and the 3 named failures are historical, from 2026-07-31, before Task
+17 landed the `RAG_MODEL_PRESET` build guard and pinned the 3
+MiniLM-assumption tests to an explicit preset. Current test suite, run the
+same way, from `chat/`: **191 passed, 0 skipped**. (An earlier revision of
+this note said "105 passed, 1 skipped" and was never refreshed through Tasks
+26-34 or the final review's fix wave. The former single skip no longer fires
+now that a Chinese gate is locally available.) Verified this session;
+`git status --short chat/data/` stayed clean and the conftest guard did not
+fire.
 
 ---
 
@@ -650,16 +666,26 @@ by language. e5 separates them without help.
 
 ## Deferred by user decision
 
-### I — `test_index_carries_a_calibrated_gate` asserts on dead fields
-`tests/test_gate.py::test_index_carries_a_calibrated_gate` checks
-`index.json`'s `gate_stat`/`gate_threshold` fields, which nothing reads for
-an e5 index: `runtime.py` builds gates from
-`gate_vectors.json`/`fallback_vectors.json`, and the deployed Tencent
-function (`functions/tencent/index.py`) reads its own bundled copy. The
-fields in `index.json` are an advisory duplicate with no live consumer.
-Confirmed still present in the current test suite (line 47 of
-`tests/test_gate.py`). Explicitly deferred — the user declined to fix it
-inside this plan; it should be pointed at by the final whole-branch review.
+### I — `test_index_carries_a_calibrated_gate` asserts on dead fields — RESOLVED
+**Status: resolved by Task 29 Part 2. The "needs a user ruling before merge
+to main" flag is retired** — three of the six final whole-branch reviewers
+reached that conclusion independently.
+
+The original finding: `tests/test_gate.py::test_index_carries_a_calibrated_gate`
+checked `index.json`'s `gate_stat`/`gate_threshold` fields, which nothing read
+for an e5 index — `runtime.py` built gates from
+`gate_vectors.json`/`fallback_vectors.json`, and the deployed Tencent function
+reads its own bundled copy — so they were an advisory duplicate with no live
+consumer, and the test was inert in the sense that matters.
+
+What changed: Task 29 Part 1/2 moved those fields to `data/meta.json` and
+retargeted the test, now
+`tests/test_gate.py::test_meta_json_carries_a_calibrated_gate`. `meta.json`'s
+`gate_threshold`/`gate_stat` have a **live** consumer:
+`scripts/chat-widget.js`'s `gateThreshold()` and `gateValue()` read them on
+every page load, in both light and degraded mode. The final review proved the
+test now bites by zeroing `meta.json`'s `gate_threshold` and watching it go
+red. Nothing to defer.
 
 ---
 

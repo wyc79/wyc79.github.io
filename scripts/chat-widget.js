@@ -29,9 +29,13 @@
 //                          build pipeline used, so query and document vectors
 //                          share one embedding space
 //   scripts/vendor/        self-hosted transformers.js runtime + ORT WASM
-//   WORKER_URL             optional Tencent SCF / Cloudflare Worker backend
-//                          for LLM answers + server-side retrieval; leave
-//                          empty for retrieval-only demo mode (no API key)
+//   WORKER_URL             optional backend for LLM answers; leave empty for
+//                          retrieval-only demo mode (no API key). Server-side
+//                          retrieval is Tencent SCF ONLY (chat/functions/
+//                          tencent) -- chat/worker/worker.js is a stale
+//                          Cloudflare implementation of the pre-Task-29
+//                          contract and 400s against this widget; do not
+//                          point WORKER_URL at it.
 //
 // Everything the widget logs (every user input, retrieval result and answer)
 // goes to console.debug, to Google Analytics when present, and — once the

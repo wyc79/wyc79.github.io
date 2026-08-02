@@ -321,15 +321,28 @@ def main() -> None:
     print(f"[4/4] packaging -> {out.name} (gates: {sorted(gate_models) or 'none'})")
     build_zip(preset, args.preset, model_dir, wheels, out, gate_models, build_info)
 
+    # Next-steps ORDER IS LOAD-BEARING, and this block is the only place some
+    # operators see it: this script's own docstring documents direct
+    # invocation (cd chat/functions/tencent && python build_package.py), so
+    # that path never prints build.py's warning. Same wording as build.py's
+    # Next: block deliberately -- when the two disagree, one of them is
+    # telling someone to break live chat.
+    #
+    # The old step 1 ("rebuild index: ... build_index.py --model ...") was
+    # removed: [2/4] above already ran exactly that command, so it told the
+    # operator to redo a step this tool had just performed.
     print(json.dumps({
         "build": build_info["build_id"],
         "next": [
-            f"rebuild index: cd chat && python scripts/build_index.py --model {args.preset}"
-            + (" (note the new gate threshold it prints)" if args.preset == "e5" else ""),
-            f"console: 本地上传zip包 -> {out.name}; 内存 1024MB; 初始化超时 120s;"
-            " env add MODEL_DIR=model, QUERY_PREFIX='" + preset["query_prefix"] + "'",
-            f"commit the rebuilt chat/data/chunks_{args.preset}.json (+ gate_en_minilm.json"
-            " when e5) and publish the site",
+            f"REDEPLOY THE FUNCTION FIRST: console 本地上传zip包 -> {out.name}; 内存 1024MB;"
+            " 初始化超时 120s; env add MODEL_DIR=model, QUERY_PREFIX='"
+            + preset["query_prefix"] + "'",
+            f"THEN commit the rebuilt chat/data/chunks_{args.preset}.json (+ gate_en_minilm.json"
+            " when e5, + meta.json/roles.json) and publish the site",
+            "order matters: the widget's /chat sends no `contexts` and an OLD deployed"
+            " function 400s without it -- publishing the site first costs every visitor"
+            " the LLM answer (the widget catches the failure and drops to its offline"
+            " search path) until the function catches up",
         ]
     }, ensure_ascii=False, indent=2))
 
