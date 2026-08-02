@@ -31,6 +31,23 @@ is the Task 24 build described in the section immediately below — the
 230-chunk/146+84 figures this line used to carry were the PRE-task-24 build
 and are superseded throughout this document exactly as flagged inline below.
 
+**Task 29 Part 2 note (filenames only, added without touching history below):**
+`data/index.json` → `data/chunks_e5.json` (or `chunks_{model_preset}.json`
+generally), `data/gate_vectors.json` → `data/gate_en_minilm.json` (committed)
++ `data/gate_zh_bge.json` (gitignored), `data/fallback_vectors.json` →
+`data/gate_en_minilm.json` + a new `data/chunks_en_minilm.json` (degraded-mode
+retrieval corpus — see `../README.md`'s file-layout table). Every mention of
+the three retired names in the findings below is a HISTORICAL fact about the
+build/artifact state at the time that finding was written and is deliberately
+left as-is, not retroactively renamed — rewriting history here would make the
+"measured against" timestamps and git-commit references above no longer
+correspond to what the surrounding prose describes. Read old filenames in
+this document as their Task-29-Part-2 successors; the numbers/margins/counts
+next to them are unaffected (this was a pure file split + a bundled-package
+naming/shape change, not a re-embedding — see
+`.superpowers/sdd/EVAL_PLAN/task-29b-report.md` for confirmation the eval
+numbers below did not move).
+
 ---
 
 ## CRITICAL — everything this file measures is the LOCAL artifact, not what's deployed

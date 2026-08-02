@@ -4,8 +4,13 @@
 
 --model e5 requires the multilingual model at chat/models/Xenova/
 multilingual-e5-small (fetched by functions/tencent/build_package.py).
-Outputs data/index.json (chunks + vectors + calibrated gate threshold) and
-data/roles.json, both committed to the repo and served by GitHub Pages.
+Outputs data/chunks_{model}.json (chunks + vectors), data/meta.json (the
+small sidecar the widget fetches, carrying the calibrated gate threshold),
+and data/roles.json -- all committed to the repo and served by GitHub Pages.
+--model e5 additionally writes data/gate_en_minilm.json (committed),
+data/gate_zh_bge.json (gitignored, only when its calibration separates) and
+data/chunks_en_minilm.json (committed, the widget's degraded-mode retrieval
+corpus) -- see chat/README.md's file-layout table.
 """
 
 import argparse
@@ -16,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-HEADER = f"{'pages':>6}{'sections':>10}{'chunks':>8}{'index_kb':>10}{'gate':>8}{'seconds':>9}"
+HEADER = f"{'pages':>6}{'sections':>10}{'chunks':>8}{'chunks_kb':>11}{'gate':>8}{'seconds':>9}"
 
 
 def main() -> None:
@@ -42,7 +47,7 @@ def main() -> None:
     print("-" * len(HEADER))
     print(
         f"{stats['pages']:>6}{stats['sections']:>10}{stats['chunks']:>8}"
-        f"{stats['index_kb']:>10}{stats['gate_threshold']:>8}{stats['elapsed_seconds']:>9.3f}"
+        f"{stats['chunks_kb']:>11}{stats['gate_threshold']:>8}{stats['elapsed_seconds']:>9.3f}"
     )
     print(f"off-topic gate: {stats['gate_stat']} >= {stats['gate_threshold']}")
 

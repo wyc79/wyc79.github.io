@@ -9,11 +9,15 @@ Run on your own machine (needs internet):
 Does four things:
 1. Downloads Xenova/multilingual-e5-small (ONNX + tokenizer, ~135MB) from
    huggingface.co, falling back to hf-mirror.com — into chat/models/... so
-   `python scripts/build_index.py --model e5` can rebuild the index with the
-   SAME model the function serves.
+   `python scripts/build_index.py --model e5` can rebuild the retrieval
+   corpus with the SAME model the function serves.
 2. Downloads Linux wheels for onnxruntime/tokenizers/numpy matching the SCF
    runtime (Python 3.10, manylinux) — regardless of your local OS.
-3. Assembles index.py + scf_bootstrap + roles.json + model/ + deps.
+3. Assembles index.py + scf_bootstrap + roles.json + model/ + deps + the
+   retrieval corpus (chat/data/chunks_{preset}.json, bundled as chunks.json)
+   and gate vectors (chat/data/gate_en_minilm.json /
+   chat/data/gate_zh_bge.json, bundled under those same names — see
+   chat/README.md's file-layout table).
 4. Writes tencent-function-e5.zip (~160-200MB, under SCF's 350MB direct
    upload limit), with scf_bootstrap's executable bit set even on Windows.
 """
@@ -43,6 +47,49 @@ PRESETS = {
     "e5": {"repo": "Xenova/multilingual-e5-small", "query_prefix": "query: "},
     "minilm": {"repo": "Xenova/all-MiniLM-L6-v2", "query_prefix": ""},
 }
+
+
+def chunks_source_path(preset_name: str) -> Path:
+    """Where build_index() writes the retrieval corpus for `preset_name` --
+    Settings.resolve_chunks_path()'s own DEFAULT derivation
+    (chat/data/chunks_{model_preset}.json), reproduced here so this
+    stdlib-only script doesn't need to import portfolio_rag to compute it.
+    Does not account for an operator explicitly overriding
+    RAG_CHUNKS_PATH away from the default (nothing in this repo's
+    .env/.env.example ever does) -- a documented gap, not silently papered
+    over: that override exists for test isolation (see
+    tests/test_index_builder.py's tiny_site fixture), not as a supported
+    production knob."""
+    return CHAT / "data" / f"chunks_{preset_name}.json"
+
+
+def chunks_preset_status(chunks_file: Path, preset_name: str) -> tuple[bool, str | None]:
+    """Whether chat/data/chunks_{preset_name}.json (if present) is safe to
+    bundle for `preset_name` -- i.e. was built with a matching model_preset.
+    Factored out of build_zip so it's unit-testable without needing real
+    model/wheel files (Task 29 fix round 1 review: this check used to not
+    exist at all, so a stale chunks file left over from a DIFFERENT preset's
+    build got bundled unconditionally -- silently, since index.py's
+    rank_chunks can't tell "wrong embedding space" apart from "no good
+    match" once vectors are just numbers).
+
+    Returns (ok, reason). ok=True means bundle it. ok=False + reason=None
+    means the file is simply missing (nothing to explain). ok=False +
+    a reason means it exists but doesn't match -- the caller should warn
+    with that reason.
+    """
+    if not chunks_file.exists():
+        return False, None
+    chunks_preset = json.loads(chunks_file.read_text(encoding="utf-8")).get("model_preset")
+    if chunks_preset == preset_name:
+        return True, None
+    # chunks_file.name, not a path computed relative to CHAT: the caller may
+    # pass an arbitrary path (tests do, from tmp_path), which .relative_to()
+    # would raise on.
+    return False, (
+        f"{chunks_file.name} was built with model_preset={chunks_preset!r}, "
+        f"not {preset_name!r}"
+    )
 
 
 def git_short_sha() -> str:
@@ -122,7 +169,7 @@ def download_wheels(py_version: str, wheel_dir: Path) -> list[Path]:
     return sorted(wheel_dir.glob("*.whl"))
 
 
-def build_zip(preset: dict, model_src: Path, wheels: list[Path], out_zip: Path,
+def build_zip(preset: dict, preset_name: str, model_src: Path, wheels: list[Path], out_zip: Path,
               gate_models: dict[str, Path] | None = None, build_info: dict | None = None) -> None:
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         # code + fresh roles fallback
@@ -141,13 +188,44 @@ def build_zip(preset: dict, model_src: Path, wheels: list[Path], out_zip: Path,
         # retrieval model
         for rel in MODEL_FILES:
             zf.write(model_src / rel, f"model/{rel}")
-        # gate model(s) + gate vectors (server-side off-topic gate)
+        # gate model(s) + gate vectors (server-side off-topic gate). Task 29
+        # Part 2: gate_en_minilm.json and gate_zh_bge.json are already
+        # complete, single-language gate specs on their own (chat/data/'s
+        # "one file, one job" split) -- bundle each under its own real name,
+        # alongside its matching model directory, instead of the old combined
+        # gate_vectors.json.
         for dir_name, src in (gate_models or {}).items():
             for rel in MODEL_FILES:
                 zf.write(src / rel, f"{dir_name}/{rel}")
-        gate_file = CHAT / "data" / "gate_vectors.json"
-        if gate_models and gate_file.exists():
-            zf.write(gate_file, "gate_vectors.json")
+        gate_files = {"gate_model": "gate_en_minilm.json", "gate_model_zh": "gate_zh_bge.json"}
+        for dir_name in (gate_models or {}):
+            gate_vectors_file = CHAT / "data" / gate_files[dir_name]
+            if gate_vectors_file.exists():
+                zf.write(gate_vectors_file, gate_files[dir_name])
+        # Retrieval corpus (Task 29): index.py loads this at startup (as
+        # chunks.json, its zip-internal name) and retrieves from it directly
+        # instead of trusting client-sent contexts. Bundled ONLY when
+        # chunks_preset_status() confirms it matches the preset being
+        # packaged right now -- see that function's docstring for why this
+        # check exists. Not packaged (missing, older zip build, or a preset
+        # mismatch) -> /chat returns 503 at runtime -- see index.py's
+        # _load_index(), which also independently re-checks this (defense in
+        # depth: a zip can be assembled by hand, without going through this
+        # function).
+        chunks_file = chunks_source_path(preset_name)
+        ok, reason = chunks_preset_status(chunks_file, preset_name)
+        if ok:
+            zf.write(chunks_file, "chunks.json")
+        elif reason:
+            print(
+                f"  WARNING: {reason} -- NOT bundling it. /chat will 503 "
+                f"(\"retrieval not available\") until a matching retrieval "
+                f"corpus is rebuilt and packaged. Run: cd chat && python "
+                f"scripts/build_index.py --model {preset_name}"
+            )
+        else:
+            print(f"  WARNING: {chunks_file.relative_to(CHAT)} not found -- "
+                  f"/chat will 503 (\"retrieval not available\") until one is built.")
         # dependencies, extracted wheel contents at package root
         for wheel in wheels:
             with zipfile.ZipFile(wheel) as wz:
@@ -198,23 +276,27 @@ def main() -> None:
 
     # Server-side gate artifacts (e5 delegates gating to MiniLM; a zh gate is
     # bundled too if build_index enabled one — see knowledge/about_zh.md).
+    # Task 29 Part 2: one gate file per language now (gate_en_minilm.json
+    # committed, gate_zh_bge.json gitignored) instead of a single combined
+    # gate_vectors.json with per-language keys -- check each file's own
+    # existence directly.
     gate_models: dict[str, Path] = {}
-    gate_file = CHAT / "data" / "gate_vectors.json"
-    if gate_file.exists() and args.preset == "e5":
-        payload = json.loads(gate_file.read_text(encoding="utf-8"))
+    gate_en_file = CHAT / "data" / "gate_en_minilm.json"
+    gate_zh_file = CHAT / "data" / "gate_zh_bge.json"
+    if gate_en_file.exists() and args.preset == "e5":
         gate_models["gate_model"] = CHAT / "models" / "Xenova" / "all-MiniLM-L6-v2"
-        if "zh" in payload:
+        if gate_zh_file.exists():
             zh_dir = CHAT / "models" / "Xenova" / "bge-small-zh-v1.5"
             download_model("Xenova/bge-small-zh-v1.5", zh_dir)
             gate_models["gate_model_zh"] = zh_dir
         # Echo each gate the index build wrote (en is always present; zh only
         # when its calibration separated) so the package log is self-describing.
-        for lang in ("en", "zh"):
-            spec = payload.get(lang)
-            print(
-                f"  gate[{lang}]: {spec['gate_stat']} >= {spec['gate_threshold']}"
-                if spec else f"  gate[{lang}]: not built (dormant)"
-            )
+        for lang, gate_file in (("en", gate_en_file), ("zh", gate_zh_file)):
+            if gate_file.exists():
+                spec = json.loads(gate_file.read_text(encoding="utf-8"))
+                print(f"  gate[{lang}]: {spec['gate_stat']} >= {spec['gate_threshold']}")
+            else:
+                print(f"  gate[{lang}]: not built (dormant)")
 
     print(f"[3/4] linux wheels for cp{args.python_version}")
     wheels = download_wheels(args.python_version, HERE / "_wheels")
@@ -222,7 +304,7 @@ def main() -> None:
 
     out = HERE / f"tencent-function-{args.preset}.zip"
     print(f"[4/4] packaging -> {out.name} (gates: {sorted(gate_models) or 'none'})")
-    build_zip(preset, model_dir, wheels, out, gate_models, build_info)
+    build_zip(preset, args.preset, model_dir, wheels, out, gate_models, build_info)
 
     print(json.dumps({
         "build": build_info["build_id"],
@@ -231,7 +313,8 @@ def main() -> None:
             + (" (note the new gate threshold it prints)" if args.preset == "e5" else ""),
             f"console: 本地上传zip包 -> {out.name}; 内存 1024MB; 初始化超时 120s;"
             " env add MODEL_DIR=model, QUERY_PREFIX='" + preset["query_prefix"] + "'",
-            "commit the rebuilt chat/data/index.json and publish the site",
+            f"commit the rebuilt chat/data/chunks_{args.preset}.json (+ gate_en_minilm.json"
+            " when e5) and publish the site",
         ]
     }, ensure_ascii=False, indent=2))
 

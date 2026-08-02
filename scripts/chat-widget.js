@@ -1,12 +1,36 @@
-// Portfolio chat agent — client-side RAG over the static index built by chat/.
+// Portfolio chat agent — normally a thin client over the backend's own
+// retrieval (Task 29); falls back to client-side RAG over the static index
+// when there is no backend (light mode) or it's unreachable (degraded mode).
 //
 // Architecture (see chat/README.md):
-//   chat/data/index.json   precomputed chunk vectors (build-time, Python)
+//   chat/data/meta.json         small metadata sidecar (build-time, Python) —
+//                              gate_threshold/gate_stat/gate_remote/model/
+//                              query_prefix/chunks_file. Fetched on every load.
+//   chat/data/{meta.chunks_file}  precomputed chunk vectors for the CONFIGURED
+//                              model (chunks_e5.json in production). Fetched
+//                              ONLY when the vendored in-browser model matches
+//                              meta.model (light mode / a `--model minilm`
+//                              build) — normal mode's retrieval happens
+//                              server-side, and degraded mode never uses this
+//                              file (see chat/data/chunks_en_minilm.json below).
+//   chat/data/gate_en_minilm.json    English off-topic gate vectors (MiniLM,
+//                              knowledge/about_en.md). Fetched only in
+//                              degraded mode (backend unreachable).
+//   chat/data/chunks_en_minilm.json  degraded mode's own retrieval corpus:
+//                              the SAME 192 English chunks as chunks_e5.json's
+//                              lang=="en" entries, re-embedded with MiniLM so
+//                              the self-hosted model can score real chunk
+//                              records — resolved by id, never by borrowing a
+//                              position from an unrelated array (Task 29
+//                              Part 2; this is the fix for the degraded-mode
+//                              source links Task 24 broke). Fetched only in
+//                              degraded mode.
 //   chat/models/           self-hosted MiniLM ONNX — the SAME weights the
 //                          build pipeline used, so query and document vectors
 //                          share one embedding space
 //   scripts/vendor/        self-hosted transformers.js runtime + ORT WASM
-//   WORKER_URL             optional Cloudflare Worker for LLM answers; leave
+//   WORKER_URL             optional Tencent SCF / Cloudflare Worker backend
+//                          for LLM answers + server-side retrieval; leave
 //                          empty for retrieval-only demo mode (no API key)
 //
 // Everything the widget logs (every user input, retrieval result and answer)
@@ -23,14 +47,14 @@
   var TOP_K = 4;
   var MIN_SCORE = 0.18;  // per-source display floor
   // Off-topic gate: statistic + threshold are calibrated per embedding model
-  // at build time and shipped in index.json (gate_stat, gate_threshold) —
+  // at build time and shipped in meta.json (gate_stat, gate_threshold) —
   // see chat/src/portfolio_rag/gate_calibration.py, mirrored in
   // chat/tests/test_gate.py. These constants are only the fallback for old
-  // indexes: raw top-score >= 0.22 (the MiniLM calibration).
+  // builds: raw top-score >= 0.22 (the MiniLM calibration).
   var OFFTOPIC_GATE = 0.22;
 
   function gateThreshold() {
-    return (state.index && state.index.gate_threshold) || OFFTOPIC_GATE;
+    return (state.meta && state.meta.gate_threshold) || OFFTOPIC_GATE;
   }
 
   function statValue(stats, kind) {
@@ -40,7 +64,7 @@
   }
 
   function gateValue(stats) {
-    return statValue(stats, (state.index && state.index.gate_stat) || 'top');
+    return statValue(stats, (state.meta && state.meta.gate_stat) || 'top');
   }
   // Name-dropping inflates similarity ("Yuanchen Wang tell me a joke" scores
   // 0.61), so when the question mentions the name, the gate is applied to the
@@ -66,6 +90,20 @@
   // language. (Explicit \u escapes: the literal compat-range start char is a
   // homoglyph of the unified one and easy to mistype.)
   var CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
+
+  // Name-blind gate input: the remainder after stripping YC's name, or null
+  // when the name should be KEPT (no name mentioned at all, or what's left
+  // after stripping is just a bio-intent stub -- see BIO_STUB_RE above).
+  // Mirrors runtime.py's strip_name(). Extracted into a named function (was
+  // formerly inlined in send()) so chat/tests/test_implementation_sync.py can
+  // execute it directly instead of a second, re-typed copy of this logic.
+  function stripName(question) {
+    if (!NAME_TEST_RE.test(question)) return null;
+    var remainder = question.replace(NAME_STRIP_RE, ' ')
+      .replace(/\s+/g, ' ').trim()
+      .replace(/^[\s:;,.!?—-]+|[\s:;,.!?—-]+$/g, '');
+    return BIO_STUB_RE.test(remainder) ? null : remainder;
+  }
 
   // Gate input. When the name was stripped (off-topic detection), gate on the
   // remainder. When it was KEPT (a bio question), normalize the name to the
@@ -112,13 +150,16 @@
       degradedCJK: 'The AI answer service is unreachable right now, and offline search only covers English. Here are some pages you can browse in the meantime:',
       degradedLoading: function (pct) { return 'Backend unreachable — loading offline search (' + pct + '%)…'; },
       degradedSources: 'The AI answer service is unreachable right now, but these pages look most relevant to your question:',
-      // Task 24 review, Important: fb.vectors is now the curated en gate
-      // corpus (~55 sections), no longer chunk-order-aligned with
-      // state.index.chunks (see the fallback_vectors.json comment in
-      // index_builder.py) -- so degradedSources' specific "these pages look
-      // most relevant" claim would be naming an unrelated chunk by accident
-      // of position. This string is honest about what local search actually
-      // confirmed (on-topic) vs. what it can't do (point to a specific page).
+      // Task 24 broke this claim by pointing the (then single, dual-purpose)
+      // fallback file's retrieval half at a curated corpus that no longer
+      // chunk-order-aligned with the full index. Task 29 Part 2 fixed it for
+      // real, not just reworded it: chat/data/chunks_en_minilm.json is now a
+      // genuine retrieval corpus (real chunk records, resolved by id -- see
+      // retrieveFallback), so degradedSources is accurate again. Kept as a
+      // SEPARATE string from degradedNoSources (below) rather than merged
+      // back into one, because that case -- gate passed, but nothing
+      // individually cleared MIN_SCORE -- is still real and still deserves
+      // its own honest wording.
       degradedNoSources: 'The AI answer service is unreachable right now. Offline search confirms this is something I can help with, but can\'t reliably point to a specific page yet — here are some pages you can browse:',
       backendDown: 'The chat backend is unreachable right now — please try again in a minute.',
       retrievalOnly: 'Demo is in retrieval-only mode (no LLM connected yet), but here\'s what the semantic index surfaces for that — sources below:',
@@ -183,7 +224,10 @@
     open: false,
     role: null,
     roles: null,
-    index: null,
+    meta: null, // chat/data/meta.json — gate_threshold/gate_stat/gate_remote/model/query_prefix/chunks_file
+    chunks: null, // chat/data/{meta.chunks_file}'s chunk array — fetched only when localModelMatchesIndex()
+    degradedGate: null, // chat/data/gate_en_minilm.json — fetched lazily, degraded mode only
+    degradedChunks: null, // chat/data/chunks_en_minilm.json — fetched lazily, degraded mode only
     extractor: null,
     loading: null, // Promise while core assets load
     extractorLoading: null, // Promise while the local model loads
@@ -305,9 +349,11 @@
   }
 
   // ── Lazy asset loading ────────────────────────────────────────────────
-  // Core (roles + index) always loads on open — it's ~600KB. The 23MB local
-  // model loads only when actually needed: immediately when there's no
-  // backend, lazily as a fallback when the backend embeds server-side.
+  // Core (roles + meta) always loads on open — it's ~10KB, not the 1.4MB
+  // chunk index (Task 29). The chunk index itself loads only when the
+  // vendored in-browser model can actually use it (light mode / the local
+  // half of degraded mode) — normal mode's retrieval happens server-side.
+  // The 23MB local model loads separately, only when actually needed.
   function loadCore() {
     if (state.loading) return state.loading;
     state.loading = (async function () {
@@ -317,20 +363,33 @@
         if (!r.ok) throw new Error('roles.json ' + r.status);
         return r.json();
       });
-      var indexRes = fetch(PREFIX + 'chat/data/index.json', { cache: 'no-cache' }).then(function (r) {
-        if (!r.ok) throw new Error('index.json ' + r.status);
+      var metaRes = fetch(PREFIX + 'chat/data/meta.json', { cache: 'no-cache' }).then(function (r) {
+        if (!r.ok) throw new Error('meta.json ' + r.status);
         return r.json();
       });
       state.roles = await rolesRes;
-      state.index = await indexRes;
+      state.meta = await metaRes;
+      if (localModelMatchesIndex()) {
+        // chunks_file (Task 29 Part 2) names the retrieval corpus for
+        // WHATEVER preset actually built this meta.json -- fetched by name,
+        // never inferred from `model` here.
+        var indexRes = fetch(PREFIX + 'chat/data/' + state.meta.chunks_file, { cache: 'no-cache' }).then(function (r) {
+          if (!r.ok) throw new Error(state.meta.chunks_file + ' ' + r.status);
+          return r.json();
+        });
+        state.chunks = (await indexRes).chunks || [];
+      } else {
+        state.chunks = [];
+      }
     })();
     return state.loading;
   }
 
   // The vendored in-browser model only matches indexes built with MiniLM —
-  // an e5-built index needs the backend's /embed and has no local fallback.
+  // an e5-built index needs the backend's own retrieval (Task 29) and has no
+  // local fallback.
   function localModelMatchesIndex() {
-    return !state.index || /all-MiniLM-L6-v2/.test(state.index.model || '');
+    return !state.meta || /all-MiniLM-L6-v2/.test(state.meta.model || '');
   }
 
   function ensureExtractor(onProgress) {
@@ -354,24 +413,39 @@
     return state.extractorLoading;
   }
 
-  // Returns {vector, gate}. gate is non-null only when the backend embeds
-  // AND has the gate model packaged — it judges gateText (the name-stripped
-  // question) with MiniLM, since e5 can't separate on/off-topic.
+  // Embed `text` with the vendored in-browser model. Used only on the local
+  // path: light mode (no backend, or the index matches the local model) and
+  // the "classic local gate" branch in send(), which always needs a genuine
+  // local vector regardless of whether the backend is otherwise reachable.
+  async function localEmbed(text) {
+    await ensureExtractor(null);
+    var out = await state.extractor((state.meta.query_prefix || '') + text, { pooling: 'mean', normalize: true });
+    return out.data; // Float32Array(384), unit norm
+  }
+
+  // Returns {vector, gate, rid}. Task 29: the backend is only ever asked for
+  // a GATE decision now (gate_only: true) — normal-mode retrieval moved
+  // server-side into /chat, so there is no more use for a remotely-computed
+  // query vector. `vector` is therefore populated only via the local
+  // in-browser model (light mode, or the local half of degraded mode); gate
+  // is non-null only when the backend embeds AND has the gate model packaged
+  // — it judges gateText (the name-stripped question) with MiniLM, since e5
+  // can't separate on/off-topic.
   async function embedQuery(text, gateText) {
-    // Preferred: the backend embeds (multilingual model, no client download).
-    // One retry with a pause covers cold starts and transient hiccups before
-    // we give up on the backend for this session.
+    // Preferred: the backend judges the gate (no client download). One retry
+    // with a pause covers cold starts and transient hiccups before we give
+    // up on the backend for this session.
     if (WORKER_URL && !state.remoteEmbedDown) {
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
           var res = await fetch(WORKER_URL + '/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text, gate_text: gateText || text }),
+            body: JSON.stringify({ text: text, gate_text: gateText || text, gate_only: true }),
           });
           if (res.ok) {
             var data = await res.json();
-            return { vector: new Float32Array(data.vector), gate: data.gate || null, rid: data.rid || null };
+            return { vector: null, gate: data.gate || null, rid: data.rid || null };
           }
           if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
         } catch (e) {
@@ -385,14 +459,15 @@
     if (!localModelMatchesIndex()) {
       throw new Error('embedding service unavailable (the search index needs the server-side model)');
     }
-    await ensureExtractor(null);
-    var out = await state.extractor((state.index.query_prefix || '') + text, { pooling: 'mean', normalize: true });
-    return { vector: out.data, gate: null, rid: null }; // Float32Array(384), unit norm
+    return { vector: await localEmbed(text), gate: null, rid: null };
   }
 
   // Dot-product retrieval + gate stats. vecAt(i) yields the i-th chunk vector,
   // chunkAt(i) the chunk it maps to — the only thing that differs between the
-  // primary (index.json) and degraded (fallback_vectors.json) paths.
+  // primary (state.chunks) and degraded (state.degradedChunks) paths. Both
+  // paths index vecAt/chunkAt into the SAME array at the SAME position i, so
+  // this is never a cross-array positional guess — see retrieveFallback below
+  // for why that distinction matters.
   function scoreChunks(count, queryVec, vecAt, chunkAt) {
     var scored = [], sum = 0, sumSq = 0;
     for (var i = 0; i < count; i++) {
@@ -415,7 +490,7 @@
   }
 
   function retrieve(queryVec) {
-    var chunks = state.index.chunks;
+    var chunks = state.chunks;
     return scoreChunks(chunks.length, queryVec,
       function (i) { return chunks[i].vector; }, function (i) { return chunks[i]; });
   }
@@ -429,34 +504,57 @@
     return out;
   }
 
-  // ── Degraded mode: backend down + e5 index ────────────────────────────
-  // The published fallback_vectors.json holds MiniLM copies of the en gate's
-  // vectors, so the local MiniLM model can still answer the gate question
-  // (on-/off-topic?) when server-side embedding and LLM answers are
-  // unreachable — that gate check is the one thing every caller of
-  // retrieveFallback needs and always gets right.
+  // ── Degraded mode: backend down + e5 index (Task 29 Part 2) ───────────
+  // Two SEPARATE single-purpose files now, never one file doing both jobs:
+  //   chat/data/gate_en_minilm.json    — MiniLM vectors over knowledge/
+  //                                      about_en.md's ~55 curated sections.
+  //                                      GATE ONLY: no chunk records, so
+  //                                      there is nothing here to resolve a
+  //                                      source link from.
+  //   chat/data/chunks_en_minilm.json  — the SAME 192 English chunks as the
+  //                                      normal-mode retrieval corpus's
+  //                                      lang=="en" entries (same ids, same
+  //                                      order, same text), re-embedded with
+  //                                      MiniLM. RETRIEVAL ONLY: real chunk
+  //                                      records, each carrying its own real
+  //                                      id/url/anchor/page_title/
+  //                                      section_title/text.
   //
-  // As of the curated-gate-corpus change (chat/src/portfolio_rag/
-  // index_builder.py, task 24), fb.vectors is knowledge/about_en.md's ~55
-  // curated sections, NOT a chunk-order-aligned prefix of index.json's
-  // chunks anymore. The chunkAt(i) below still indexes state.index.chunks[i]
-  // positionally — that mapping is now coincidental, not meaningful, so the
-  // *source links* this produces (as opposed to its gate score) may name an
-  // unrelated chunk. Known, not yet fixed: see the index_builder.py comment
-  // above the fallback_vectors.json write for the reasoning and the options
-  // for a proper follow-up (a second, retrieval-shaped fallback corpus, or
-  // chunk_ids the widget looks up by id instead of by position).
-  function loadFallbackVectors() {
-    if (state.fallback) return Promise.resolve(state.fallback);
-    return fetch(PREFIX + 'chat/data/fallback_vectors.json', { cache: 'no-cache' }).then(function (r) {
-      if (!r.ok) throw new Error('fallback index unavailable');
+  // Task 24 broke degraded-mode source links by pointing the (then single,
+  // dual-purpose) gate file at a curated corpus that no longer order-aligned
+  // with the full chunk index, while retrieveFallback kept mapping
+  // fb.vectors[i] -> state.index.chunks[i] positionally across those two
+  // now-unrelated arrays. The fix here is not a rename: gate scoring and
+  // retrieval now run against two INDEPENDENT arrays, and retrieveFallback
+  // below resolves each result from chunks_en_minilm.json's OWN chunk
+  // record at that SAME position — never a position borrowed from a
+  // different array. That is exactly the "resolve by id, never by a
+  // position borrowed from an unrelated array" property this split exists
+  // to restore; addSources/dedupeForDisplay/sourcesForLog/record.retrieved
+  // all read real chunk ids again, same as normal mode.
+  function loadDegradedGate() {
+    if (state.degradedGate) return Promise.resolve(state.degradedGate);
+    return fetch(PREFIX + 'chat/data/gate_en_minilm.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('offline gate unavailable');
       return r.json();
-    }).then(function (fb) { state.fallback = fb; return fb; });
+    }).then(function (g) { state.degradedGate = g; return g; });
   }
 
-  function retrieveFallback(fb, queryVec) {
-    return scoreChunks(fb.vectors.length, queryVec,
-      function (i) { return fb.vectors[i]; }, function (i) { return state.index.chunks[i]; });
+  function loadDegradedChunks() {
+    if (state.degradedChunks) return Promise.resolve(state.degradedChunks);
+    return fetch(PREFIX + 'chat/data/chunks_en_minilm.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('offline search index unavailable');
+      return r.json();
+    }).then(function (c) { state.degradedChunks = c; return c; });
+  }
+
+  // Identical shape to retrieve() above, parameterized on WHICH chunk array
+  // to score — chunks_en_minilm.json's real chunk records, not fb.vectors'
+  // curated gate corpus. vecAt/chunkAt both index the SAME array at the
+  // SAME position, so this is never a cross-array positional guess.
+  function retrieveFallback(chunks, queryVec) {
+    return scoreChunks(chunks.length, queryVec,
+      function (i) { return chunks[i].vector; }, function (i) { return chunks[i]; });
   }
 
   async function degradedTurn(question, stripped, thinking, record) {
@@ -520,17 +618,18 @@
   // Consent granted: pull the MiniLM model and do local fallback retrieval.
   async function runOfflineSearch(question, stripped, thinking, record) {
     try {
-      var fb = await loadFallbackVectors();
+      var gate = await loadDegradedGate();
+      var chunks = await loadDegradedChunks();
       thinking.classList.add('ycchat-dots');
       await ensureExtractor(function (pct) {
         thinking.textContent = t('degradedLoading', pct);
         thinking.classList.remove('ycchat-dots');
       });
-      var embedFb = async function (q) {
-        var out = await state.extractor((fb.query_prefix || '') + q, { pooling: 'mean', normalize: true });
+      var embedLocal = async function (q, prefix) {
+        var out = await state.extractor((prefix || '') + q, { pooling: 'mean', normalize: true });
         return out.data;
       };
-      var retrieved = retrieveFallback(fb, await embedFb(question));
+      var retrieved = retrieveFallback(chunks.chunks, await embedLocal(question, chunks.query_prefix));
       // Gate on gateForm()'s output, not on `stripped ? stripped : question`.
       // Those differ when the name was KEPT (a bio question): gateForm then
       // normalizes the name to the gate corpus's own language, which the raw
@@ -538,34 +637,37 @@
       // on gateForm's output, so the shortcut was a silent third divergence —
       // the same class as BIO_STUB_RE's, which has already drifted twice.
       var degradedGateText = gateForm(question, stripped);
-      var gateScore = statValue(
-        retrieveFallback(fb, await embedFb(degradedGateText)).stats,
-        fb.gate_stat || 'top'
-      );
+      var gateVec = await embedLocal(degradedGateText, gate.query_prefix);
+      var gateStats = scoreChunks(
+        gate.vectors.length, gateVec,
+        function (i) { return gate.vectors[i]; }, function () { return null; }
+      ).stats;
+      var gateScore = statValue(gateStats, gate.gate_stat || 'top');
       thinking.classList.remove('ycchat-dots');
-      if (gateScore < (fb.gate_threshold || OFFTOPIC_GATE)) {
+      if (gateScore < (gate.gate_threshold || OFFTOPIC_GATE)) {
         thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
         pushLog({ type: 'bot', text: thinking.textContent });
         pushLog({ type: 'starters' });
+      } else if (retrieved.results.length) {
+        // Task 29 Part 2: retrieved.results now names REAL chunks from
+        // chunks_en_minilm.json (see retrieveFallback above), so degraded
+        // mode can show real source links again, same as normal mode.
+        thinking.textContent = t('degradedSources');
+        addSources(retrieved.results);
+        pushLog({ type: 'bot', text: thinking.textContent });
+        pushLog({ type: 'sources', results: sourcesForLog(retrieved.results) });
       } else {
-        // Task 24 review, Important: retrieved.results' chunkAt(i) mapping is
-        // no longer trustworthy (see retrieveFallback's comment above) -- it
-        // would confidently name a chunk that has nothing to do with the
-        // query. Showing wrong sources is worse than showing none, so this
-        // shows the same static, curated page-link list degradedCJK and
-        // offlineDeclined already use elsewhere, not addSources(retrieved.
-        // results). The gate decision itself (gateScore above) is unaffected
-        // and still gates on the real fb vectors.
+        // Gate passed (on-topic) but nothing cleared MIN_SCORE -- genuinely
+        // no reliable source to point to, so fall back to the static,
+        // curated page-link list degradedCJK/offlineDeclined already use.
         thinking.textContent = t('degradedNoSources');
         addPageLinks();
         pushLog({ type: 'bot', text: thinking.textContent });
         pushLog({ type: 'pagelinks' });
       }
-      // Internal audit log only (console.debug / analytics /log, never
-      // re-rendered to the visitor -- contrast pushLog above) -- kept as the
-      // raw fb-based scores/ids for the site owner's own debugging even
-      // though the chunkAt(i) mapping is unreliable for display purposes.
+      // record.retrieved carries real chunk ids again (Task 29 Part 2) --
+      // contrast the old fallback-corpus-position ids this used to log.
       record.retrieved = retrieved.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
       record.answer = thinking.textContent;
       logTurn(record);
@@ -577,7 +679,9 @@
   }
 
   // ── LLM call via worker ───────────────────────────────────────────────
-  async function askWorker(question, results) {
+  // Task 29: the client no longer sends contexts — the function retrieves
+  // from its own bundled index and returns the chunks it used as `sources`.
+  async function askWorker(question) {
     var res = await fetch(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -587,20 +691,40 @@
         lang: lang(),
         question: question,
         history: state.history.slice(-6),
-        contexts: results.map(function (r) {
-          return {
-            id: r.chunk.id,
-            title: r.chunk.page_title + ' — ' + r.chunk.section_title,
-            url: r.chunk.url,
-            text: r.chunk.text,
-            score: +r.score.toFixed(4), // client-side retrieval similarity — the
-            // server logs it so 日志查询 shows retrieval quality per chunk.
-          };
-        }),
       }),
     });
+    // Same rate-limit message /embed's remote branch throws (see
+    // embedQuery) -- send()'s chatErr handler bubbles this one to the
+    // generic "something went wrong" path instead of degraded mode, for the
+    // same reason: a transient rate limit isn't "the backend is down," and
+    // shouldn't prompt a 23MB offline-model download.
+    if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
     if (!res.ok) throw new Error('worker ' + res.status);
-    return await res.json(); // {answer, model, rid}
+    return await res.json(); // {answer, model, rid, sources[], refused?}
+  }
+
+  // Rebuilds the widget's internal {chunk, score} shape (what addSources,
+  // dedupeForDisplay, sourcesForLog and record.retrieved all expect) from
+  // /chat's `sources` array — the read-side equivalent of what retrieve()
+  // used to return, now that retrieval happens server-side (Task 29).
+  function resultsFromSources(sources) {
+    return (sources || []).map(function (s) {
+      // Guard at the boundary where server-supplied data becomes the
+      // widget's internal {chunk, score} shape: every downstream reader
+      // (addSources' r.score.toFixed(2), the record.retrieved/sourcesForLog
+      // .toFixed(3) call sites) assumes a real number, the same guarantee
+      // scoreChunks' own numeric loop always provides for the client-side
+      // path. A backend that omits or malforms `score` must not throw deep
+      // inside rendering.
+      var score = typeof s.score === 'number' && isFinite(s.score) ? s.score : 0;
+      return {
+        chunk: {
+          id: s.id, url: s.url, anchor: s.anchor,
+          page_title: s.page_title, section_title: s.section_title, text: s.text,
+        },
+        score: score,
+      };
+    });
   }
 
   // ── UI ────────────────────────────────────────────────────────────────
@@ -807,47 +931,49 @@
     try {
       // Name-blind gate input: strip YC's name unless the remainder is a
       // bio-intent stub (a genuine question about him).
-      var stripped = null;
-      if (NAME_TEST_RE.test(question)) {
-        var remainder = question.replace(NAME_STRIP_RE, ' ')
-          .replace(/\s+/g, ' ').trim()
-          .replace(/^[\s:;,.!?—-]+|[\s:;,.!?—-]+$/g, '');
-        if (!BIO_STUB_RE.test(remainder)) stripped = remainder;
-      }
+      var stripped = stripName(question);
 
       var record = { event: 'turn', role: state.role, question: question };
+      var gateText = gateForm(question, stripped);
       var emb;
       try {
-        emb = await embedQuery(question, gateForm(question, stripped));
+        emb = await embedQuery(question, gateText);
       } catch (embErr) {
         if (String(embErr && embErr.message).indexOf('embedding service unavailable') !== 0) throw embErr;
         await degradedTurn(question, stripped, thinking, record);
         return;
       }
       record.embed_rid = emb.rid || undefined; // correlate with the server /embed log
-      var retrieved = retrieve(emb.vector);
-      var results = retrieved.results;
-      record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
 
-      // Off-topic gate: refuse before any LLM call. Three cases: the backend
-      // judged it (server-side MiniLM gate), the index expects a remote gate
-      // that wasn't available (fail open — the LLM prompt still refuses), or
-      // the classic local gate on this index's own scores.
+      // emb.vector is populated only on the LOCAL embedding path (light
+      // mode, or backend-down-but-local-model-matches) — normal mode's
+      // retrieval now happens server-side inside /chat (Task 29), so there
+      // is nothing to score locally there; results come from /chat's
+      // `sources` instead, once the gate (below) has passed.
+      var localRetrieval = emb.vector ? retrieve(emb.vector) : null;
+      if (localRetrieval) {
+        record.retrieved = localRetrieval.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
+      }
+
+      // Off-topic gate: refuse before any retrieval/LLM call. Three cases:
+      // the backend judged it (server-side gate_only /embed call), the index
+      // expects a remote gate that wasn't available (fail open — the LLM
+      // prompt still refuses), or the classic local gate on this browser's
+      // own in-memory index.
       var refused = false;
       if (emb.gate) {
         refused = !emb.gate.pass;
         record.gate = { remote: true, value: emb.gate.value, reason: emb.gate.reason, stripped: stripped || undefined };
-      } else if (state.index.gate_remote) {
+      } else if (state.meta.gate_remote) {
         record.gate = { remote: true, unavailable: true };
       } else {
-        // Same fix as the degraded branch above: gate on gateForm()'s output,
-        // which normalizes a KEPT name to the gate corpus's language. The old
-        // `stripped ? stripped : question` shortcut skipped that normalization
-        // and diverged from runtime.py / functions/tencent/index.py.
-        var localGateText = gateForm(question, stripped);
-        var gateScore = gateValue(
-          retrieve((await embedQuery(localGateText, localGateText)).vector).stats
-        );
+        // Gate on gateForm()'s output via its OWN local embedding (may differ
+        // from `question` itself when the name was stripped/normalized) —
+        // mirrors runtime.py / functions/tencent/index.py's gate_form. Always
+        // a genuine local embedding (not embedQuery), so this works even in
+        // the edge case where the backend is reachable enough to answer
+        // gate_only /embed calls but has no gate model packaged.
+        var gateScore = gateValue(retrieve(await localEmbed(gateText)).stats);
         if (stripped) record.gate = { stripped: stripped, score: +gateScore.toFixed(3) };
         refused = gateScore < gateThreshold();
       }
@@ -863,19 +989,36 @@
         return;
       }
 
-      var answer;
+      var answer, results;
       if (WORKER_URL) {
         record.mode = 'llm';
-        var resp = await askWorker(question, results);
-        answer = resp.answer;
+        var resp;
+        try {
+          resp = await askWorker(question);
+        } catch (chatErr) {
+          if (String(chatErr && chatErr.message).indexOf('rate limited') === 0) throw chatErr;
+          // Log before falling into degradedTurn -- otherwise a /chat
+          // failure left no diagnostic anywhere (degradedTurn's own
+          // logTurn calls describe the offline-consent flow, not why this
+          // turn ended up there).
+          logTurn({ event: 'error', role: state.role, question: question, error: String(chatErr) });
+          // A gate_only /embed call can succeed even when /chat itself is
+          // down or misconfigured (e.g. an old zip with no bundled index,
+          // Task 29) — treat that the same as an unreachable backend.
+          await degradedTurn(question, stripped, thinking, record);
+          return;
+        }
+        results = resultsFromSources(resp.sources);
+        record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
         record.rid = resp.rid || undefined; // server /chat log id, for correlation
         // The UI renders plain text; strip stray markdown emphasis the LLM
         // may emit despite the prompt (e.g. **Prime Engine**).
-        answer = answer.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#+\s+/gm, '');
+        answer = resp.answer.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#+\s+/gm, '');
         thinking.classList.remove('ycchat-dots');
         thinking.textContent = answer;
       } else {
         record.mode = 'retrieval-only';
+        results = localRetrieval ? localRetrieval.results : [];
         thinking.classList.remove('ycchat-dots');
         thinking.textContent = t('retrievalOnly');
         answer = thinking.textContent;

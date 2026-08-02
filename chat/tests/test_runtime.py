@@ -117,23 +117,23 @@ def test_chinese_question_routes_to_the_zh_gate(rt) -> None:
 
 
 def test_gate_meta_reports_the_real_margin_from_the_rebuilt_artifact(rt) -> None:
-    """The committed chat/data/gate_vectors.json (or fallback_vectors.json)
-    on disk used to predate task 20's gate_margin field, so this test used to
-    assert the "n/a" (None) case directly off real data. Task 24 rebuilt the
-    en gate against the curated knowledge/about_en.md corpus (55 sections,
-    not the ~144 indexed English chunks), and that rebuild carries
-    gate_margin like every build has since task 20 -- the artifact on disk no
-    longer predates it, so the real-data "n/a" case this test used to
-    demonstrate no longer exists. See
+    """The committed chat/data/gate_en_minilm.json (Task 29 Part 2; formerly
+    gate_vectors.json/fallback_vectors.json) on disk used to predate task
+    20's gate_margin field, so this test used to assert the "n/a" (None)
+    case directly off real data. Task 24 rebuilt the en gate against the
+    curated knowledge/about_en.md corpus (55 sections, not the ~144 indexed
+    English chunks), and that rebuild carries gate_margin like every build
+    has since task 20 -- the artifact on disk no longer predates it, so the
+    real-data "n/a" case this test used to demonstrate no longer exists. See
     test_gate_bundle_reports_none_when_the_spec_has_no_margin_key below for
     that case, now covered synthetically instead. _GateBundle.margin (and
     gate_meta's "margin") must read as the real measured float here -- an
     artifact that HAS the measurement must not report it as absent."""
     meta = rt.gate_meta
-    assert "en" in meta, "the committed index ships an en gate"
+    assert "en" in meta, "the committed chunks file ships an en gate"
     assert isinstance(meta["en"]["margin"], float), (
-        "the rebuilt gate_vectors.json/fallback_vectors.json on disk carries "
-        "gate_margin -- this must read as the real float, not None"
+        "the rebuilt gate_en_minilm.json on disk carries gate_margin -- "
+        "this must read as the real float, not None"
     )
 
 
@@ -182,8 +182,8 @@ def test_knowledge_chunk_ids_matches_the_curated_corpus_exactly(rt) -> None:
 
 
 def test_stale_knowledge_headings_is_empty_against_the_current_build(rt) -> None:
-    """The committed data/index.json and the current chat/knowledge/*.md files
-    agree (nothing renamed since the last rebuild), so the desync diagnostic
+    """The committed data/chunks_e5.json and the current chat/knowledge/*.md
+    files agree (nothing renamed since the last rebuild), so the desync diagnostic
     must report nothing. If this ever fails on the committed artifacts, a
     heading was edited without a rebuild -- see knowledge_chunk_ids's
     docstring for why that silently corrupts hit_at_4_page_only."""

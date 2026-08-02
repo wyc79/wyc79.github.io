@@ -115,6 +115,57 @@ class GateDecision:
     reason: str | None = None
 
 
+def _hits_from_scores(scores: np.ndarray, meta: list[dict], k: int) -> Retrieval:
+    """Rank an already-scored candidate set: sort descending, take the top k,
+    THEN drop any below MIN_SCORE. Order matters -- floor after top-k, not
+    before. Shared by rank_hits (below) and Runtime.retrieve's exclude_ids
+    path (which pre-masks excluded rows to -inf before calling this).
+
+    Two corrections from a cross-implementation sync-test review (Task 29
+    fix round 1), both required to actually match chat-widget.js:
+    - `kind="stable"`: np.argsort's default is NOT stable (introsort/
+      quicksort), so ties broke differently than JS's Array.prototype.sort
+      (stable since ES2019) -- the widget keeps original chunk order on
+      equal scores, so this must too. Fuzzed on the real committed index:
+      40/40 tie-heavy queries disagreed with the widget before this fix.
+    - The MIN_SCORE comparison runs on the RAW (unrounded) score, not the
+      4-decimal-rounded one -- rounding-then-comparing let scores like
+      0.179960 round up to 0.18 and clear a floor they shouldn't. The
+      widget's scoreChunks never rounds internally, so it always compared
+      raw. round() is applied only when building the returned Hit/top_score,
+      for output, never for the floor test itself.
+    """
+    order = np.argsort(-scores, kind="stable")[:k]
+    top = [(meta[i], float(scores[i])) for i in order if np.isfinite(scores[i])]
+    kept = [
+        Hit(chunk_id=m["id"], url=m.get("url", ""), lang=m.get("lang", "en"), score=round(s, 4))
+        for m, s in top
+        if s >= MIN_SCORE
+    ]
+    return Retrieval(
+        hits=tuple(kept),
+        dropped_by_floor=len(top) - len(kept),
+        top_score=round(top[0][1], 4) if top else 0.0,
+    )
+
+
+def rank_hits(matrix: np.ndarray, meta: list[dict], query_vec: np.ndarray, k: int = TOP_K) -> Retrieval:
+    """Pure ranking function: score every chunk row by dot product against
+    query_vec (all vectors are unit-normalized, so this is cosine), sort
+    descending, take the top k, then drop any below MIN_SCORE.
+
+    Deliberately takes a precomputed query vector rather than embedding a
+    question itself, so it can run without an ONNX model. Mirrored, with the
+    same two constants (TOP_K/MIN_SCORE) and the same floor-after-top-k
+    order, by chat-widget.js's scoreChunks and functions/tencent/index.py's
+    rank_chunks -- chat/tests/test_retrieval_sync.py executes all three
+    against one shared fixture and asserts they agree.
+    """
+    if matrix.shape[0] == 0:
+        return Retrieval(hits=(), dropped_by_floor=0, top_score=0.0)
+    return _hits_from_scores(matrix @ query_vec, meta, k)
+
+
 def _stat_value(scores: np.ndarray, kind: str) -> float:
     """Mirrors gate_calibration.stat_value and the widget's statValue()."""
     top = float(np.max(scores))
@@ -236,8 +287,9 @@ class Runtime:
         about_<lang>.md files still agree on heading text.
 
         They do not always. The CHUNKS are frozen at build time: page_title/
-        section_title is whatever heading text was on disk when index.json
-        was last written. The heading SET this is compared against, by
+        section_title is whatever heading text was on disk when
+        chunks_{model_preset}.json was last written. The heading SET this is
+        compared against, by
         contrast, is read from the CURRENT about_<lang>.md files on every
         call (via load_knowledge, the same parser index_builder.py uses) --
         not a snapshot from that same build. A heading rename or removal with
@@ -337,7 +389,7 @@ class Runtime:
         if self._embedder is None:
             raise RuntimeError(
                 f"retrieval unavailable: the model directory {self._model_dir} "
-                f"declared by index.json (model_preset="
+                f"declared by the chunks file (model_preset="
                 f"{self._index.get('model_preset')!r}) is not present — it is "
                 "gitignored, so a fresh clone must download it before evaluating"
             )
@@ -347,24 +399,7 @@ class Runtime:
             if rows:
                 scores = scores.copy()
                 scores[rows] = -np.inf
-        order = np.argsort(-scores)[:k]
-        chunks = self._index["chunks"]
-        top = [
-            Hit(
-                chunk_id=chunks[i]["id"],
-                url=chunks[i]["url"],
-                lang=chunks[i].get("lang", "en"),
-                score=round(float(scores[i]), 4),
-            )
-            for i in order
-            if np.isfinite(scores[i])
-        ]
-        kept = [h for h in top if h.score >= MIN_SCORE]
-        return Retrieval(
-            hits=tuple(kept),
-            dropped_by_floor=len(top) - len(kept),
-            top_score=top[0].score if top else 0.0,
-        )
+        return _hits_from_scores(scores, self._index["chunks"], k)
 
     def gate(self, question: str) -> GateDecision:
         text = gate_form(question)
@@ -384,39 +419,29 @@ class Runtime:
 
 
 def load_runtime() -> Runtime:
-    """Load index + gate bundles + retrieval embedder, degrading explicitly."""
-    index = json.loads(
-        settings.resolve_path(settings.index_path).read_text(encoding="utf-8")
-    )
+    """Load the chunks file + gate bundles + retrieval embedder, degrading
+    explicitly. Task 29 Part 2: gate_en_minilm.json is committed (e5 can
+    never self-gate), so unlike before the split, there is no
+    fallback-file branch for the en gate — it is simply always present.
+    gate_zh_bge.json is gitignored and is the one that goes missing on a
+    fresh clone; its absence is reported (zh_gate_available == False),
+    never silently scored as 0."""
+    index = json.loads(settings.resolve_chunks_path().read_text(encoding="utf-8"))
 
     gates: dict = {"en": None, "zh": None}
-    gate_path = settings.resolve_path(settings.gate_vectors_path)
-    if gate_path.exists():
-        payload = json.loads(gate_path.read_text(encoding="utf-8"))
-        for lang in ("en", "zh"):
-            spec = payload.get(lang)
-            if spec:
-                gates[lang] = _GateBundle(spec["model_preset"], spec)
-    else:
-        # gate_vectors.json is gitignored. fallback_vectors.json IS committed
-        # and carries the same MiniLM vectors + stat + threshold, so the en
-        # gate always survives. There is no committed zh equivalent.
-        fallback = settings.resolve_path(settings.fallback_vectors_path)
-        if fallback.exists():
-            fallback_spec = json.loads(fallback.read_text(encoding="utf-8"))
-            gates["en"] = _GateBundle(
-                # fallback_vectors.json records no model identity today, so
-                # "minilm" is the documented default. Read the key if a future
-                # build starts writing it, rather than silently mismatching the
-                # way the settings-based embedder lookup did.
-                fallback_spec.get("model_preset", "minilm"),
-                fallback_spec,
-            )
+    gate_en_path = settings.resolve_path(settings.gate_en_minilm_path)
+    if gate_en_path.exists():
+        spec = json.loads(gate_en_path.read_text(encoding="utf-8"))
+        gates["en"] = _GateBundle(spec["model_preset"], spec)
+    gate_zh_path = settings.resolve_path(settings.gate_zh_bge_path)
+    if gate_zh_path.exists():
+        spec = json.loads(gate_zh_path.read_text(encoding="utf-8"))
+        gates["zh"] = _GateBundle(spec["model_preset"], spec)
 
-    # The INDEX declares which model built it — not settings, and not a
+    # The CHUNKS FILE declares which model built it — not settings, and not a
     # hardcoded preset. settings.model_preset defaults to "minilm" while the
-    # committed index.json was built with e5, so resolving from settings would
-    # dot MiniLM query vectors against e5 chunk vectors and return
+    # committed chunks_e5.json was built with e5, so resolving from settings
+    # would dot MiniLM query vectors against e5 chunk vectors and return
     # plausible-looking garbage (measured: top score ~0.10 instead of ~0.86).
     # get_embedder()'s module-level cache is shared with the other test modules,
     # so build a dedicated instance rather than reusing it.
