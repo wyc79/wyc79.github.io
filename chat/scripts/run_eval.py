@@ -20,15 +20,6 @@ from portfolio_rag.evaluation import (
 )
 from portfolio_rag.runtime import load_runtime
 
-# Every "n_*" key a shared cell can carry WITHOUT a not-yet-migrated negative
-# in it: the two bookkeeping counts plus the three adjacency buckets (see
-# evaluation.aggregate). Anything else starting with "n_" is a dynamic
-# leftover bucket for a negative with no valid adjacency -- reported as a
-# count of excluded cases rather than silently folded into a bucket it
-# doesn't belong to.
-_SHARED_N_KEYS = {"n_positive", "n_negative", "n_easy", "n_adjacent", "n_injection"}
-
-
 def print_gate_summary(gate_meta: dict) -> None:
     """Build-time gate calibration, per language -- stat/threshold/margin.
 
@@ -111,7 +102,6 @@ def print_shared_table(cells: dict) -> None:
     print(f"\n{'shared negatives':<16} {'off_topic/easy':>16} {'off_topic/adjacent':>20} "
           f"{'injection':>12}")
     print("-" * 68)
-    unaccounted = 0
     for name in sorted(cells):
         c = cells[name]
         if c["gate_available"]:
@@ -121,13 +111,7 @@ def print_shared_table(cells: dict) -> None:
         else:
             easy = adjacent = injection = "n/a"
         print(f"{c['lang']:<16} {easy:>16} {adjacent:>20} {injection:>12}")
-        unaccounted += sum(v for k, v in c.items()
-                            if k.startswith("n_") and k not in _SHARED_N_KEYS)
     print("-" * 68)
-    if unaccounted:
-        print(f"note: {unaccounted} negative case(s) have no valid adjacency (an off_topic "
-              "case without 'easy'/'adjacent') and are excluded from the buckets above -- "
-              "run with --json to see them.")
 
 
 def print_verbose(results: list) -> None:
@@ -158,6 +142,13 @@ def main() -> int:
     ap.add_argument("--verbose", action="store_true", help="per-case detail")
     ap.add_argument("--json", action="store_true", help="machine-readable cells")
     ap.add_argument("--update-baseline", action="store_true")
+    ap.add_argument(
+        "--allow-stale-index", action="store_true",
+        help="write the baseline even though the committed chunks file's knowledge-corpus "
+             "headings no longer match chat/knowledge/about_*.md on disk (see "
+             "Runtime.stale_knowledge_headings). Only for deliberately freezing a "
+             "known-stale state.",
+    )
     args = ap.parse_args()
 
     rt = load_runtime()
@@ -183,10 +174,10 @@ def main() -> int:
 
     if args.role:
         # Negatives carry no role (SHARED_ROLE) -- --role filters positive
-        # cells only. Applying it to negatives too would show a "shared"
-        # block that is not actually the shared pool, just whatever fraction
-        # of it happens to still carry this role in the not-yet-migrated
-        # dataset, which is worse than not filtering at all.
+        # cells only. Applying it to negatives too would print a "shared"
+        # block that is not the shared pool at all, just the slice of it the
+        # filter happened to keep, under a heading that says otherwise --
+        # worse than not filtering it.
         print(f"note: --role={args.role} filters positive cells only; negatives have no "
               "role and the shared block below always covers the full pool for the "
               "selected language(s).", file=sys.stderr)
@@ -227,6 +218,27 @@ def main() -> int:
         if args.role or args.lang:
             print("refusing to write a baseline from a filtered run -- "
                   "run without --role/--lang", file=sys.stderr)
+            return 2
+        # Same refusal, same reason, for the other way a baseline can be
+        # captured from a state that does not represent the system. The stale
+        # note printed above (:171-182) was advisory, and a printed warning is
+        # not a guard when the thing being warned about is a write:
+        # Runtime.stale_knowledge_headings' own docstring measures the damage
+        # -- renaming 5 about_en.md headings with no rebuild moved
+        # knowledge_chunk_ids 108 -> 103 and hit_at_4_page_only 59/96 -> 56/96,
+        # a 3-case move in an unpredictable direction. data/eval_baseline.json
+        # is what tests/test_golden.py::test_no_metric_regressed compares
+        # against, so freezing it here silently re-anchors the project's own
+        # success criterion to a broken measurement.
+        if stale_headings and not args.allow_stale_index:
+            print(
+                f"refusing to write a baseline while {len(stale_headings)} knowledge-corpus "
+                "heading(s) are stale (see the note above) -- the committed chunks file no "
+                "longer matches chat/knowledge/about_*.md, so hit@4(pg) is measuring a state "
+                "that does not exist. Rebuild the index first: python scripts/build_index.py. "
+                "Pass --allow-stale-index to freeze this state deliberately.",
+                file=sys.stderr,
+            )
             return 2
         BASELINE_PATH.write_text(
             json.dumps(build_baseline(rt, cells), ensure_ascii=False, indent=2),

@@ -238,6 +238,11 @@ python scripts/run_eval.py --update-baseline         # after a deliberate, revie
 pytest tests/test_golden.py                          # fails on any regression vs data/eval_baseline.json
 ```
 
+`--update-baseline` refuses to write from a run that cannot represent the
+system: a filtered run (`--role`/`--lang`), or one where the committed chunks
+file's knowledge headings no longer match `chat/knowledge/about_*.md` on disk
+(rebuild the index first — `--allow-stale-index` is the deliberate override).
+
 Run everything from `chat/`, with the interpreter that has `portfolio_rag`
 installed editable — `env_file=".env"` in `config.py` resolves relative to
 the working directory, so running from the repo root silently drops

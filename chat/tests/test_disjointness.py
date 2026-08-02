@@ -1,4 +1,5 @@
-"""calibration <-> corpus and golden <-> corpus disjointness (Task 26).
+"""Pairwise disjointness across all three sets (Task 26; the calibration <->
+golden edge added by the final whole-branch review).
 
 Three sets, two "scored against" edges (see gate_calibration.py's module
 docstring and this project's eval/README.md):
@@ -7,12 +8,15 @@ docstring and this project's eval/README.md):
     golden (eval/golden.jsonl)                            --validates-> threshold
     corpus (knowledge/about_en.md, about_zh.md)            scored AGAINST by both
 
-test_golden.py's test_cases_are_disjoint_from_fit_data already guards golden
-against reusing calibration/role-starter TEXT, but only by exact normalized
-equality -- it passes on any reworded near-paraphrase, exact or not, which is
-exactly the shape of collision measured (elsewhere in this project) to
-inflate a score by about +0.2. And nothing at all previously compared either
-query set against the corpus. This file adds that comparison for both.
+test_golden.py's test_cases_are_disjoint_from_fit_data guards golden against
+reusing calibration/role-starter TEXT, but only by exact normalized equality
+-- it passes on any reworded near-paraphrase, exact or not, which is exactly
+the shape of collision measured (elsewhere in this project) to inflate a score
+by about +0.2. And nothing at all previously compared either query set against
+the corpus. This file adds the strong comparator for the corpus edges, and
+(final whole-branch review) for the calibration <-> golden edge too, which is
+the pair where contamination matters most and which had only the exact-equality
+check -- proven exploitable, see "the third edge" section at the bottom.
 
 Comparator: character-level longest common substring (LCS), not word
 tokenization. Word/whitespace tokenization is ASCII-shaped and is blind to
@@ -369,4 +373,73 @@ def test_golden_en_is_disjoint_from_the_en_corpus(en_corpus) -> None:
 def test_golden_zh_is_disjoint_from_the_zh_corpus(zh_corpus) -> None:
     queries = [c.q for c in load_cases(GOLDEN_PATH) if c.lang == "zh"]
     collisions = _find_collisions(queries, zh_corpus)
+    assert not collisions, _format(collisions)
+
+
+# --- the third edge: calibration <-> golden -------------------------------
+#
+# The two edges above were the ones this file was written for. The final
+# whole-branch review found that the THIRD pairwise edge -- calibration <->
+# golden, the one that decides whether the held-out set is still held out --
+# had only exact normalized equality guarding it
+# (test_golden.py::test_cases_are_disjoint_from_fit_data), and proved it
+# exploitable with two mutations that left the ENTIRE suite green:
+#
+#   * a held-out golden zh question copied into ON_TOPIC_ZH with its trailing
+#     "？" swapped for "，" -- the long-deferred Task 8 `_normalize`
+#     punctuation gap, promoted from theoretical to a working exploit;
+#   * "Tell me: " + a verbatim golden EN question added to ON_TOPIC. The
+#     golden question is present character-for-character; this comparator
+#     scores it at ratio ~0.86, so it was never a comparator weakness -- the
+#     comparator was simply never run on this pair.
+#
+# This is the pair where contamination matters most: calibration DERIVES the
+# threshold and is freely tunable, golden VALIDATES it and is never tuned
+# against, so a leak here silently converts held-out validation into fit-on
+# scoring -- the exact failure the three-set discipline exists to prevent.
+#
+# Checked in BOTH directions. The ratio rule is relative to the QUERY's own
+# effective length, so it is asymmetric: a short calibration entry swallowed
+# by a long golden question and a short golden question swallowed by a long
+# calibration entry are different collisions, and only running one direction
+# would catch only one of them.
+#
+# Headroom on the current sets, measured (both directions, both languages):
+# max effective LCS 18.0 EN / 17.5 ZH against _ABS_EFFECTIVE_THRESHOLD=30,
+# max ratio 0.667 against _RATIO_THRESHOLD=0.8. The top matches are shared
+# domain terms every on-topic question about this portfolio must legitimately
+# share (" machine learning ", " game development", " yuanchen wang"), which
+# is the same shape the thresholds were originally sized against -- no
+# threshold change was needed to add this edge, and none was made.
+
+
+def _golden_as_sections(lang: str) -> list[tuple[str, str]]:
+    return [(c.id, c.q) for c in load_cases(GOLDEN_PATH) if c.lang == lang]
+
+
+@pytest.mark.parametrize("lang", ["en", "zh"])
+def test_calibration_is_disjoint_from_the_golden_set(lang: str) -> None:
+    calibration = ON_TOPIC + OFF_TOPIC if lang == "en" else ON_TOPIC_ZH + OFF_TOPIC_ZH
+    golden = _golden_as_sections(lang)
+    assert golden, f"fixture assumption: the golden set has {lang} cases"
+
+    collisions = _find_collisions(calibration, golden)
+    assert not collisions, (
+        "calibration reuses held-out golden text -- the gate would be tuned on "
+        "the set that validates it:\n  " + _format(collisions)
+    )
+
+
+@pytest.mark.parametrize("lang", ["en", "zh"])
+def test_the_golden_set_is_disjoint_from_calibration_in_the_other_direction(lang: str) -> None:
+    """Same edge, opposite roles. The ratio rule normalizes by the QUERY's
+    effective length, so a short golden question almost wholly contained in a
+    longer calibration entry scores below threshold when calibration is the
+    query and above it when golden is."""
+    calibration = ON_TOPIC + OFF_TOPIC if lang == "en" else ON_TOPIC_ZH + OFF_TOPIC_ZH
+    golden = [q for _, q in _golden_as_sections(lang)]
+
+    collisions = _find_collisions(
+        golden, [(f"calibration[{i}]", c) for i, c in enumerate(calibration)]
+    )
     assert not collisions, _format(collisions)

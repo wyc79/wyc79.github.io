@@ -31,11 +31,18 @@ moves on every rebuild of this file.
 
 Naming: both languages live in this one folder split by suffix — about_en.md
 (this file, English, the en-gate corpus) and about_zh.md (Chinese; ALSO a gate
-corpus by design, but its calibration currently doesn't separate on-/off-topic,
-so no Chinese gate ships from this repo's own artifacts today — Chinese
-questions bypass the local gate via `cjk_bypass` instead; see
-`eval/README.md`'s Known Limits). `load_knowledge(dir, lang)` reads only
-`*_<lang>.md`, so the en gate never ingests zh chunks and vice-versa.
+corpus by design). `load_knowledge(dir, lang)` reads only `*_<lang>.md`, so the
+en gate never ingests zh chunks and vice-versa.
+
+Whether a Chinese gate actually ships is decided per build and is deliberately
+NOT stated here: `build_index.py` writes `data/gate_zh_bge.json` only when that
+build's zh calibration separates on-/off-topic, and removes a stale one only
+when this build's own calibration ran and failed. This header used to assert an
+answer instead, and was wrong — the same class of claim in the same place was
+flagged by two consecutive whole-branch reviews. For the current state read the
+build log's `zh gate:` line, or `eval/README.md`'s Known Limits, which is kept
+current. When no zh gate ships, Chinese questions bypass the local gate via
+`cjk_bypass` and are guarded by the LLM system prompt instead.
 
 ## Who this portfolio site is about
 link: index.html

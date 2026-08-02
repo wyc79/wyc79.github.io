@@ -1,4 +1,16 @@
 /**
+ * ┌──────────────────────────────────────────────────────────────────────┐
+ * │ STALE — NOT DEPLOYED, DO NOT DEPLOY.                                  │
+ * │ This file implements the PRE-Task-29 /chat contract, in which the     │
+ * │ client sent `contexts[]`. The current widget does not send that       │
+ * │ field, so this worker 400s on every turn against it and the widget    │
+ * │ drops to its offline search path. The live backend is the Tencent SCF │
+ * │ function at chat/functions/tencent/index.py, which retrieves          │
+ * │ server-side from its own bundled corpus. Kept for reference only —    │
+ * │ see chat/README.md's "Deploying a backend". Everything below this     │
+ * │ banner describes the retired contract, not the current one.           │
+ * └──────────────────────────────────────────────────────────────────────┘
+ *
  * Cloudflare Worker — the only server-side piece of the portfolio chat agent.
  *
  * The browser widget does retrieval client-side and sends the top chunks

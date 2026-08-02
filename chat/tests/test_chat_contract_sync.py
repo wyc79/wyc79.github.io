@@ -18,6 +18,16 @@ functions/tencent/index.py's validate_chat_body and sources_from_hits
    losslessly through the widget's own resultsFromSources -- if either side
    ever renamed or dropped a field, this would show up as a missing/None
    value on the other side instead of silently building a broken UI.
+3. /chat's OTHER 200 shape -- the refusal (`{answer, refused, rid,
+   sources: []}`) -- must be handled by the widget as a refusal, in the
+   visitor's own language. This was the gap the final whole-branch review
+   found: askWorker's return comment declared `refused?`, send() never read
+   it, so a server-side refusal rendered index.py's hardcoded ENGLISH
+   REFUSAL even at lang() === 'zh', with no starters and no page links, and
+   record.mode stayed 'llm' so GA and the transcript could not tell a
+   refusal from an answer. The test below executes the widget's REAL
+   refusal branch (extracted verbatim, run in node) against the REAL
+   payload refusal_response() builds.
 """
 
 import importlib.util
@@ -86,6 +96,103 @@ def _widget_results_from_sources(sources: list) -> list:
         "process.stdout.write(JSON.stringify(resultsFromSources(sources)));\n"
     )
     return run_node_json(script)
+
+
+def _run_widget_refusal_branch(resp: dict, page_lang: str) -> dict:
+    """Execute send()'s REAL server-refusal branch -- the whole
+    `if (resp.refused) { ... }` statement, extracted verbatim including its
+    condition (reading that field is the whole point) -- in a node process,
+    against `resp`, with the page language set to `page_lang`.
+
+    The widget's own STR table, lang() and t() are extracted verbatim too, so
+    the rendered text is the real localized string, not a fixture. Everything
+    the branch touches that belongs to send()'s closure or the DOM (record,
+    thinking, state, addStarters, pushLog, logTurn) is stubbed and recorded.
+    The wrapper returns a sentinel that only survives if the branch did NOT
+    return early, which is how "the refusal was handled" is distinguished
+    from "control fell through to the normal-answer path"."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    script = (
+        "var window = { YCI18N: { current: function () { return " + json.dumps(page_lang) + "; } } };\n"
+        + extract_js_function(src, "var STR = ") + ";\n"
+        + extract_js_function(src, "function lang(") + "\n"
+        + extract_js_function(src, "function t(") + "\n"
+        "var calls = [];\n"
+        "var record = {};\n"
+        "var thinking = { textContent: null, classList: { remove: function (c) { calls.push('remove:' + c); } } };\n"
+        "var state = { role: 'visitor', roles: { roles: { visitor: { label: 'Visitor' } } } };\n"
+        "function addStarters(role) { calls.push('addStarters'); }\n"
+        "function pushLog(e) { calls.push('pushLog:' + e.type); }\n"
+        "function logTurn(r) { calls.push('logTurn'); }\n"
+        "function handleServerResponse(resp) {\n"
+        # Marker deliberately stops before the closing paren: a mutation that
+        # weakens the CONDITION (`if (resp.refused && false)`) then still
+        # extracts, and shows up as a behavioural failure below rather than as
+        # an extraction error that says nothing about what broke.
+        + extract_js_function(src, "if (resp.refused") + "\n"
+        "  return 'FELL_THROUGH_TO_NORMAL_ANSWER';\n"
+        "}\n"
+        "var out = handleServerResponse(" + json.dumps(resp) + ");\n"
+        "process.stdout.write(JSON.stringify({\n"
+        "  fellThrough: out === 'FELL_THROUGH_TO_NORMAL_ANSWER',\n"
+        "  record: record, text: thinking.textContent, calls: calls,\n"
+        "  localizedRefusal: t('refused'),\n"
+        "}));\n"
+    )
+    return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_server_refusal_renders_localized_with_a_way_forward() -> None:
+    """The refusal index.py really returns, handled by the widget's real
+    branch, on a Chinese page. Must render the widget's own zh refusal (never
+    the function's hardcoded English REFUSAL), offer starters, and classify
+    the turn as a refusal rather than an LLM answer."""
+    mod = _load_backend()
+    payload = mod.refusal_response("0801-120000-0001")
+    assert payload["refused"] is True and payload["sources"] == []
+
+    got = _run_widget_refusal_branch(payload, page_lang="zh")
+
+    assert not got["fellThrough"], (
+        "send() ignored /chat's `refused` field and treated the refusal as an "
+        "ordinary LLM answer -- the visitor would see index.py's English REFUSAL"
+    )
+    assert got["text"] == got["localizedRefusal"], "the refusal must be the widget's localized string"
+    assert got["text"] != mod.REFUSAL, (
+        "a zh visitor was shown the function's hardcoded English refusal"
+    )
+    assert "addStarters" in got["calls"], (
+        "a server refusal must offer the same way forward the client-side gate "
+        "refusal does -- otherwise it is a dead end (no starters, no page links)"
+    )
+    assert got["record"]["mode"] == "off_topic_refused", (
+        "record.mode must not stay 'llm' -- GA and the transcript cannot "
+        "distinguish a refusal from an answer if it does"
+    )
+    assert got["calls"].count("logTurn") == 1, "the refused turn must still be logged exactly once"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_normal_answer_is_not_treated_as_a_refusal() -> None:
+    """Complement: the branch must not swallow ordinary answers (a test that
+    only checked the refusal path would pass on `if (true)`)."""
+    got = _run_widget_refusal_branch(
+        {"answer": "He built Prime Engine.", "rid": "r1", "sources": []}, page_lang="en"
+    )
+
+    assert got["fellThrough"], "a normal /chat answer must fall through to the answer path"
+    assert got["record"] == {}
+    assert got["calls"] == []
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_refusal_payloads_sources_survive_resultsfromsources() -> None:
+    """The refusal carries `sources: []`; resultsFromSources must yield [] and
+    not throw, so addSources' early return is reached rather than a TypeError
+    deep in rendering."""
+    mod = _load_backend()
+    assert _widget_results_from_sources(mod.refusal_response("r1")["sources"]) == []
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")

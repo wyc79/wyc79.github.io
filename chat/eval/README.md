@@ -117,6 +117,13 @@ python scripts/run_eval.py --role visitor --lang zh --verbose
 python scripts/run_eval.py --update-baseline    # after a deliberate change
 ```
 
+`--update-baseline` refuses a filtered run (`--role`/`--lang`) and refuses a
+run whose index is known stale (`Runtime.stale_knowledge_headings` non-empty —
+rebuild first, or pass `--allow-stale-index` to freeze that state on purpose).
+Both refusals exist because the baseline is what `test_no_metric_regressed`
+compares against: a baseline captured from a state that does not represent the
+system silently re-anchors the regression gate.
+
 The table prints two blocks that are never blended into each other: a
 per-`(role, lang)` positive-cell table (gate-pass, `hit@4`, keyword coverage,
 retrieved languages), then a shared-negatives block with one row per

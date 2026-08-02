@@ -34,10 +34,21 @@ def _load_build_package():
     return mod
 
 
+def _chunks_payload(model_preset: str) -> str:
+    """A minimal but STRUCTURALLY REAL chunks file: a retrieval corpus is a
+    model_preset plus a non-empty chunks list. The fixtures used to carry the
+    preset alone, which is also true of chat/data/meta.json -- see
+    test_a_preset_matching_file_with_no_chunks_is_not_a_retrieval_corpus."""
+    return json.dumps({
+        "model_preset": model_preset,
+        "chunks": [{"id": "c1", "url": "pages/x.html", "text": "hello", "vector": [1.0, 0.0]}],
+    })
+
+
 def test_matching_preset_is_ok_to_bundle(tmp_path: Path) -> None:
     mod = _load_build_package()
     chunks_file = tmp_path / "chunks_e5.json"
-    chunks_file.write_text(json.dumps({"model_preset": "e5"}), encoding="utf-8")
+    chunks_file.write_text(_chunks_payload("e5"), encoding="utf-8")
 
     ok, reason = mod.chunks_preset_status(chunks_file, "e5")
     assert ok is True
@@ -47,12 +58,49 @@ def test_matching_preset_is_ok_to_bundle(tmp_path: Path) -> None:
 def test_mismatched_preset_is_not_ok_and_names_both_presets(tmp_path: Path) -> None:
     mod = _load_build_package()
     chunks_file = tmp_path / "chunks_e5.json"
-    chunks_file.write_text(json.dumps({"model_preset": "e5"}), encoding="utf-8")
+    chunks_file.write_text(_chunks_payload("e5"), encoding="utf-8")
 
     ok, reason = mod.chunks_preset_status(chunks_file, "minilm")
     assert ok is False
     assert reason is not None
     assert "e5" in reason and "minilm" in reason
+
+
+def test_a_preset_matching_file_with_no_chunks_is_not_a_retrieval_corpus(tmp_path: Path) -> None:
+    """The mis-bundling this guard exists to catch is not only "wrong preset".
+    chat/data/meta.json sits beside chunks_e5.json, also declares
+    "model_preset": "e5", and carries no chunks at all -- so under a
+    preset-only check it was bundle-able as chunks.json, and index.py then
+    loaded it as a zero-row matrix that is not None and therefore reported
+    itself as available (200 + the canned refusal for every visitor, forever,
+    with GET / saying "retrieval": true).
+
+    Uses the REAL committed data/meta.json rather than a synthetic stand-in,
+    so this test fails if meta.json ever stops being the shape that made the
+    hole reachable."""
+    mod = _load_build_package()
+    real_meta = settings.resolve_path(settings.meta_path)
+    assert real_meta.exists(), f"expected the committed sidecar at {real_meta}"
+    assert json.loads(real_meta.read_text(encoding="utf-8")).get("model_preset") == settings.model_preset, (
+        "premise of this test: meta.json carries the same model_preset as the chunks file, "
+        "which is why a preset-only check could not tell them apart"
+    )
+
+    ok, reason = mod.chunks_preset_status(real_meta, settings.model_preset)
+    assert ok is False, "meta.json must never be bundle-able as the retrieval corpus"
+    assert reason is not None and "chunks" in reason
+
+
+def test_an_empty_chunks_list_is_not_a_retrieval_corpus(tmp_path: Path) -> None:
+    """A file that is otherwise a correct chunks file but whose chunk list is
+    empty is a failed build, not a corpus with nothing in it."""
+    mod = _load_build_package()
+    chunks_file = tmp_path / "chunks_e5.json"
+    chunks_file.write_text(json.dumps({"model_preset": "e5", "chunks": []}), encoding="utf-8")
+
+    ok, reason = mod.chunks_preset_status(chunks_file, "e5")
+    assert ok is False
+    assert reason is not None and "chunks" in reason
 
 
 def test_missing_chunks_file_is_not_ok_with_no_reason(tmp_path: Path) -> None:

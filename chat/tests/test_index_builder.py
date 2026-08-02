@@ -196,6 +196,134 @@ def test_build_with_no_existing_chunks_file_does_not_require_opt_in(
     index_builder.build_index(site_root=tiny_site)  # must not raise
 
 
+def test_build_refuses_a_preset_change_declared_only_by_meta_json(
+    tiny_site: Path, monkeypatch
+) -> None:
+    """The preset guard must be anchored on meta.json, not on the chunks file
+    alone. chunks_path is preset-derived (config.py's resolve_chunks_path), so
+    a genuine preset switch resolves to a filename that does NOT exist yet and
+    the chunks-file check is skipped entirely -- while meta.json, which is NOT
+    preset-derived, is overwritten unconditionally by every build. That is the
+    file chat-widget.js reads to decide which mode every visitor runs in, so a
+    stray `--model minilm` build silently repointed it at a minilm corpus and a
+    gate calibrated against all 192 site chunks (measured self-gate margin
+    +2.52%, so _check_en_gate_margin cleared too -- both guards passed).
+
+    Reproduced here exactly: NO chunks file at the configured preset's derived
+    path, only a meta.json declaring the other preset."""
+    monkeypatch.delenv("RAG_ALLOW_PRESET_CHANGE", raising=False)
+    monkeypatch.setattr(settings, "model_preset", "minilm")
+    # Let chunks_path fall back to its preset-derived default, inside tmp_path
+    # -- "data/chunks_minilm.json" under the fixture's out/ parent, which does
+    # not exist. This is the state that used to skip the guard.
+    monkeypatch.setattr(settings, "chunks_path", str(tiny_site / "out" / "chunks_minilm.json"))
+    assert not (tiny_site / "out" / "chunks_minilm.json").exists()
+    (tiny_site / "out" / "meta.json").write_text(
+        json.dumps({"model_preset": "e5", "chunks_file": "chunks_e5.json"}), encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        index_builder.build_index(site_root=tiny_site)
+    message = str(excinfo.value)
+    assert "meta.json" in message, "the error must name the file that disagrees"
+    assert "e5" in message and "minilm" in message, (
+        "the error must name both the existing preset and the configured one"
+    )
+
+
+# --- Final whole-branch review, 1.3: nothing may be written before the build --
+# has finished computing -------------------------------------------------------
+#
+# _check_en_gate_margin's docstring used to state an ordering RULE ("call
+# before ANY of [the five outputs] are written -- a raise after even one of
+# those writes leaves data/ half-updated, which is worse than the silent-ship
+# bug it replaces"), and build_index violated it: gate_en_minilm.json was
+# written at the top of the gate branch, and then TWO more failable ONNX passes
+# ran before anything else was written -- _build_zh_gate (loads a model and
+# infers) and the degraded-corpus embedding (a full 192-chunk MiniLM pass).
+# build_index now accumulates every payload and flushes once at the end, so the
+# property is structural. These two tests pin it at both of the passes that
+# violated it. One of the five outputs (gate_zh_bge.json) is gitignored and
+# unrecoverable by git, which is why this is worth testing rather than trusting.
+
+
+def _plant_sentinels(out_dir: Path) -> dict[Path, bytes]:
+    """Write a recognisable sentinel at every one of build_index's six output
+    paths and return their bytes, so a failed build can be checked for having
+    touched ANY of them (not just the one file a given test is about)."""
+    planted: dict[Path, bytes] = {}
+    for name in ("chunks.json", "roles.json", "meta.json", "gate_en_minilm.json",
+                 "gate_zh_bge.json", "chunks_en_minilm.json"):
+        path = out_dir / name
+        # model_preset matches the configured preset so the preset guard (a
+        # DIFFERENT guard, checked before any of this) stays out of the way.
+        path.write_text(json.dumps({"sentinel": name, "model_preset": "e5"}), encoding="utf-8")
+        planted[path] = path.read_bytes()
+    return planted
+
+
+def _assert_untouched(planted: dict[Path, bytes]) -> None:
+    for path, before in planted.items():
+        assert path.exists(), f"{path.name} was deleted by a build that raised"
+        assert path.read_bytes() == before, (
+            f"{path.name} was rewritten by a build that raised -- data/ is now "
+            f"half-updated, the exact state _check_en_gate_margin's docstring "
+            f"calls worse than the bug it replaces"
+        )
+
+
+def test_a_raise_in_the_zh_gate_pass_leaves_every_output_untouched(
+    tiny_site: Path, monkeypatch
+) -> None:
+    """_build_zh_gate loads an ONNX model and runs inference, and it used to
+    run AFTER gate_en_minilm.json was already on disk. A corrupt model file or
+    an OOM there left new gate vectors beside an old chunks file and an old
+    meta.json."""
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    planted = _plant_sentinels(tiny_site / "out")
+
+    def boom(*a, **k):
+        raise RuntimeError("simulated ONNX failure in the zh gate pass")
+
+    monkeypatch.setattr(index_builder, "_build_zh_gate", boom)
+
+    with pytest.raises(RuntimeError, match="simulated ONNX failure"):
+        index_builder.build_index(site_root=tiny_site)
+
+    _assert_untouched(planted)
+
+
+def test_a_raise_in_the_degraded_corpus_pass_leaves_every_output_untouched(
+    tiny_site: Path, monkeypatch
+) -> None:
+    """The degraded-mode corpus embedding is a full en-chunk MiniLM pass that
+    used to run after BOTH gate files were already written, and before
+    chunks_*.json, meta.json and roles.json. This drives the real build and
+    fails that real pass: it is the SECOND embed_documents call on the gate
+    (MiniLM) embedder -- the first is the en gate corpus, which must have
+    already succeeded for this test to be exercising the window it claims."""
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    planted = _plant_sentinels(tiny_site / "out")
+
+    real_embed = OnnxEmbedder.embed_documents
+    seen: list = []
+
+    def failing(self, texts):
+        seen.append(self)
+        if seen.count(self) == 2:
+            raise RuntimeError("simulated OOM in the degraded-corpus embedding pass")
+        return real_embed(self, texts)
+
+    monkeypatch.setattr(OnnxEmbedder, "embed_documents", failing)
+
+    with pytest.raises(RuntimeError, match="simulated OOM"):
+        index_builder.build_index(site_root=tiny_site)
+
+    _assert_untouched(planted)
+
+
 # --- Task 20: fail the build on a non-separating en gate calibration -------
 #
 # compute_gate() already logs a WARNING and ships anyway when nothing

@@ -15,8 +15,22 @@ Same contract and guarantees as the Cloudflare worker:
   the client no longer sends contexts (a `contexts` field on an old cached
   widget is ignored outright, logged as client_contexts_ignored, never used
   to build the prompt). Retrieval returning nothing -> canned refusal, no LLM
-  call (server-side off-topic guard, now independent of what the client
-  sends).
+  call.
+- WHICH GUARDS ARE SERVER-SIDE, precisely (these are two different things and
+  the boundary is easy to misread):
+    * The retrieval-empty refusal above IS a server-side backstop, and it is
+      the one that is genuinely independent of what the client sends: it is
+      computed from this function's own index over the client's question, and
+      no client field can turn it off. Rate limiting is the other one.
+    * The CALIBRATED OFF-TOPIC GATE IS NOT a server-side backstop. It lives on
+      /embed, it judges `gate_text` — a string the CLIENT computes and sends —
+      and /chat has no gate at all. Any client that skips /embed, ignores its
+      verdict, or sends a benign gate_text still reaches the LLM as long as
+      something clears MIN_SCORE. The gate is a UX filter the server computes
+      on the client's behalf, not an access control, and the refusal rates the
+      golden harness measures for it are measurements of that filter.
+      Deliberate: for a portfolio site the practical exposure is LLM spend,
+      which rate_limited() covers.
 - Role prompts come from the site's roles.json (client sends a role id only);
   a bundled roles.json copy is the fallback if github.io is unreachable from
   the function's region.
@@ -106,10 +120,19 @@ _gates: dict = {"en": None, "zh": None}
 # chunks.json, bundled from chat/data/chunks_{preset}.json next to
 # gate_en_minilm.json/gate_zh_bge.json (see build_package.py). /chat
 # retrieves from this directly instead of trusting client-sent contexts --
-# see the module docstring. matrix stays None (not an empty array) until a
-# real index loads, so callers can tell "not packaged / failed to load"
-# apart from "packaged but genuinely empty".
-_index: dict = {"matrix": None, "chunks": None, "error": None}
+# see the module docstring. matrix is None for EVERY state in which retrieval
+# cannot work (not packaged, failed to load, preset mismatch, zero chunks), so
+# the single check `_index["matrix"] is None` is a complete availability test
+# for /chat's guard and GET /'s health flag. WHICH failure it was lives in
+# _index["error"], which the health payload also reports -- an earlier version
+# distinguished "packaged but genuinely empty" by loading it as an empty
+# matrix, which is not None and therefore reported itself as working.
+#
+# "query_prefix" is the prefix chunks.json says its OWN document vectors were
+# embedded with -- the authoritative value for what a query embedded against
+# them must use. _check_query_prefix() compares the effective QUERY_PREFIX env
+# var against it at startup; see there for why this warns and never refuses.
+_index: dict = {"matrix": None, "chunks": None, "error": None, "query_prefix": None}
 
 # Mirrors chat-widget.js's TOP_K/MIN_SCORE and portfolio_rag.runtime's same
 # constants -- see rank_chunks below and chat/tests/test_retrieval_sync.py,
@@ -150,7 +173,12 @@ def _load_embedder() -> None:
         with _embed["lock"]:
             _embed["tokenizer"], _embed["session"] = tok, session
             _embed["prefix"] = env("QUERY_PREFIX", "")
-        log({"type": "embedder_loaded"})
+        # The effective prefix is logged, not just applied. QUERY_PREFIX is a
+        # manual console step, it silently governs the ONLY production
+        # retrieval path, and getting it wrong is a measurable retrieval-
+        # quality regression that looks identical to a correct deployment from
+        # outside. See _check_query_prefix() for the startup cross-check.
+        log({"type": "embedder_loaded", "query_prefix": _embed["prefix"]})
     except Exception as err:
         _embed["error"] = repr(err)
         log({"type": "embedder_load_failed", "error": repr(err)})
@@ -167,8 +195,20 @@ def _load_embedder() -> None:
         gate_file = Path(__file__).with_name(files[lang])
         if not gate_file.exists():
             continue
-        spec = json.loads(gate_file.read_text(encoding="utf-8"))
         try:
+            # The JSON read belongs INSIDE this try. It used to sit above it,
+            # so a truncated or malformed gate file raised JSONDecodeError out
+            # of _load_embedder() -- which main() calls BEFORE binding :9000 --
+            # and killed the whole process: /chat, /embed, /log and health all
+            # down, for a corrupt file whose only honest blast radius is "no
+            # gate for this language". A missing KEY in the same file was
+            # already caught cleanly here (gate_load_failed, service stays up),
+            # and _load_index() below has always handled JSONDecodeError
+            # correctly -- this was the one path that did not degrade.
+            # Degrading here means: en -> gate_decision() returns None (no
+            # gate); zh -> cjk_bypass, the same fallback a missing zh file
+            # already gets.
+            spec = json.loads(gate_file.read_text(encoding="utf-8"))
             tok, session = _load_model(dirs[lang])
             _gates[lang] = {
                 "tokenizer": tok,
@@ -254,18 +294,73 @@ def _load_index() -> None:
             log({"type": "index_load_failed", "error": _index["error"]})
             return
         chunks = payload.get("chunks") or []
-        matrix = (
-            np.array([c["vector"] for c in chunks], dtype=np.float32)
-            if chunks
-            else np.empty((0, 0), dtype=np.float32)
-        )
-        _index["matrix"] = matrix
+        if not chunks:
+            # "packaged but genuinely empty" has no legitimate production
+            # meaning, and it used to load as np.empty((0, 0)) -- which is not
+            # None, so it passed /chat's `_index["matrix"] is None` guard and
+            # GET /'s health flag while rank_chunks returned [] for every
+            # question. Result: HTTP 200 + the canned refusal forever, the
+            # widget never falling to degraded mode (200 is success), and
+            # health cheerfully reporting "retrieval": true. Nothing anywhere
+            # said "broken".
+            #
+            # Reachable, not hypothetical: build_package.py's
+            # chunks_preset_status() validates only model_preset, so
+            # chat/data/meta.json (which sits beside chunks_e5.json and also
+            # carries "model_preset": "e5") bundled as chunks.json used to
+            # sail through the guard that exists specifically to catch
+            # mis-bundling. That guard now also requires a non-empty chunks
+            # list; this is the load-side half of the same fix.
+            _index["error"] = "chunks.json has no chunks"
+            log({"type": "index_load_failed", "error": _index["error"],
+                 "model_preset": payload.get("model_preset")})
+            return
+        _index["matrix"] = np.array([c["vector"] for c in chunks], dtype=np.float32)
         _index["chunks"] = chunks
+        _index["query_prefix"] = payload.get("query_prefix")
         log({"type": "index_loaded", "chunks": len(chunks),
-             "model_preset": payload.get("model_preset")})
+             "model_preset": payload.get("model_preset"),
+             "query_prefix": _index["query_prefix"]})
     except Exception as err:
         _index["error"] = repr(err)
         log({"type": "index_load_failed", "error": repr(err)})
+
+
+def _check_query_prefix() -> None:
+    """Cross-check the effective QUERY_PREFIX against the prefix chunks.json
+    says its own document vectors were built with, and WARN on a mismatch.
+
+    QUERY_PREFIX is a manual console step (see DEPLOY.md). Forgetting it on an
+    e5 deployment embeds queries without the "query: " prefix the documents
+    were built for -- a real, measurable retrieval-quality regression that is
+    otherwise indistinguishable from a correct deployment from the logs, from
+    the health endpoint and from the outside. It matters more since Task 29
+    moved retrieval server-side: this is now the only retrieval path a
+    normal-mode visitor touches, and the golden harness evaluates runtime.py
+    (which always applies the prefix), so the measurement apparatus this whole
+    branch exists to build cannot see this failure.
+
+    Compared against chunks.json's OWN "query_prefix" -- the authoritative
+    statement of what the vectors in that same file were embedded with -- and
+    not against a preset->prefix table copied in from portfolio_rag.config
+    (this module is stdlib-only by contract and cannot import it, and a copied
+    table would be one more thing to drift).
+
+    WARNS, never refuses. A hard fail here would turn one forgotten console
+    step into a permanent /chat outage for an otherwise-correct deployment --
+    the same trade-off _load_index()'s preset check already settled the same
+    way. The point is that the tolerated failure is now visible."""
+    if _index["matrix"] is None or _index["query_prefix"] is None:
+        return  # nothing loaded, or an index that does not declare one
+    if _embed["prefix"] != _index["query_prefix"]:
+        log({
+            "type": "query_prefix_unexpected",
+            "effective": _embed["prefix"],
+            "index_declares": _index["query_prefix"],
+            "warning": "the QUERY_PREFIX env var does not match the prefix chunks.json's "
+                       "document vectors were built with -- retrieval quality is degraded. "
+                       "Set QUERY_PREFIX in the function's console config. Serving anyway.",
+        })
 
 
 def rank_chunks(matrix, chunks: list, query_vec) -> list:
@@ -359,7 +454,14 @@ def embed_text(text: str) -> list[float]:
 
 
 def gate_decision(gate_text: str) -> dict | None:
-    """Language-routed off-topic gate; None when no gate is packaged."""
+    """Language-routed off-topic gate; None when no gate is packaged.
+
+    `gate_text` is CLIENT-SUPPLIED (see _embed_route). This function is the
+    whole of the calibrated gate on the server side, it is reachable only via
+    /embed, and /chat never calls it -- so this is a UX filter computed on the
+    client's behalf, not an enforcement point. See the module docstring's
+    "which guards are server-side" note; the server-side backstops are the
+    retrieval-empty refusal in _chat and rate_limited()."""
     global CJK_RE
     if _gates["en"] is None:
         return None
@@ -525,6 +627,20 @@ REFUSAL = (
 )
 
 
+def refusal_response(rid: str) -> dict:
+    """/chat's 200 body for "retrieval returned nothing": the canned REFUSAL,
+    `refused: True`, and an empty sources list.
+
+    `refused` is load-bearing on the client. chat-widget.js's send() keys its
+    own LOCALIZED refusal off this field and only renders REFUSAL's English
+    text if the field goes missing -- which is exactly what happened while the
+    widget declared the field and never read it (a zh visitor got English, with
+    no starters and no way forward). Pure and separate from the handler, like
+    sources_from_hits, so chat/tests/test_chat_contract_sync.py can assert on
+    the real shape rather than a retyped copy of it."""
+    return {"answer": REFUSAL, "refused": True, "rid": rid, "sources": []}
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -575,11 +691,25 @@ class Handler(BaseHTTPRequestHandler):
         if not allowed_origin(self._origin()):
             return self._json(403, {"error": "origin not allowed"})
         if self.path.split("?")[0] == "/":
+            # chunk_count + retrieval_error make the two ways retrieval can be
+            # unavailable distinguishable from outside: "not packaged" (error
+            # names the missing file), "packaged but empty" (error says so),
+            # "preset mismatch" (error names both presets). Before this, an
+            # unusable index could report "retrieval": true, so the health
+            # endpoint could not be used to check a deployment at all.
             return self._json(200, {
                 "service": "portfolio-chat",
                 "ok": True,
                 "embed": _embed["session"] is not None,
                 "retrieval": _index["matrix"] is not None,
+                "chunk_count": len(_index["chunks"] or []),
+                "retrieval_error": _index["error"],
+                # The effective QUERY_PREFIX beside what chunks.json says its
+                # own vectors were built with: a forgotten console step is a
+                # silent retrieval-quality regression, so it must be checkable
+                # from outside. See _check_query_prefix().
+                "query_prefix": _embed["prefix"],
+                "index_query_prefix": _index["query_prefix"],
                 "build": BUILD_INFO,
             })
         self._json(404, {"error": "not found"})
@@ -676,7 +806,7 @@ class Handler(BaseHTTPRequestHandler):
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
                 "client_contexts_ignored": client_contexts_ignored,
             })
-            return self._json(200, {"answer": REFUSAL, "refused": True, "rid": rid, "sources": []})
+            return self._json(200, refusal_response(rid))
 
         roles_data = load_roles()
         role = roles_data["roles"].get(body.get("role")) or roles_data["roles"][roles_data["default_role"]]
@@ -768,6 +898,7 @@ def main() -> None:
     # index in the same window -- /chat's 503 means either piece is missing.
     _load_embedder()
     _load_index()
+    _check_query_prefix()  # warn-only; both loads must have run first
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
