@@ -435,9 +435,10 @@ def test_build_removes_a_stale_zh_gate_file_when_calibration_does_not_separate(
 ) -> None:
     """Reproduces the reviewer's exact demonstration: plant a stale
     gate_zh_bge.json (as if written by an earlier build whose calibration
-    separated), then run a build where _build_zh_gate returns None (this
-    build's calibration does NOT separate) -- the stale file must be gone
-    afterward, not silently left in place for a later consumer to trust."""
+    separated), then run a build where _build_zh_gate reports that
+    calibration DID run this build but did not separate (ZhGateResult(gate=
+    None, calibrated=True)) -- the stale file must be gone afterward, not
+    silently left in place for a later consumer to trust."""
     monkeypatch.setattr(settings, "model_preset", "e5")
     monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
     stale = {
@@ -448,14 +449,18 @@ def test_build_removes_a_stale_zh_gate_file_when_calibration_does_not_separate(
     }
     stale_path = tiny_site / "out" / "gate_zh_bge.json"
     stale_path.write_text(json.dumps(stale), encoding="utf-8")
-    monkeypatch.setattr(index_builder, "_build_zh_gate", lambda *a, **k: None)
+    monkeypatch.setattr(
+        index_builder, "_build_zh_gate",
+        lambda *a, **k: index_builder.ZhGateResult(gate=None, calibrated=True),
+    )
 
     index_builder.build_index(site_root=tiny_site)
 
     assert not stale_path.exists(), (
         "a stale zh gate file must not survive a build whose own zh "
-        "calibration does not separate (index_builder.py's zh-gate "
-        "else-branch must unlink it, not leave it untouched)"
+        "calibration ran and did not separate (index_builder.py's "
+        "zh-gate calibrated-but-not-separating branch must unlink it, "
+        "not leave it untouched)"
     )
 
 
@@ -482,9 +487,128 @@ def test_build_writes_a_fresh_zh_gate_over_a_stale_one_when_calibration_separate
         "gate_stat": "top", "gate_threshold": 0.51, "gate_margin": 0.05,
         "vectors": [[0.0, 1.0]],
     }
-    monkeypatch.setattr(index_builder, "_build_zh_gate", lambda *a, **k: fresh_zh_gate)
+    monkeypatch.setattr(
+        index_builder, "_build_zh_gate",
+        lambda *a, **k: index_builder.ZhGateResult(gate=fresh_zh_gate, calibrated=True),
+    )
 
     index_builder.build_index(site_root=tiny_site)
 
     written = json.loads(stale_path.read_text(encoding="utf-8"))
     assert written == fresh_zh_gate, "a fresh separating zh gate must overwrite a stale file, not skip it"
+
+
+# --- Task 34, Part B: the zh-gate deletion must not fire on an incomplete --
+# environment (the previous round's fix over-fired) --------------------------
+#
+# _build_zh_gate() returns gate=None for FOUR distinct reasons, only one of
+# which (calibration ran and the margin did not clear) is real evidence a
+# stale gate_zh_bge.json should be deleted. The other three -- the bge_zh
+# model directory missing, chat/knowledge/ missing, about_zh.md having no zh
+# sections yet -- mean calibration never got to run at all THIS build. A
+# fresh clone (chat/models/ is gitignored, never checked out) is exactly
+# the "model directory missing" case, so the previous round's unconditional
+# `else: unlink()` silently deleted a previously-good, separating Chinese
+# gate on a routine `python build.py` after cloning. A reviewer proved this
+# by execution: pointing MODEL_PRESETS["bge_zh"]["dir"] at a nonexistent
+# path (simulating "model not downloaded here", not a calibration failure)
+# still deleted a planted gate_zh_bge.json.
+
+
+def test_build_zh_gate_reports_calibrated_false_when_the_model_directory_is_missing(
+    monkeypatch,
+) -> None:
+    """Unit-level reproduction of the reviewer's exact demonstration,
+    against the REAL _build_zh_gate (not a stand-in): point
+    MODEL_PRESETS["bge_zh"]["dir"] at a path that does not exist -- exactly
+    what a fresh clone looks like, since chat/models/ is gitignored -- and
+    confirm the result says calibration never ran (`calibrated=False`), not
+    that it ran and failed (`calibrated=True`). The real chat/knowledge/
+    directory exists on this machine, so this exercises specifically the
+    model-directory branch, not a knowledge/-missing shortcut."""
+    monkeypatch.setitem(MODEL_PRESETS["bge_zh"], "dir", "models/Xenova/does-not-exist")
+
+    result = index_builder._build_zh_gate(MODEL_PRESETS["e5"], ndigits=6)
+
+    assert result.gate is None
+    assert result.calibrated is False, (
+        "a missing bge_zh model directory means calibration never ran this "
+        "build -- ZhGateResult.calibrated must be False, or the caller "
+        "cannot tell this apart from a real calibration failure and will "
+        "delete a good gate file it never had a chance to re-check"
+    )
+
+
+def test_build_leaves_a_stale_zh_gate_file_alone_when_the_environment_is_incomplete(
+    tiny_site: Path, monkeypatch, caplog
+) -> None:
+    """Call-site complement to the two tests above: when _build_zh_gate
+    reports calibrated=False (environment incomplete -- model/knowledge/
+    sections missing), a stale gate_zh_bge.json from an earlier, separating
+    build must survive UNTOUCHED, and the build must say so in its log --
+    silence here is exactly what made the original stale-gate bug
+    invisible."""
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    stale = {
+        "model": "OLD", "model_preset": "OLD", "query_prefix": "",
+        "pooling": "mean", "lang": "zh", "corpus": "knowledge/about_zh.md",
+        "gate_stat": "top", "gate_threshold": 0.4919, "gate_margin": 0.02,
+        "vectors": [[0.0]],
+    }
+    stale_path = tiny_site / "out" / "gate_zh_bge.json"
+    stale_path.write_text(json.dumps(stale), encoding="utf-8")
+    monkeypatch.setattr(
+        index_builder, "_build_zh_gate",
+        lambda *a, **k: index_builder.ZhGateResult(gate=None, calibrated=False),
+    )
+
+    with caplog.at_level("INFO", logger="portfolio_rag.index_builder"):
+        index_builder.build_index(site_root=tiny_site)
+
+    assert stale_path.exists(), (
+        "a stale zh gate file must survive a build where calibration never "
+        "ran (environment incomplete) -- deleting it here is the over-fire "
+        "Task 34 Part B exists to close"
+    )
+    assert json.loads(stale_path.read_text(encoding="utf-8")) == stale, (
+        "the file must be left byte-for-byte alone, not merely re-created "
+        "with the same content"
+    )
+    assert any(
+        "untouched" in r.message and "gate_zh_bge.json" in r.message for r in caplog.records
+    ), "an incomplete-environment build must log that it left the stale file alone, and why"
+
+
+def test_build_index_end_to_end_leaves_a_real_stale_zh_gate_alone_when_the_bge_zh_model_is_missing(
+    tiny_site: Path, monkeypatch
+) -> None:
+    """Full end-to-end reproduction of the reviewer's demonstration through
+    the real build_index() -- not a mocked _build_zh_gate -- using the same
+    MODEL_PRESETS mutation the reviewer used. This is what a fresh clone's
+    first `python build.py` actually does: the bge_zh model directory does
+    not exist, chat/knowledge/ (the real one) does, about_zh.md has real
+    sections, so without the mutation this would calibrate normally --
+    pointing the model dir at nothing is what turns this into "environment
+    incomplete", matching a fresh clone rather than a hand-built
+    ZhGateResult."""
+    monkeypatch.setattr(settings, "model_preset", "e5")
+    monkeypatch.setenv("RAG_ALLOW_NEGATIVE_MARGIN", "1")
+    monkeypatch.setitem(MODEL_PRESETS["bge_zh"], "dir", "models/Xenova/does-not-exist")
+    stale = {
+        "model": "OLD", "model_preset": "OLD", "query_prefix": "",
+        "pooling": "mean", "lang": "zh", "corpus": "knowledge/about_zh.md",
+        "gate_stat": "top", "gate_threshold": 0.4919, "gate_margin": 0.02,
+        "vectors": [[0.0]],
+    }
+    stale_path = tiny_site / "out" / "gate_zh_bge.json"
+    stale_path.write_text(json.dumps(stale), encoding="utf-8")
+
+    index_builder.build_index(site_root=tiny_site)
+
+    assert stale_path.exists(), (
+        "a real build on a machine missing the bge_zh model (e.g. a fresh "
+        "clone -- chat/models/ is gitignored) must not delete an existing "
+        "gate_zh_bge.json; it never had evidence the gate went stale"
+    )
+    assert json.loads(stale_path.read_text(encoding="utf-8")) == stale

@@ -16,6 +16,7 @@ import logging
 import os
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,61 +34,112 @@ logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 2
 
 
-def _build_zh_gate(preset: dict, ndigits: int) -> dict | None:
+@dataclass(frozen=True)
+class ZhGateResult:
+    """Outcome of one call to `_build_zh_gate`. `gate` is None for four
+    different reasons (see that function's docstring), and the caller's
+    only *correct* reaction to a stale on-disk `gate_zh_bge.json` depends on
+    WHICH one -- so the distinction is carried here, on the return value,
+    instead of being re-derived at the call site (which has no way to tell
+    "the bge_zh model directory is missing" apart from "calibration ran and
+    the margin did not clear" once all it sees is `gate is None`).
+
+    `calibrated` is True only when `compute_gate()` actually ran THIS build
+    and measured a margin, whether or not that margin cleared the bar.
+    False means calibration never ran at all this build (model directory
+    missing, chat/knowledge/ missing, or about_zh.md has no zh sections
+    yet) -- an incomplete environment, not evidence about the gate's
+    quality. A fresh clone (bge_zh model not yet downloaded) is exactly
+    this case, which is why the caller must NOT unlink an existing gate
+    file when `calibrated` is False: this build simply couldn't check it,
+    so treating "couldn't check" the same as "checked and it failed" would
+    delete a previously-good, separating gate for no evidence-based reason.
+    """
+
+    gate: dict | None
+    calibrated: bool
+
+
+def _build_zh_gate(preset: dict, ndigits: int) -> ZhGateResult:
     """Chinese first-pass gate: bge-zh over the hand-written
     knowledge/about_zh.md corpus. Evidence-gated — only enabled if calibration
     on the zh query sets actually separates (otherwise the backend keeps the
     CJK bypass). Set RAG_ZH_GATE_FORCE=1 to write it despite overlap (testing).
 
-    Returned (never written here — the caller writes it to
-    settings.gate_zh_bge_path, gitignored, see config.py) as a dict, never a
-    None-then-write: the caller decides whether to write it at all. There is
-    deliberately no "chunks_zh_minilm" retrieval counterpart to pair with
-    this gate the way chunks_en_minilm.json pairs with the en gate. MiniLM —
-    the ONLY model this project ever ships to the browser — cannot embed
-    Chinese at all, and the widget already handles CJK questions in degraded
-    mode by showing `degradedCJK` plus static page links (the SUGGESTED_PAGES
-    list in scripts/chat-widget.js), never by attempting local Chinese
-    retrieval. A symmetric-looking "chunks_zh_minilm.json" is the tempting
-    mistake someone will eventually reach for BECAUSE gate_en_minilm.json has
-    a retrieval counterpart and this file looks like it "should" too — it
-    should not, and building one would silently violate the "no Chinese
-    degraded mode" contract with no error to catch it."""
+    Returns a ZhGateResult, never a bare dict-or-None: `.gate` is never
+    written here — the caller writes it to settings.gate_zh_bge_path,
+    gitignored, see config.py — the caller decides whether to write it at
+    all. `.calibrated` tells the caller WHY `.gate` is None when it is,
+    which matters because `.gate is None` happens for four different
+    reasons and only one of them (calibration ran and the margin did not
+    clear) is evidence that a stale on-disk gate_zh_bge.json should be
+    removed:
+      1. this preset has no gate_model_zh at all (not e5) — calibrated=False
+      2. the bge_zh model directory is not present on this machine (e.g. a
+         fresh clone before functions/tencent/build_package.py's first
+         download) — calibrated=False
+      3. chat/knowledge/ is not present — calibrated=False
+      4. about_zh.md has no zh sections yet — calibrated=False
+      5. calibration ran and the margin did not clear — calibrated=True
+    A machine that is simply missing the model (2) looks, from the OLD
+    "gate is None" signal alone, identical to a calibration that genuinely
+    stopped separating (5) — but only (5) is real evidence about gate
+    quality; (2)-(4) mean this build never got to check at all. Conflating
+    them was the over-fire a reviewer demonstrated by pointing
+    MODEL_PRESETS["bge_zh"]["dir"] at a nonexistent path (case 2) and
+    watching a planted, still-separating gate_zh_bge.json get deleted
+    anyway.
+
+    There is deliberately no "chunks_zh_minilm" retrieval counterpart to
+    pair with this gate the way chunks_en_minilm.json pairs with the en
+    gate. MiniLM — the ONLY model this project ever ships to the browser —
+    cannot embed Chinese at all, and the widget already handles CJK
+    questions in degraded mode by showing `degradedCJK` plus static page
+    links (the SUGGESTED_PAGES list in scripts/chat-widget.js), never by
+    attempting local Chinese retrieval. A symmetric-looking
+    "chunks_zh_minilm.json" is the tempting mistake someone will eventually
+    reach for BECAUSE gate_en_minilm.json has a retrieval counterpart and
+    this file looks like it "should" too — it should not, and building one
+    would silently violate the "no Chinese degraded mode" contract with no
+    error to catch it."""
     zh_model = preset.get("gate_model_zh")
     if not zh_model:
-        return None
+        return ZhGateResult(gate=None, calibrated=False)
     zh_preset = MODEL_PRESETS[zh_model]
     model_dir = settings.resolve_path(zh_preset["dir"])
     corpus_dir = settings.chat_root / "knowledge"
     if not model_dir.is_dir() or not corpus_dir.is_dir():
         logger.info("zh gate: skipped (%s missing)", "model" if not model_dir.is_dir() else "knowledge/")
-        return None
+        return ZhGateResult(gate=None, calibrated=False)
 
     sections = load_knowledge(corpus_dir, "zh")
     if not sections:
         logger.info("zh gate: skipped (knowledge/about_zh.md has no sections yet)")
-        return None
+        return ZhGateResult(gate=None, calibrated=False)
     embedder = OnnxEmbedder.from_preset(zh_preset, model_dir, settings.embedding_max_tokens)
     vecs = np.round(embedder.embed_documents([s.text for s in sections]).astype(float), ndigits)
     gate = compute_gate(embedder, vecs.astype(np.float32), on=ON_TOPIC_ZH, off=OFF_TOPIC_ZH)
     if gate["margin"] <= 0 and not os.environ.get("RAG_ZH_GATE_FORCE"):
         logger.warning("zh gate: calibration does not separate (margin %.1f%%) — NOT enabled; "
                        "CJK queries will bypass the gate", gate["margin"] * 100)
-        return None
+        return ZhGateResult(gate=None, calibrated=True)
     logger.info("zh gate: enabled (%s >= %s, margin %.1f%%, %d sections)",
                 gate["stat"], gate["threshold"], gate["margin"] * 100, len(sections))
-    return {
-        "model": zh_preset["name"],
-        "model_preset": zh_model,
-        "query_prefix": zh_preset["query_prefix"],
-        "pooling": zh_preset.get("pooling", "mean"),
-        "lang": "zh",
-        "corpus": "knowledge/about_zh.md",
-        "gate_stat": gate["stat"],
-        "gate_threshold": gate["threshold"],
-        "gate_margin": gate["margin"],
-        "vectors": vecs.tolist(),
-    }
+    return ZhGateResult(
+        gate={
+            "model": zh_preset["name"],
+            "model_preset": zh_model,
+            "query_prefix": zh_preset["query_prefix"],
+            "pooling": zh_preset.get("pooling", "mean"),
+            "lang": "zh",
+            "corpus": "knowledge/about_zh.md",
+            "gate_stat": gate["stat"],
+            "gate_threshold": gate["threshold"],
+            "gate_margin": gate["margin"],
+            "vectors": vecs.tolist(),
+        },
+        calibrated=True,
+    )
 
 
 def _check_en_gate_margin(gate: dict) -> None:
@@ -315,16 +367,16 @@ def build_index(site_root: Path | None = None) -> dict:
             json.dumps(gate_en, ensure_ascii=False), encoding="utf-8"
         )
 
-        zh_gate = _build_zh_gate(preset, ndigits)
+        zh_result = _build_zh_gate(preset, ndigits)
         gate_zh_path = settings.resolve_path(settings.gate_zh_bge_path)
-        if zh_gate:
+        if zh_result.gate:
             # Gitignored (settings.gate_zh_bge_path / chat/.gitignore) — the
             # ONLY enforcement that this never reaches a browser which does
             # not depend on the widget behaving correctly. See
             # _build_zh_gate's own docstring for why there is deliberately no
             # "chunks_zh_minilm.json" retrieval counterpart to pair it with.
-            gate_zh_path.write_text(json.dumps(zh_gate, ensure_ascii=False), encoding="utf-8")
-        else:
+            gate_zh_path.write_text(json.dumps(zh_result.gate, ensure_ascii=False), encoding="utf-8")
+        elif zh_result.calibrated:
             # Fix round 1 review, Important 1: the OLD gate_vectors.json was
             # rewritten WHOLE on every build (one combined file, "en" and
             # "zh" keys both written every time), so a zh gate that stopped
@@ -340,7 +392,30 @@ def build_index(site_root: Path | None = None) -> dict:
             # decided should not exist. missing_ok=True: a machine that
             # never had one (the common case -- gitignored, not on a fresh
             # clone) must not raise here.
+            #
+            # Guarded on zh_result.calibrated (Task 34, Part B — the previous
+            # round's unconditional `else: unlink` over-fired): compute_gate()
+            # genuinely ran THIS build and measured a margin that did not
+            # clear, so this build has real evidence the file is stale.
             gate_zh_path.unlink(missing_ok=True)
+        else:
+            # zh_result.calibrated is False: calibration never ran this
+            # build at all (bge_zh model not on this machine, chat/knowledge/
+            # missing, or about_zh.md has no zh sections yet -- see
+            # _build_zh_gate's docstring). A fresh clone is exactly this
+            # case (the bge_zh model is gitignored, never checked out), so
+            # unlinking here on the strength of "gate is None" alone would
+            # delete a previously-good, separating gate_zh_bge.json for no
+            # evidence-based reason -- the over-fire a reviewer demonstrated
+            # by pointing MODEL_PRESETS["bge_zh"]["dir"] at a nonexistent
+            # path. Leave any existing file untouched, and say so explicitly
+            # -- silence here is exactly what made the original stale-gate
+            # bug invisible in the first place.
+            if gate_zh_path.exists():
+                logger.info(
+                    "zh gate: environment incomplete this build (calibration did not "
+                    "run) -- leaving existing %s untouched", gate_zh_path.name,
+                )
 
         # Degraded-mode RETRIEVAL corpus (Task 29 Part 2 — the actual fix for
         # chat-widget.js's degraded-mode source links, not just a rename).
