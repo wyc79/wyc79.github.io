@@ -3,8 +3,8 @@
 Different embedding models need different gate statistics: MiniLM's raw
 top score separates on-/off-topic cleanly, but e5-family models compress
 all cosines into a ~0.7-0.9 band where absolute thresholds overlap. So the
-calibration scores canonical on-/off-topic query sets, evaluates several
-candidate statistics, and picks the one with the widest relative margin:
+calibration scores canonical on-/off-topic query sets on three candidate
+statistics:
 
   top      — max similarity (works for MiniLM)
   contrast — max minus corpus mean (peak height above background)
@@ -13,6 +13,33 @@ candidate statistics, and picks the one with the widest relative margin:
 The chosen statistic + threshold ship in index.json (gate_stat,
 gate_threshold); the widget and tests/test_gate.py implement the same three
 statistics — keep them in sync.
+
+Task 27: replaced the earlier "widest relative margin" policy, which picked
+whichever statistic maximized (min(on) - max(off)) / spread and, whenever
+that came out negative, threshold'd at max(off) * 1.02 WITHOUT regard to
+where on-topic scores actually sat. That fallback silently accepted false
+refusals: adding a harder on-topic query only ever pulled min(on) down,
+which made a negative margin MORE negative and left the threshold pinned to
+the off-topic ceiling regardless. Measured directly on this project's zh
+gate: calibration on-topic floor 0.5153 vs golden positives' real floor
+0.4536 -- a threshold derived from the (higher) calibration floor refused
+real visitor questions the calibration set never anticipated.
+
+The policy now in force is zero-false-refusal, by construction rather than
+by luck: for each statistic, `hi` = min(on) is a hard ceiling the threshold
+may never exceed, so no calibration on-topic query is ever refused. Off-topic
+values strictly below `hi` are "caught" (they will be refused); values at or
+above it cannot be caught at any threshold that preserves zero false
+refusals, so they simply are not. The chosen statistic is whichever catches
+the most off-topic entries this way (ties broken by headroom -- see below);
+threshold is the midpoint of [max(caught off-topic), hi], not `hi` itself, so
+the lowest legitimate on-topic query is not left sitting on a knife edge and
+the highest caught off-topic query is not either. When NO statistic catches
+anything, the gate has earned no place in the pipeline: threshold is pinned
+to `hi` (still zero false refusals, but zero benefit) and `margin` comes out
+<= 0 -- the same signal the old policy used for "does not separate", so the
+existing build_index.py guards (_check_en_gate_margin's floor,
+_build_zh_gate's `margin <= 0` disable check) keep working unchanged.
 """
 
 import logging
@@ -51,6 +78,24 @@ logger = logging.getLogger(__name__)
 # refuse them, it would just raise the threshold until it refuses real
 # visitors too. This is a measured limitation, not an oversight -- see
 # eval/KNOWN_ISSUES.md and the Task 25 report.
+#
+# Task 27 audit: "resume highlights" (0.2078) has been the single lowest
+# on-topic score since Task 25 -- the en gate's floor rode on ONE lucky draw,
+# exactly the failure mode the Task 25 comment above warns against for a
+# small set. Measured a batch of similarly terse, generic career-vocabulary
+# phrasings against the current 55-section about_en.md corpus (minilm,
+# read-only, not committed): "CV summary" 0.2248, "professional highlights"
+# 0.2473, "quick bio" 0.2577 -- a genuine CLUSTER in the 0.20-0.26 band, not
+# one outlier with the next-lowest score 0.062 away (the old shape: 0.2078
+# then a jump to 0.2698). The floor is now corroborated by four
+# independently-authored queries, not one. Also added: "what's his deal"
+# (0.3269, oblique/colloquial -- a shape underrepresented in the original 18,
+# which lean formal/keyword-shaped) and two task-phrased requests real
+# visitors use ("give me the short version of his background" 0.3015,
+# "summarise his engine work for me" 0.4440) -- see the ON_TOPIC_ZH comment
+# below for why this shape was missing across both languages. All six
+# checked disjoint from about_en.md via tests/test_disjointness.py before
+# landing here.
 ON_TOPIC = [
     "resume highlights",
     "what did he study",
@@ -70,6 +115,12 @@ ON_TOPIC = [
     "chat widget architecture",
     "how the gate blocks prompt injection",
     "solo developed game",
+    "CV summary",
+    "professional highlights",
+    "quick bio",
+    "what's his deal",
+    "give me the short version of his background",
+    "summarise his engine work for me",
 ]
 
 # All additions are "easy" (unambiguously unrelated), matching the original
@@ -100,6 +151,30 @@ OFF_TOPIC = [
 # Grown 8->18/8->16 alongside the English sets above (Task 25); every zh
 # addition was authored natively in Chinese, never translated from the en
 # additions, per this project's standing zh-authoring rule (Task 23).
+#
+# Task 27: the original 18 are formal/keyword-shaped ("他的教育背景是什么",
+# "他发表过什么论文") and cluster at 0.51-0.65 against the current 53-section
+# about_zh.md corpus (bge-zh, read-only measurement, not committed) -- ABOVE
+# where OFF_TOPIC_ZH's hardest entry lands (0.5169), which is exactly why the
+# zh gate has shipped disabled since Task 24 (margin negative under the old
+# policy). Real visitors ask obliquely, not in corpus vocabulary: measured a
+# batch of colloquial/indirect zh phrasings and kept six that are genuinely
+# hard (below or near the old floor) while still unambiguously asking about
+# 王元辰 -- "他平常都捣鼓些什么" (what does he usually tinker with, 0.4120),
+# "他老家是哪的，平时都在忙什么" (where's he from / what's he up to lately,
+# 0.4198), "他这一路是怎么走过来的" (how did he get to where he is, 0.4485),
+# "他大概是什么背景" (roughly what's his background, 0.4609), "他是干嘛的"
+# (what does he do, terse/colloquial, 0.5098), "他之前是学什么的" (what did
+# he study, colloquial phrasing of an existing formal entry, 0.5485). Also
+# added two legitimately task-phrased requests (a shape almost entirely
+# absent from the original 18, which are nearly all bare questions) mirroring
+# the English additions above: "帮我用几句话总结一下王元辰的背景" (summarize
+# his background for me in a few sentences, 0.6870) and "麻烦简单讲讲王元辰的
+# 引擎开发经历" (please briefly describe his engine dev experience, 0.7559).
+# Authored natively in Chinese first, never translated from an English
+# draft, and naming him as 王元辰 rather than "YC" per this project's
+# standing rule. All eight checked disjoint from about_zh.md via
+# tests/test_disjointness.py before landing here.
 ON_TOPIC_ZH = [
     "他做过哪些战斗设计工作",
     "介绍一下他的游戏引擎开发经验",
@@ -119,6 +194,14 @@ ON_TOPIC_ZH = [
     "这个聊天助手是他自己写的吗",
     "他有没有做过三维渲染或着色器相关的项目",
     "他平时用什么工具做开发",
+    "他平常都捣鼓些什么",
+    "他老家是哪的，平时都在忙什么",
+    "他这一路是怎么走过来的",
+    "他大概是什么背景",
+    "他是干嘛的",
+    "他之前是学什么的",
+    "帮我用几句话总结一下王元辰的背景",
+    "麻烦简单讲讲王元辰的引擎开发经历",
 ]
 OFF_TOPIC_ZH = [
     "给我讲个笑话",
@@ -161,6 +244,19 @@ def compute_gate(
     on: list | None = None,
     off: list | None = None,
 ) -> dict:
+    """Zero-false-refusal threshold selection (Task 27) -- see module docstring.
+
+    For each candidate statistic: `hi` = min(on) is the on-topic floor, a hard
+    ceiling the threshold may never cross. Off-topic values strictly below
+    `hi` are "caught" -- refused at any threshold placed at or below `hi`.
+    Off-topic values at or above `hi` cannot be caught without also refusing
+    the lowest on-topic query, so they are excluded from consideration
+    entirely rather than pinning the threshold to them (the old policy's
+    mistake). The chosen statistic maximizes catch COUNT first (how much
+    off-topic this gate actually earns its keep by refusing), then relative
+    margin as a tie-break (more headroom between the worst caught off-topic
+    query and the on-topic floor).
+    """
     on = on if on is not None else ON_TOPIC + (ON_TOPIC_ZH if multilingual else [])
     off = off if off is not None else OFF_TOPIC + (OFF_TOPIC_ZH if multilingual else [])
     on_scores = [matrix @ embedder.embed_query(q) for q in on]
@@ -170,31 +266,48 @@ def compute_gate(
     for kind in GATE_STATS:
         on_vals = [stat_value(s, kind) for s in on_scores]
         off_vals = [stat_value(s, kind) for s in off_scores]
-        lo, hi = max(off_vals), min(on_vals)
+        hi = min(on_vals)
         spread = max(on_vals + off_vals) - min(on_vals + off_vals) + 1e-9
+        caught = [v for v in off_vals if v < hi]
+        # lo is the highest off-topic value this stat can actually catch
+        # without crossing hi. When nothing is caught, lo falls back to the
+        # true off-topic max, which sits at or above hi by construction (that
+        # is exactly what "caught" being empty means) -- margin comes out
+        # <= 0, the same signal a non-separating stat produced under the old
+        # policy, so downstream guards need no change.
+        lo = max(caught) if caught else max(off_vals)
         margin = (hi - lo) / spread  # relative, comparable across stats
         logger.info(
-            "gate calibration [%s]: off-topic max %.3f | on-topic min %.3f | rel margin %.1f%%",
-            kind, lo, hi, margin * 100,
+            "gate calibration [%s]: on-topic floor %.3f | off-topic caught %d/%d "
+            "(highest caught %.3f) | rel margin %.1f%%",
+            kind, hi, len(caught), len(off_vals), lo, margin * 100,
         )
-        if best is None or margin > best["margin"]:
-            best = {"stat": kind, "lo": lo, "hi": hi, "margin": margin}
+        candidate = {"stat": kind, "lo": lo, "hi": hi, "margin": margin, "n_caught": len(caught)}
+        if best is None or (candidate["n_caught"], candidate["margin"]) > (
+            best["n_caught"], best["margin"]
+        ):
+            best = candidate
 
-    if best["margin"] <= 0:
+    if best["n_caught"] == 0:
         logger.warning(
-            "gate calibration: no statistic separates the distributions (best: %s); "
-            "gating just above the off-topic max — expect some false refusals",
+            "gate calibration: no statistic catches any off-topic query without "
+            "also refusing an on-topic one (best: %s); gating at the on-topic "
+            "floor — zero false refusals, but this gate catches nothing",
             best["stat"],
         )
-        threshold = round(best["lo"] * 1.02 + 1e-4, 4)
+        threshold = round(best["hi"], 4)
     else:
         threshold = round((best["lo"] + best["hi"]) / 2, 4)
 
-    logger.info("gate calibration: chose stat=%s threshold=%.4f", best["stat"], threshold)
-    # lo/hi (off-topic max / on-topic min, in the chosen stat's units) ride
-    # along so a caller that rejects a non-separating margin (index_builder's
-    # en floor, task 20) can name both distribution bounds in its error, not
-    # just the derived margin number.
+    logger.info(
+        "gate calibration: chose stat=%s threshold=%.4f (catches %d off-topic "
+        "quer%s at zero false-refusal)",
+        best["stat"], threshold, best["n_caught"], "y" if best["n_caught"] == 1 else "ies",
+    )
+    # lo/hi (highest caught off-topic value / on-topic min, in the chosen
+    # stat's units) ride along so a caller that rejects a non-catching gate
+    # (index_builder's en floor, task 20) can name both distribution bounds
+    # in its error, not just the derived margin number.
     return {
         "stat": best["stat"],
         "threshold": threshold,

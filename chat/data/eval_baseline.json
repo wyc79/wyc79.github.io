@@ -1,12 +1,17 @@
 {
   "k": 4,
-  "generated_at": "2026-08-01T20:46:05+00:00",
-  "index_built_at": "2026-08-01T20:45:15+00:00",
+  "generated_at": "2026-08-02T01:01:00+00:00",
+  "index_built_at": "2026-08-02T00:59:16+00:00",
   "gate": {
     "en": {
       "stat": "top",
       "threshold": 0.2006,
       "margin": 0.025
+    },
+    "zh": {
+      "stat": "top",
+      "threshold": 0.3979,
+      "margin": 0.0589
     }
   },
   "cells": {
@@ -35,7 +40,7 @@
       "hit_at_4_page_only": 5,
       "keywords_found": 13,
       "keywords_total": 15,
-      "gate_available": false,
+      "gate_available": true,
       "retrieved_langs": {
         "zh": 48
       }
@@ -65,7 +70,7 @@
       "hit_at_4_page_only": 9,
       "keywords_found": 18,
       "keywords_total": 25,
-      "gate_available": false,
+      "gate_available": true,
       "retrieved_langs": {
         "zh": 48
       }
@@ -95,7 +100,7 @@
       "hit_at_4_page_only": 8,
       "keywords_found": 18,
       "keywords_total": 24,
-      "gate_available": false,
+      "gate_available": true,
       "retrieved_langs": {
         "zh": 48
       }
@@ -125,7 +130,7 @@
       "hit_at_4_page_only": 5,
       "keywords_found": 19,
       "keywords_total": 23,
-      "gate_available": false,
+      "gate_available": true,
       "retrieved_langs": {
         "zh": 48
       }
@@ -148,13 +153,13 @@
       "lang": "zh",
       "n_positive": 0,
       "n_negative": 12,
-      "refusal_easy": 0,
+      "refusal_easy": 3,
       "n_easy": 4,
       "refusal_adjacent": 0,
       "n_adjacent": 4,
       "refusal_injection": 0,
       "n_injection": 4,
-      "gate_available": false
+      "gate_available": true
     }
   }
 }
