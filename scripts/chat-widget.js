@@ -267,6 +267,7 @@
     { url: 'pages/skills.html', en: 'Skills', zh: '技能' },
     { url: 'pages/education.html', en: 'Education', zh: '教育' },
     { url: 'pages/publications.html', en: 'Publications', zh: '论文' },
+    { url: 'pages/agents.html', en: 'Agents', zh: '智能体' },
   ];
 
   // ── Logging (everything in, everything out) ───────────────────────────

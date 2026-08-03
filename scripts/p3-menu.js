@@ -21,6 +21,8 @@
       wedge: { baseTop: -0.06, baseBot: 1.05, leanBot: 0.15, tipY: 0.55, tipScale: 1.30, backOffX: -0.035, backOffY: 0.12 } },
     { id: 'publications', label: 'PUBLICATIONS', href: 'pages/publications.html', fontSize: 62, offsetX: 60, offsetY: 0, tilt:  5.0, shift: -4,
       wedge: { baseTop:  0.00, baseBot: 0.98, leanBot: 0.25, tipY: 0.42, tipScale: 1.55, backOffX: -0.050, backOffY: 0.08 } },
+    { id: 'agents',       label: 'AGENTS',       href: 'pages/agents.html',       fontSize: 58, offsetX: 40, offsetY: 0, tilt: -3.5, shift:  1,
+      wedge: { baseTop: -0.03, baseBot: 1.00, leanBot: 0.18, tipY: 0.46, tipScale: 1.40, backOffX: -0.040, backOffY: 0.11 } },
     { id: 'toolbox',      label: 'TOOLBOX',      href: 'pages/toolbox.html',      fontSize: 56, offsetX: 28, offsetY: 0, tilt: -4.0, shift:  3,
       wedge: { baseTop: -0.05, baseBot: 1.04, leanBot: 0.20, tipY: 0.38, tipScale: 1.35, backOffX: -0.045, backOffY: 0.13 } },
     { id: 'github',       label: 'GITHUB',       href: 'https://github.com/wyc79', fontSize: 50, offsetX: 12, offsetY: 0, tilt:  3.0, shift: -2, external: true,
