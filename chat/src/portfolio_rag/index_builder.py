@@ -271,8 +271,12 @@ def build_index(site_root: Path | None = None) -> dict:
                     f"{settings.model_preset!r}. Rebuilding would desync meta.json "
                     "(which chat-widget.js reads to decide which mode every visitor "
                     "runs), gate_en_minilm.json, gate_zh_bge.json, "
-                    "chunks_en_minilm.json and the deployed backend. Set "
-                    "RAG_ALLOW_PRESET_CHANGE=1 to rebuild anyway."
+                    "chunks_en_minilm.json and the deployed backend. If this is a "
+                    "fresh clone, you likely just need chat/.env: copy it from "
+                    "chat/.env.example (RAG_MODEL_PRESET=e5) so settings.model_preset "
+                    "matches the committed artifacts. Only set "
+                    "RAG_ALLOW_PRESET_CHANGE=1 if you deliberately mean to switch "
+                    "presets and rebuild everything downstream."
                 )
 
     # A multilingual retrieval model (e5) gets a DE-INTERLEAVED bilingual index:
