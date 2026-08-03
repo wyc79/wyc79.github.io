@@ -12,7 +12,7 @@ demonstration of a full RAG pipeline that fits inside a static site:
   (see below), while light mode and degraded mode embed the question **in the
   browser** with transformers.js and score a dot product against a committed chunks
   file, with the top chunks rendered as linked source cards.
-- **Generation (optional, `worker/`/`functions/tencent/`):** a backend holds the LLM
+- **Generation (optional, `functions/tencent/`):** a backend holds the LLM
   API key and turns retrieved chunks into grounded answers. Without one the widget
   runs in retrieval-only demo mode — still useful, still fully client-side.
 
@@ -74,19 +74,19 @@ disk), so a second, much smaller model — `all-MiniLM-L6-v2` (~23 MB, self-host
 entirely client-side via transformers.js/WASM and does two jobs, each against its own
 single-purpose file (Task 29 Part 2): the local off-topic gate (`data/gate_en_minilm.json`,
 below) and the degraded-mode retrieval fallback (`data/chunks_en_minilm.json`) used when
-the Worker/function is unreachable. Both models run the same mean-pooling +
+the function is unreachable. Both models run the same mean-pooling +
 L2-normalize recipe on the Python (onnxruntime) and JS (transformers.js) sides. Measured
 cross-runtime parity for the MiniLM path: cosine(browser vector, python vector) ≈ 0.99 —
 native vs WASM int8 kernels round differently — with top-4 retrieval overlap of 3–4/4 on
 test queries. Documents are embedded one at a time, unpadded, because padded batches
 shift the dynamic-quantization scales and would break this parity.
 
-**The only secret lives in the Worker.** Anything shipped to a static site is public,
-so the Anthropic key sits in a Cloudflare Worker secret. The client sends a role *id*,
-never prompt text — the Worker reads `data/roles.json` from the site itself, so prompts
-can't be injected through the API surface. The Worker validates and size-caps every
-field, checks the `Origin` header, caps `max_tokens`, and (with the optional KV
-binding) rate-limits per IP.
+**The only secret lives in the backend function.** Anything shipped to a static site is
+public, so the LLM API key (DeepSeek by default) sits in the Tencent SCF function's
+environment config, never in the repo. The client sends a role *id*, never prompt text
+— the function reads `data/roles.json` from the site itself, so prompts can't be
+injected through the API surface. The function validates and size-caps every field,
+checks the `Origin` header, caps `max_tokens`, and rate-limits per IP.
 
 **Off-topic use is refused three times over.** The chat is not a general assistant:
 (1) the widget gates on retrieval score — if the best chunk scores below the
@@ -116,7 +116,7 @@ the currently deployed backend** — see "Deploying a backend" below.
 The gate is name-blind: mentioning "Yuanchen Wang" inflates similarity (a
 name-dropped joke request scores 0.61), so name-bearing questions are gated on the
 question with the name stripped out, unless the remainder is a bio-intent stub
-("who is", "tell me about", empty) — those are genuinely about YC and pass; (2) the Worker independently refuses empty-context requests, so bypassing the
+("who is", "tell me about", empty) — those are genuinely about YC and pass; (2) the function independently refuses empty-context requests, so bypassing the
 widget doesn't buy anything; (3) the system prompt instructs the model to decline
 general-purpose requests and ignore instruction-injection in questions. Pages'
 `<meta name="description">` tags are indexed as summary chunks so broad-but-legitimate
@@ -124,7 +124,8 @@ questions ("who is YC") clear the gate comfortably.
 
 **Everything is logged.** Each turn (input, retrieved chunk ids + scores, output) goes
 to `console.debug`, to Google Analytics as a `chat_turn` event when available, and
-server-side via the Worker (`wrangler tail` live; 30-day KV persistence when bound).
+server-side via the Tencent SCF function (JSON lines in the SCF console's 日志查询;
+see `.claude/DEPLOY.md`).
 
 **Curated chunks bridge vocabulary gaps — and are now the English gate's corpus
 too.** Visitors ask in hiring vocabulary the pages never use ("resume highlights",
@@ -156,9 +157,7 @@ chat/
 │                          #   (degraded-mode retrieval), meta.json (small sidecar the widget
 │                          #   fetches instead of the full chunks file), roles.json (personas)
 ├── models/                # self-hosted MiniLM ONNX (weights + tokenizer)
-├── functions/tencent/     # Tencent SCF backend + build_package.py (what build.py --function calls)
-└── worker/                # Cloudflare Worker (LLM proxy + logging) + wrangler.toml -- NOT
-                           #   interchangeable with functions/tencent/, see "Deploying a backend"
+└── functions/tencent/     # Tencent SCF backend + build_package.py (what build.py --function calls)
 ../scripts/chat-widget.js  # the site-side widget (self-contained, no framework)
 ../scripts/vendor/         # self-hosted transformers.min.js + ONNX Runtime WASM
 ```
@@ -286,20 +285,11 @@ load-bearing-order callout below for the exact mechanism, and `.claude/DEPLOY.md
 local-only) for the step-by-step console walkthrough.
 
 The site works without this step — the widget stays in retrieval-only mode until
-`WORKER_URL` is set. Two backends exist, but as of Task 29 they are **not**
-interchangeable — see the callout below:
-
-- **Tencent SCF (chosen for China reachability + DeepSeek):** sources in
-  `functions/tencent/`; the step-by-step console guide is kept locally in
-  `.claude/DEPLOY.md` (gitignored, not published). Speaks the current `/chat`
-  contract (retrieves server-side, no `contexts` in the request).
-- **Cloudflare Worker (Anthropic API):** below. **Not yet updated for Task 29** —
-  `worker/worker.js` still requires `contexts` in the `/chat` request body
-  (`validate_chat_body` there 400s without it) and does not retrieve for the
-  caller. If `WORKER_URL` is ever pointed at a Cloudflare Worker deployment, the
-  widget's `/chat` calls (which no longer send `contexts`) will 400 against it.
-  Bringing `worker/worker.js` in line with `functions/tencent/index.py`'s new
-  contract is unstarted work, tracked as a gap by this task, not done here.
+`WORKER_URL` is set. The only backend is **Tencent SCF (chosen for China
+reachability + DeepSeek):** sources in `functions/tencent/`; the step-by-step
+console guide is kept locally in `.claude/DEPLOY.md` (gitignored, not
+published). Speaks the current `/chat` contract (retrieves server-side, no
+`contexts` in the request).
 
 > **Deployment order is load-bearing (Task 29).** The widget's `/chat` request no
 > longer sends `contexts`; the OLD deployed Tencent function's `validate_chat_body`
@@ -339,28 +329,16 @@ interchangeable — see the callout below:
 > `index.py` needs no code change to consume the new gate file shape
 > — a repackage-and-redeploy is a pure win, not a risky one.
 
-```bash
-cd chat/worker
-npx wrangler login
-npx wrangler secret put ANTHROPIC_API_KEY     # paste your key; never committed
-npx wrangler deploy                            # prints https://portfolio-chat.<acct>.workers.dev
-```
-
-Optional but recommended — logging persistence + per-IP rate limiting:
-
-```bash
-npx wrangler kv namespace create CHAT_KV       # then uncomment the binding in wrangler.toml
-npx wrangler deploy
-```
-
-Finally, point the widget at the Worker: in `scripts/chat-widget.js` set
+Deploying the function for the first time (new SCF function, not a redeploy) is a
+console-driven process — see `.claude/DEPLOY.md` (gitignored, local-only) for the
+full walkthrough, including secrets and rate limits. Once it's live, point the
+widget at it: in `scripts/chat-widget.js` set
 
 ```js
-var WORKER_URL = 'https://portfolio-chat.<acct>.workers.dev';
+var WORKER_URL = 'https://<函数URL>';
 ```
 
-Watch live logs with `npx wrangler tail`. Model and origin allowlist are plain vars in
-`wrangler.toml`.
+using the URL shown on the function's 函数URL page in the SCF console.
 
 ## Model provenance
 
@@ -381,7 +359,7 @@ this way" above for how they fit together):
   (Apache-2.0), 384-dim, dynamically quantized, ~23 MB — small enough to self-host and
   run client-side via transformers.js/WASM. `scripts/vendor/` holds transformers.js
   2.17.2 and its ONNX Runtime WASM, so this path has zero runtime dependencies outside
-  this repository and the (optional) Worker.
+  this repository and the (optional) backend function.
 - **Chinese gate (`data/gate_zh_bge.json`, gitignored)** — `models/Xenova/bge-small-zh-v1.5/`,
   the standard transformers.js
   export of [`Xenova/bge-small-zh-v1.5`](https://huggingface.co/Xenova/bge-small-zh-v1.5)

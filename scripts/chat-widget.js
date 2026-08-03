@@ -31,20 +31,18 @@
 //   scripts/vendor/        self-hosted transformers.js runtime + ORT WASM
 //   WORKER_URL             optional backend for LLM answers; leave empty for
 //                          retrieval-only demo mode (no API key). Server-side
-//                          retrieval is Tencent SCF ONLY (chat/functions/
-//                          tencent) -- chat/worker/worker.js is a stale
-//                          Cloudflare implementation of the pre-Task-29
-//                          contract and 400s against this widget; do not
-//                          point WORKER_URL at it.
+//                          retrieval is the Tencent SCF function
+//                          (chat/functions/tencent) -- the only backend this
+//                          widget speaks to.
 //
 // Everything the widget logs (every user input, retrieval result and answer)
 // goes to console.debug, to Google Analytics when present, and — once the
-// worker is deployed — to the worker's server-side log.
+// function is deployed — to the function's server-side log.
 (function () {
   'use strict';
 
   // ── Config ────────────────────────────────────────────────────────────
-  // Backend base URL (Tencent SCF 函数URL or Cloudflare Worker). Set it here
+  // Backend base URL (Tencent SCF 函数URL). Set it here
   // after deploying — see chat/functions/tencent/DEPLOY.md. A page may also
   // predefine window.YC_CHAT_WORKER_URL before this script loads.
   var WORKER_URL = (window.YC_CHAT_WORKER_URL || 'https://1302480548-79ajhb3iyj.ap-guangzhou.tencentscf.com').replace(/\/+$/, '');
