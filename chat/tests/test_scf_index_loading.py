@@ -362,6 +362,36 @@ def test_a_matching_query_prefix_logs_no_warning(no_stray_chunks_json) -> None:
     )
 
 
+def test_a_failed_embedder_suppresses_the_query_prefix_advice(no_stray_chunks_json) -> None:
+    """The symmetric failure to test_a_forgotten_query_prefix_warns_and_still_serves
+    above: here the INDEX loaded fine but the EMBEDDER did not.
+    _embed["prefix"] never got past its "" module-scope default (only
+    _load_embedder()'s success path sets it), so comparing that "" against a
+    non-empty index-declared query_prefix would previously fire the same
+    query_prefix_unexpected warning and tell the operator to "Set QUERY_PREFIX
+    in the function's console config" -- backwards advice when the real
+    problem is a dead embedder that already logged embedder_load_failed.
+    _embed["error"] is what a failed load actually leaves behind; simulate it
+    directly, the way this file simulates every other load state."""
+    _write_index(no_stray_chunks_json, "e5")  # declares query_prefix "query: "
+    mod = _load_index_module()
+    mod.BUILD_INFO = {"preset": "e5"}
+    mod._load_index()
+    mod._embed["error"] = "RuntimeError('onnx session failed')"  # embedder never loaded
+    assert mod._embed["prefix"] == "", "sanity: the untouched default the old comparison used"
+    calls = _recording_log(mod)
+
+    mod._check_query_prefix()
+
+    assert not any(c.get("type") == "query_prefix_unexpected" for c in calls), (
+        "a dead embedder must not be reported as a forgotten QUERY_PREFIX "
+        f"console step; got {calls!r}"
+    )
+    skips = [c for c in calls if c.get("type") == "query_prefix_check_skipped"]
+    assert len(skips) == 1, f"expected exactly one skip notice, got {calls!r}"
+    assert skips[0]["embedder_error"] == mod._embed["error"]
+
+
 # ── _load_embedder(): a corrupt gate file must not take the function down ──
 
 
@@ -432,3 +462,92 @@ def test_a_truncated_gate_file_degrades_instead_of_killing_the_function(no_stray
     assert mod.gate_decision("你好，请介绍一下这个项目") == {
         "pass": True, "value": None, "reason": "cjk_bypass",
     }
+
+
+# ── main(): nothing in the pre-bind window may prevent the port from binding ─
+#
+# main() calls _load_embedder(), _load_index(), then _check_query_prefix(),
+# all BEFORE ThreadingHTTPServer(...).serve_forever() binds :9000 (see the
+# comment in main() and its docstring cross-references). _load_embedder() and
+# _load_index() already catch their own exceptions internally by design (they
+# record an error and let the route report unavailable -- see the tests
+# above and each function's docstring), so they need no further guard here.
+# _check_query_prefix() has no failure path today, but nothing enforces that
+# -- fix-wave finding 1.1 was exactly this shape (a json.loads() outside its
+# try in _load_embedder()'s gate loading) turning one corrupt bundled file
+# into a total outage. main() now wraps _check_query_prefix() in its own
+# try/except so the same class of bug there is structurally incapable of
+# stopping the port from binding, however the function grows.
+
+
+def test_check_query_prefix_raising_does_not_prevent_the_port_from_binding(monkeypatch) -> None:
+    """Force the exact failure mode finding 1.1 warned about: a pre-bind
+    diagnostic that raises. Demonstrated, not asserted -- ThreadingHTTPServer
+    is replaced with a recording stub (never actually binding a real socket)
+    so the real main() body can run end to end and prove it still reaches
+    the construct-and-serve call despite _check_query_prefix() blowing up."""
+    mod = _load_index_module()
+    # Out of scope for this test -- see test_a_truncated_gate_file_... above
+    # for _load_embedder()'s own pre-bind safety, and the mismatched/missing/
+    # empty-index tests above for _load_index()'s. Replace both with no-ops so
+    # this test is only about _check_query_prefix()'s failure, not entangled
+    # with real model/index loading.
+    mod._load_embedder = lambda: None
+    mod._load_index = lambda: None
+
+    def _boom() -> None:
+        raise RuntimeError("diagnostic exploded")
+
+    mod._check_query_prefix = _boom
+    calls = _recording_log(mod)
+
+    bind_calls = []
+
+    class _StubServer:
+        def __init__(self, addr, handler):
+            bind_calls.append(addr)
+
+        def serve_forever(self):
+            pass  # stand-in for the real bind+listen loop
+
+    mod.ThreadingHTTPServer = _StubServer
+    monkeypatch.setenv("PORT", "9123")
+
+    mod.main()  # must not raise -- the whole point of this test
+
+    assert bind_calls == [("0.0.0.0", 9123)], (
+        "main() did not reach ThreadingHTTPServer(...).serve_forever() after "
+        f"_check_query_prefix() raised; bind_calls={bind_calls!r}"
+    )
+    failures = [c for c in calls if c.get("type") == "check_query_prefix_failed"]
+    assert len(failures) == 1, f"expected exactly one failure log, got {calls!r}"
+    assert "diagnostic exploded" in failures[0]["error"]
+
+
+def test_check_query_prefix_succeeding_still_binds_as_before(monkeypatch) -> None:
+    """No-regression companion to the test above: the non-raising path must
+    still reach the same bind call, with no spurious failure log."""
+    mod = _load_index_module()
+    mod._load_embedder = lambda: None
+    mod._load_index = lambda: None
+    checked = []
+    mod._check_query_prefix = lambda: checked.append(True)
+    calls = _recording_log(mod)
+
+    bind_calls = []
+
+    class _StubServer:
+        def __init__(self, addr, handler):
+            bind_calls.append(addr)
+
+        def serve_forever(self):
+            pass
+
+    mod.ThreadingHTTPServer = _StubServer
+    monkeypatch.setenv("PORT", "9123")
+
+    mod.main()
+
+    assert checked == [True], "_check_query_prefix() must still run in the normal case"
+    assert bind_calls == [("0.0.0.0", 9123)]
+    assert not any(c.get("type") == "check_query_prefix_failed" for c in calls)
