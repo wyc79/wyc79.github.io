@@ -349,9 +349,26 @@ def _check_query_prefix() -> None:
     WARNS, never refuses. A hard fail here would turn one forgotten console
     step into a permanent /chat outage for an otherwise-correct deployment --
     the same trade-off _load_index()'s preset check already settled the same
-    way. The point is that the tolerated failure is now visible."""
+    way. The point is that the tolerated failure is now visible.
+
+    Symmetric case: if the EMBEDDER failed to load while the index loaded
+    fine, _embed["prefix"] is still sitting at its "" module-scope default
+    (only ever set inside _load_embedder()'s success path) -- comparing that
+    against a non-empty index-declared prefix would then emit the QUERY_PREFIX
+    console-config advice, which is exactly wrong: the operator does not have
+    a forgotten env var, they have a dead embedder. _embed["error"] is None
+    only on that success path, so it is the signal a failed load left behind.
+    embedder_load_failed already logged the real cause; skip the misleading
+    advice here rather than pile a second, wrong diagnosis on top of it."""
     if _index["matrix"] is None or _index["query_prefix"] is None:
         return  # nothing loaded, or an index that does not declare one
+    if _embed["error"] is not None:
+        log({
+            "type": "query_prefix_check_skipped",
+            "reason": "embedder failed to load; see embedder_load_failed",
+            "embedder_error": _embed["error"],
+        })
+        return
     if _embed["prefix"] != _index["query_prefix"]:
         log({
             "type": "query_prefix_unexpected",
@@ -898,7 +915,22 @@ def main() -> None:
     # index in the same window -- /chat's 503 means either piece is missing.
     _load_embedder()
     _load_index()
-    _check_query_prefix()  # warn-only; both loads must have run first
+    # _load_embedder() and _load_index() already handle their own failures
+    # internally (they record an error and let the route report unavailable;
+    # see their docstrings) -- nothing here needs to guard those two calls
+    # again. _check_query_prefix() is different: it is a pure diagnostic with
+    # no failure path of its own today (it only reads module-scope dict keys
+    # already initialised at import and calls log()), which is exactly the
+    # "obviously safe" shape that grew teeth once before -- fix-wave finding
+    # 1.1 was a json.loads() outside its try in _load_embedder()'s gate
+    # loading, and a truncated bundled file took the whole function down
+    # before :9000 ever bound. Make the guarantee structural rather than
+    # incidental: whatever _check_query_prefix() does in the future, it must
+    # not be able to prevent the port from binding.
+    try:
+        _check_query_prefix()  # warn-only; both loads must have run first
+    except Exception as err:
+        log({"type": "check_query_prefix_failed", "error": repr(err)})
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
