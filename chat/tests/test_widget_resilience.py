@@ -458,49 +458,30 @@ def test_chat_err_rate_limit_behavior_is_unchanged_by_the_mechanism_switch() -> 
     assert got["message"] == "rate limited — please wait a minute and try again"
 
 
-# ── Task 9: don't let the first message pay for a cold container ───────────
+# ── Task 9 / Task 10: don't let the first message pay for a cold container ──
 #
 # functions/tencent/index.py's main() loads three ONNX models and the chunk
 # index BEFORE binding its port, so a cold container's first request waits
-# out the whole load. Task 2's flat EMBED_TIMEOUT_MS aborts that wait,
-# retries, aborts again, and demotes the tab to the offline-model prompt --
-# for a backend that was only starting up. embedDeadline() gives the first
-# backend call of a session a much longer budget; prewarm() spends the
-# visitor's role-picking time on the spin-up instead.
+# out the whole load. Task 9 added a longer per-attempt deadline
+# (COLD_START_BUDGET_MS + embedDeadline()) as insurance against that wait
+# outlasting EMBED_TIMEOUT_MS. Task 10 removed both: production measured the
+# real cold start at 2.5-2.6s ("Init Report Coldstart: 2552ms" / "...2645ms"),
+# well inside EMBED_TIMEOUT_MS's 20000ms, so the extra budget was guarding a
+# failure mode that never happens -- its only live effect was letting a
+# genuinely dead backend take ~96s to reach degraded mode instead of ~41s.
+# embedQuery now uses one flat EMBED_TIMEOUT_MS for both attempts;
+# prewarm() (still a real win -- see its own comment in chat-widget.js)
+# still spends the visitor's role-picking time on the 2.5s spin-up.
 
 
-@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
-def test_embed_deadline_depends_on_whether_the_backend_is_known_warm() -> None:
+def test_warming_notice_fires_well_before_the_embed_deadline_gives_up() -> None:
+    """Values, not behavior -- but a notice that fires after the deadline
+    already gave up on the request is dead code."""
     src = _widget_src()
-    script = (
-        "var EMBED_TIMEOUT_MS = " + extract_js_var(src, "EMBED_TIMEOUT_MS") + ";\n"
-        "var COLD_START_BUDGET_MS = " + extract_js_var(src, "COLD_START_BUDGET_MS") + ";\n"
-        "var state = { backendWarm: false };\n"
-        + extract_js_function(src, "function embedDeadline(") + "\n"
-        "var cold = embedDeadline();\n"
-        "state.backendWarm = true;\n"
-        "var warm = embedDeadline();\n"
-        "process.stdout.write(JSON.stringify({ cold: cold, warm: warm }));\n"
-    )
-    got = run_node_json(script)
-
-    cold_ms = int(extract_js_var(src, "COLD_START_BUDGET_MS"))
-    embed_ms = int(extract_js_var(src, "EMBED_TIMEOUT_MS"))
-    assert got["cold"] == cold_ms, "an unproven session must get the cold-start budget"
-    assert got["warm"] == embed_ms, "a session that already succeeded once is talking to a warm process"
-
-
-def test_cold_start_budget_and_warming_notice_are_sized_sensibly() -> None:
-    """Values, not behavior -- but a budget that doesn't exceed the warm
-    deadline does nothing, and a notice that fires after the deadline already
-    gave up on the request is dead code."""
-    src = _widget_src()
-    cold_ms = int(extract_js_var(src, "COLD_START_BUDGET_MS"))
     embed_ms = int(extract_js_var(src, "EMBED_TIMEOUT_MS"))
     warming_ms = int(extract_js_var(src, "WARMING_NOTICE_MS"))
 
-    assert cold_ms > embed_ms, "the cold-start budget must exceed the ordinary deadline"
-    assert warming_ms < embed_ms, "the warming notice must fire well before either deadline gives up"
+    assert warming_ms < embed_ms, "the warming notice must fire well before the deadline gives up"
 
 
 def _run_prewarm(worker_url_js: str, times: int) -> dict:
@@ -508,7 +489,7 @@ def _run_prewarm(worker_url_js: str, times: int) -> dict:
     script = (
         "var calls = [];\n"
         "var WORKER_URL = " + worker_url_js + ";\n"
-        "var COLD_START_BUDGET_MS = " + extract_js_var(src, "COLD_START_BUDGET_MS") + ";\n"
+        "var EMBED_TIMEOUT_MS = " + extract_js_var(src, "EMBED_TIMEOUT_MS") + ";\n"
         "var state = { prewarmed: false, backendWarm: false };\n"
         "function fetchWithTimeout(url, opts, ms) {\n"
         "  calls.push({ url: url, ms: ms });\n"
@@ -529,7 +510,11 @@ def test_prewarm_fires_at_most_once_per_page_load() -> None:
 
     assert got["count"] == 1, "repeated opens must not re-fire the prewarm request"
     assert got["calls"][0]["url"] == "http://example.invalid/"
-    assert got["calls"][0]["ms"] == int(extract_js_var(_widget_src(), "COLD_START_BUDGET_MS"))
+    assert got["calls"][0]["ms"] == int(extract_js_var(_widget_src(), "EMBED_TIMEOUT_MS")), (
+        "prewarm's fetchWithTimeout deadline must be EMBED_TIMEOUT_MS -- the "
+        "separate COLD_START_BUDGET_MS it used to reference was removed "
+        "(Task 10) once production measured cold starts at 2.5-2.6s"
+    )
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
@@ -548,7 +533,7 @@ def test_prewarm_swallows_a_rejected_fetch_without_an_unhandled_rejection() -> N
     src = _widget_src()
     script = (
         "var WORKER_URL = 'http://example.invalid';\n"
-        "var COLD_START_BUDGET_MS = " + extract_js_var(src, "COLD_START_BUDGET_MS") + ";\n"
+        "var EMBED_TIMEOUT_MS = " + extract_js_var(src, "EMBED_TIMEOUT_MS") + ";\n"
         "var state = { prewarmed: false, backendWarm: false };\n"
         "function fetchWithTimeout() { return Promise.reject(new Error('down')); }\n"
         + extract_js_function(src, "function prewarm(") + "\n"
@@ -573,20 +558,18 @@ def test_warming_notice_exists_in_both_languages_without_a_double_ellipsis() -> 
         )
 
 
-def _run_embed_query_deadlines(backend_warm: bool) -> dict:
-    """Drive the REAL embedQuery + embedDeadline against a fetchWithTimeout
-    stub that always fails (status 500, not 429) so both retry attempts run,
-    recording the `ms` deadline passed on each. localModelMatchesIndex is
-    stubbed false so the function settles (rejects) once the retries are
-    exhausted -- the settlement itself isn't what this test is about, only
-    which deadline each attempt was given."""
+def _run_embed_query_deadlines() -> dict:
+    """Drive the REAL embedQuery against a fetchWithTimeout stub that always
+    fails (status 500, not 429) so both retry attempts run, recording the
+    `ms` deadline passed on each. localModelMatchesIndex is stubbed false so
+    the function settles (rejects) once the retries are exhausted -- the
+    settlement itself isn't what this test is about, only which deadline
+    each attempt was given."""
     src = _widget_src()
     script = (
         "var WORKER_URL = 'http://example.invalid';\n"
         "var EMBED_TIMEOUT_MS = " + extract_js_var(src, "EMBED_TIMEOUT_MS") + ";\n"
-        "var COLD_START_BUDGET_MS = " + extract_js_var(src, "COLD_START_BUDGET_MS") + ";\n"
-        "var state = { remoteEmbedDownAt: null, backendWarm: "
-        + ("true" if backend_warm else "false") + " };\n"
+        "var state = { remoteEmbedDownAt: null, backendWarm: false };\n"
         "function remoteEmbedDown() { return false; }\n"
         "function logTurn() {}\n"
         "function localModelMatchesIndex() { return false; }\n"
@@ -595,7 +578,6 @@ def _run_embed_query_deadlines(backend_warm: bool) -> dict:
         "  calls.push(ms);\n"
         "  return Promise.resolve({ ok: false, status: 500 });\n"
         "}\n"
-        + extract_js_function(src, "function embedDeadline(") + "\n"
         + extract_js_function(src, "async function embedQuery(") + "\n"
         "embedQuery('q', 'q').then(function () {\n"
         "  process.stdout.write(JSON.stringify({ threw: false, calls: calls }));\n"
@@ -609,42 +591,28 @@ def _run_embed_query_deadlines(backend_warm: bool) -> dict:
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
-def test_embed_query_applies_the_cold_start_budget_to_the_first_attempt_only() -> None:
-    """embedQuery retries once. If the cold-start budget applied to BOTH
-    attempts, a genuinely dead backend would cost 75s + 1.5s + 75s before
-    degraded mode -- far too long. The first attempt (which might be waiting
-    out a real cold start) gets the long budget; the retry -- which already
-    knows the first attempt didn't succeed within it -- falls back to the
-    ordinary EMBED_TIMEOUT_MS."""
-    got = _run_embed_query_deadlines(backend_warm=False)
+def test_embed_query_uses_a_flat_deadline_for_both_attempts() -> None:
+    """Task 9 gave the first attempt a longer COLD_START_BUDGET_MS via
+    embedDeadline() (state.backendWarm chose between the two); Task 10
+    removed both once production measured real cold starts at 2.5-2.6s (see
+    EMBED_TIMEOUT_MS's comment in chat-widget.js) -- nowhere near enough to
+    justify a separate, much longer per-attempt budget. Both retry attempts
+    now get the same EMBED_TIMEOUT_MS regardless of state.backendWarm."""
+    got = _run_embed_query_deadlines()
 
-    cold_ms = int(extract_js_var(_widget_src(), "COLD_START_BUDGET_MS"))
     embed_ms = int(extract_js_var(_widget_src(), "EMBED_TIMEOUT_MS"))
     assert len(got["calls"]) == 2, "embedQuery must still make exactly two attempts"
-    assert got["calls"][0] == cold_ms, "a cold session's FIRST attempt gets the cold-start budget"
-    assert got["calls"][1] == embed_ms, "the retry must not also pay the cold-start budget"
-
-
-@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
-def test_embed_query_uses_the_warm_deadline_throughout_once_the_backend_is_known_warm() -> None:
-    """Complement: a session that already has a successful /embed under its
-    belt must not pay the cold-start budget again on either attempt."""
-    got = _run_embed_query_deadlines(backend_warm=True)
-
-    embed_ms = int(extract_js_var(_widget_src(), "EMBED_TIMEOUT_MS"))
     assert got["calls"] == [embed_ms, embed_ms]
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_embed_query_marks_the_backend_warm_on_a_successful_response() -> None:
-    """A successful /embed is the signal that this turn's own /chat call, and
-    every later /embed call in the session, no longer needs the cold-start
-    budget."""
+    """A successful /embed is the signal that gates the warming notice
+    (WARMING_NOTICE_MS) for the rest of the session."""
     src = _widget_src()
     script = (
         "var WORKER_URL = 'http://example.invalid';\n"
         "var EMBED_TIMEOUT_MS = " + extract_js_var(src, "EMBED_TIMEOUT_MS") + ";\n"
-        "var COLD_START_BUDGET_MS = " + extract_js_var(src, "COLD_START_BUDGET_MS") + ";\n"
         "var state = { remoteEmbedDownAt: null, backendWarm: false };\n"
         "function remoteEmbedDown() { return false; }\n"
         "function logTurn() {}\n"
@@ -653,7 +621,6 @@ def test_embed_query_marks_the_backend_warm_on_a_successful_response() -> None:
         "    ok: true, json: function () { return Promise.resolve({ gate: null, rid: 'r1' }); },\n"
         "  });\n"
         "}\n"
-        + extract_js_function(src, "function embedDeadline(") + "\n"
         + extract_js_function(src, "async function embedQuery(") + "\n"
         "embedQuery('q', 'q').then(function (r) {\n"
         "  process.stdout.write(JSON.stringify({ backendWarm: state.backendWarm, rid: r.rid }));\n"

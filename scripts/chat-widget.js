@@ -71,20 +71,17 @@
     return fetch(url, merged).finally(function () { clearTimeout(timer); });
   }
 
-  // The session's first backend call may be waiting out a cold container's
-  // model load; every later one talks to a warm process. One flat deadline
-  // cannot serve both -- sized for the warm case it aborts cold starts that
-  // would have succeeded, and sized for the cold case it makes a genuinely
-  // dead backend take over a minute to report. So: budget for the first,
-  // EMBED_TIMEOUT_MS thereafter. 75000 is a starting value, not a
-  // measurement -- functions/tencent/index.py's true cold start (three ONNX
-  // models plus the chunk index, loaded before the port even binds) has not
-  // been timed yet. Retune this one constant once it has been.
-  var COLD_START_BUDGET_MS = 75000;
-
-  function embedDeadline() {
-    return state.backendWarm ? EMBED_TIMEOUT_MS : COLD_START_BUDGET_MS;
-  }
+  // A cold container's model load was once assumed to be slow enough to need
+  // its own longer per-attempt deadline (COLD_START_BUDGET_MS, 75000ms,
+  // removed here) -- production has since measured the real number: two
+  // cold starts logged at "Init Report Coldstart: 2552ms" and "...2645ms"
+  // (functions/tencent/index.py's own startup report, three ONNX models
+  // plus the chunk index, loaded before the port even binds). 2.5-2.6s is
+  // well inside EMBED_TIMEOUT_MS's 20000ms, so the separate budget was
+  // guarding a failure mode that does not happen; its only live effect was
+  // letting a genuinely dead backend take ~96s to reach degraded mode
+  // instead of ~41s (two EMBED_TIMEOUT_MS attempts + the retry pause). One
+  // flat EMBED_TIMEOUT_MS now covers both attempts (see embedQuery below).
 
   // A slow first call is otherwise indistinguishable from a hung one --
   // silent animated dots either way. Below this, send() swaps the thinking
@@ -289,7 +286,7 @@
     extractorLoading: null, // Promise while the local model loads
     remoteEmbedDownAt: null, // ms timestamp of the last /embed give-up, or null
     prewarmed: false, // prewarm() has fired this page load (at most once)
-    backendWarm: false, // a /embed has already succeeded this session -- embedDeadline() can stop budgeting for a cold start
+    backendWarm: false, // a /embed (or prewarm) has already succeeded this session -- gates the warming notice in send() (see WARMING_NOTICE_MS)
     busy: false,
     session: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
     history: [], // [{role:'user'|'assistant', content}], alias of transcripts[role].history
@@ -510,18 +507,15 @@
     if (WORKER_URL && !remoteEmbedDown()) {
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
-          // Only the FIRST attempt may be waiting out a cold start -- if it
-          // burned the whole cold-start budget the container is either up
-          // by now or genuinely broken, and a second long wait buys nothing
-          // (see COLD_START_BUDGET_MS's comment for the cost of getting
-          // this wrong: applying it to both attempts turns a dead backend
-          // into a 150s wait before degraded mode).
-          var deadline = attempt === 0 ? embedDeadline() : EMBED_TIMEOUT_MS;
+          // Both attempts use the same flat deadline. A cold start measures
+          // 2.5-2.6s (see EMBED_TIMEOUT_MS's comment above), nowhere near
+          // EMBED_TIMEOUT_MS's 20000ms, so the first attempt never needed a
+          // longer budget than the retry.
           var res = await fetchWithTimeout(WORKER_URL + '/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text, gate_text: gateText || text, gate_only: true }),
-          }, deadline);
+          }, EMBED_TIMEOUT_MS);
           if (res.ok) {
             state.backendWarm = true; // this session's next call is talking to a warm process
             var data = await res.json();
@@ -1285,18 +1279,19 @@
   }
 
   // Cold-start prewarm. functions/tencent/index.py's main() loads three ONNX
-  // models and the chunk index BEFORE binding its port, so the first request
-  // to a cold container waits out the whole load -- and Task 2's deadline
-  // would abort it, demoting the tab to the offline-model prompt for a backend
-  // that was only starting. Opening the panel is the earliest signal a
-  // question is coming; spend the visitor's role-picking time on the spin-up
-  // instead of their first question's. Nothing waits on this and failures are
-  // ignored -- it is a hint to the platform, not a request we need answered.
+  // models and the chunk index BEFORE binding its port -- measured at 2.5-
+  // 2.6s in production (see EMBED_TIMEOUT_MS's comment above). Still a real
+  // win even though EMBED_TIMEOUT_MS alone comfortably covers a cold start:
+  // opening the panel is the earliest signal a question is coming, so this
+  // spends the visitor's role-picking time on the spin-up instead of adding
+  // it to their first question's wait. Nothing waits on this and failures
+  // are ignored -- it is a hint to the platform, not a request we need
+  // answered.
   function prewarm() {
     if (state.prewarmed || !WORKER_URL) return;
     state.prewarmed = true;
     try {
-      fetchWithTimeout(WORKER_URL + '/', { method: 'GET' }, COLD_START_BUDGET_MS)
+      fetchWithTimeout(WORKER_URL + '/', { method: 'GET' }, EMBED_TIMEOUT_MS)
         .then(function (res) { if (res && res.ok) state.backendWarm = true; })
         .catch(function () {});
     } catch (e) { /* prewarming must never break the chat */ }
