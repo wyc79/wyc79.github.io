@@ -45,6 +45,30 @@ change — read them straight from `data/meta.json` (`chunk_count`, `built_at`,
 quoted here; `eval/KNOWN_ISSUES.md` records the counts as of its most recent
 measurement.
 
+**The chat knows which page you are on.** The widget sends the current page's
+site-relative url (`pages/skills.html`) with every `/chat` request, and the
+function appends up to `PAGE_CONTEXT_MAX` of that page's own chunks to the
+context, tagged `current_page="true"`, with the page's `<meta
+name="description">` summary chunk first. There is no intent detection: the
+model decides from the tag whether a question is about the page in front of the
+visitor ("summarize this page") or about the site in general. Retrieval
+returning nothing no longer refuses on its own — a deictic question has no
+useful query vector, which is exactly why it used to hit the canned refusal.
+Only the url crosses the wire; the page title in the system prompt is read off
+the function's own chunk records, so no client-supplied string reaches the
+prompt. Page-injected chunks are context only and never render as source cards
+— the visitor is already on that page.
+
+That summary chunk exists in both languages because each page's `<meta
+name="description">` carries a `data-zh` attribute alongside its English
+`content=`, following the site's own i18n convention (`scripts/i18n.js`).
+**Never put `data-en` on a `<meta>` tag** — i18n.js selects `[data-en][data-zh]`
+and assigns `textContent`, which is meaningless on a void element;
+`tests/test_loader.py::test_no_meta_description_carries_data_en` enforces this.
+A page with no `data-zh` yields no Chinese summary chunk rather than falling
+back to the English string, which would put English text in the Chinese half of
+the index where the zh gate cannot judge it.
+
 ### File layout (`chat/data/`, Task 29 Part 2)
 
 One file, one job — this split is what makes degraded mode's source links reliable
