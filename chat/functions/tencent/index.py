@@ -49,7 +49,8 @@ Routes and guarantees:
   own client-side top-k {id, score} to /log (degraded/light-mode audit) — all
   correlate by rid/sid.
 Config via environment variables: LLM_API_KEY (required), LLM_BASE_URL,
-LLM_MODEL, LLM_MAX_TOKENS, SITE_BASE, ALLOWED_ORIGINS, RATE_LIMIT_PER_HOUR.
+LLM_MODEL, LLM_MAX_TOKENS, LLM_THINKING, SITE_BASE, ALLOWED_ORIGINS,
+RATE_LIMIT_PER_HOUR.
 """
 
 import hashlib
@@ -642,6 +643,7 @@ def validate_chat_body(body) -> str | None:
 
 
 LLM_MAX_TOKENS_DEFAULT = "2048"
+LLM_THINKING_DEFAULT = "disabled"
 
 
 def llm_payload(system: str, messages: list) -> dict:
@@ -667,6 +669,25 @@ def llm_payload(system: str, messages: list) -> dict:
     answer. A malformed value (e.g. a typo'd console entry) falls back to
     the default and logs it -- a bad env var must degrade one setting, not
     take every /chat request down with a ValueError.
+
+    DeepSeek's reasoning models (deepseek-v4-flash/-pro) have thinking mode
+    ON by default, effort "high" -- that default is *why* the incident above
+    was possible at all: max_tokens has to cover a reasoning trace this
+    agent never asked for and gets no benefit from (it answers 2-5 sentence
+    questions from context retrieval already found), so it defaults to
+    disabled here. Per DeepSeek's docs the OpenAI SDK sends this via
+    extra_body, which merges its keys into the TOP level of the request JSON
+    -- call_llm builds that JSON itself with urllib rather than the SDK, so
+    "thinking" goes at the top level alongside "model" and "max_tokens", not
+    nested under anything else. LLM_THINKING="" is a deliberate escape hatch
+    that omits the field entirely rather than sending it empty/disabled:
+    unlike max_tokens, "thinking" is DeepSeek-specific and this function is
+    otherwise provider-agnostic (OpenAI-compatible protocol, LLM_BASE_URL
+    can point elsewhere) -- a future model or API version that rejects an
+    unrecognized "thinking" key needs a way out without a code change. Any
+    other unrecognized value (e.g. a typo) falls back to the default and
+    logs it, same reasoning as the max_tokens fallback: a bad env var must
+    not become an unknown field the API might reject outright.
     """
     raw = env("LLM_MAX_TOKENS", LLM_MAX_TOKENS_DEFAULT)
     try:
@@ -674,11 +695,20 @@ def llm_payload(system: str, messages: list) -> dict:
     except ValueError:
         log({"type": "llm_max_tokens_invalid", "value": raw, "fallback": LLM_MAX_TOKENS_DEFAULT})
         max_tokens = int(LLM_MAX_TOKENS_DEFAULT)
-    return {
+    payload = {
         "model": env("LLM_MODEL", "deepseek-chat"),
         "max_tokens": max_tokens,
         "messages": [{"role": "system", "content": system}] + messages,
     }
+    thinking = env("LLM_THINKING", LLM_THINKING_DEFAULT)
+    if thinking == "":
+        pass  # escape hatch: omit the field entirely, see docstring
+    elif thinking in ("disabled", "enabled"):
+        payload["thinking"] = {"type": thinking}
+    else:
+        log({"type": "llm_thinking_invalid", "value": thinking, "fallback": LLM_THINKING_DEFAULT})
+        payload["thinking"] = {"type": LLM_THINKING_DEFAULT}
+    return payload
 
 
 def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | None]:

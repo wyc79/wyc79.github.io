@@ -327,3 +327,61 @@ def test_llm_payload_falls_back_to_the_default_on_a_malformed_max_tokens(monkeyp
     payload = mod.llm_payload("system prompt", [])
 
     assert payload["max_tokens"] == int(mod.LLM_MAX_TOKENS_DEFAULT)
+
+
+# ── llm_payload: thinking mode is off by default ────────────────────────────
+#
+# DeepSeek's reasoning models (deepseek-v4-flash/-pro) enable "thinking" by
+# default, effort "high" -- see the incident above, where a live turn spent
+# every one of its 512 completion tokens on reasoning_content and returned
+# content: "". Raising max_tokens (previous commit) stops the starvation but
+# still pays for a reasoning trace this 2-5 sentence, context-already-found
+# agent gets no value from. Sending {"thinking": {"type": "disabled"}} at the
+# TOP level of the request body (per DeepSeek's docs -- the OpenAI SDK's
+# extra_body merges there, and call_llm builds the raw JSON itself) removes
+# that cost entirely.
+
+
+def test_llm_payload_disables_thinking_by_default(monkeypatch) -> None:
+    mod = _load_backend()
+    monkeypatch.delenv("LLM_THINKING", raising=False)
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert payload["thinking"] == {"type": "disabled"}
+
+
+def test_llm_payload_honors_llm_thinking_enabled(monkeypatch) -> None:
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_THINKING", "enabled")
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert payload["thinking"] == {"type": "enabled"}
+
+
+def test_llm_payload_empty_llm_thinking_omits_the_field_entirely(monkeypatch) -> None:
+    """The escape hatch: LLM_THINKING="" must drop the key outright, not send
+    an empty/None value -- this field is DeepSeek-specific, and LLM_BASE_URL
+    can point call_llm at an OpenAI-compatible provider that rejects an
+    unknown `thinking` key. Reachable without a code change (just unset/blank
+    the env var), for a provider swap this branch's author cannot predict."""
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_THINKING", "")
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert "thinking" not in payload
+
+
+def test_llm_payload_unrecognised_llm_thinking_falls_back_to_disabled(monkeypatch) -> None:
+    """A typo'd value (e.g. "maybe") must not be passed through verbatim --
+    that risks the API rejecting the whole request over an unknown `type`,
+    same failure shape as the malformed-max_tokens case above."""
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_THINKING", "maybe")
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert payload["thinking"] == {"type": "disabled"}
+    assert "maybe" not in json.dumps(payload)
