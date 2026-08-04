@@ -8,7 +8,7 @@
   "gate_stat": "top",
   "gate_threshold": 0.2029,
   "gate_margin": 0.0168,
-  "built_at": "2026-08-02T23:06:47+00:00",
+  "built_at": "2026-08-04T02:56:06+00:00",
   "dim": 384,
-  "chunk_count": 308
+  "chunk_count": 315
 }
