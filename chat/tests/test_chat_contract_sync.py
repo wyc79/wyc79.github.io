@@ -271,3 +271,59 @@ def test_usable_answer_rejects_what_would_paint_an_empty_bubble() -> None:
     assert mod.usable_answer("   \n  ") is False
     assert mod.usable_answer(None) is False
     assert mod.usable_answer(123) is False
+
+
+# ── llm_payload: max_tokens must not starve a reasoning model's answer ──────
+#
+# A live /chat turn against LLM_MODEL=deepseek-v4-flash (a reasoning model)
+# came back {"answer": "", "finish_reason": "length", ...,
+# "usage": {"completion_tokens": 512, "completion_tokens_details":
+# {"reasoning_tokens": 512}}} -- the hardcoded max_tokens: 512 ceiling let the
+# model spend its ENTIRE completion budget on reasoning_content and leave
+# content empty. The visitor saw a blank bot bubble with source cards under
+# it. llm_payload is the pure request-building half of call_llm, extracted so
+# these tests don't need a live LLM call.
+
+
+def test_llm_payload_honors_llm_max_tokens_env_override(monkeypatch) -> None:
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_MAX_TOKENS", "4096")
+
+    payload = mod.llm_payload("system prompt", [{"role": "user", "content": "hi"}])
+
+    assert payload["max_tokens"] == 4096
+
+
+def test_llm_payload_default_max_tokens_is_comfortably_above_the_512_that_caused_the_incident(monkeypatch) -> None:
+    """Pins the default well above the 512 ceiling that starved
+    deepseek-v4-flash -- a future edit that lowers it back down fails here."""
+    mod = _load_backend()
+    monkeypatch.delenv("LLM_MAX_TOKENS", raising=False)
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert payload["max_tokens"] >= 2048
+
+
+def test_llm_payload_puts_system_first_then_messages_and_carries_the_model(monkeypatch) -> None:
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_MODEL", "deepseek-v4-flash")
+    messages = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "yo"}]
+
+    payload = mod.llm_payload("system prompt text", messages)
+
+    assert payload["messages"][0] == {"role": "system", "content": "system prompt text"}
+    assert payload["messages"][1:] == messages
+    assert payload["model"] == "deepseek-v4-flash"
+
+
+def test_llm_payload_falls_back_to_the_default_on_a_malformed_max_tokens(monkeypatch) -> None:
+    """A typo'd console value (e.g. "abc") must not raise out of a request --
+    that would take /chat down entirely instead of just serving one turn with
+    the default ceiling."""
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_MAX_TOKENS", "abc")
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert payload["max_tokens"] == int(mod.LLM_MAX_TOKENS_DEFAULT)

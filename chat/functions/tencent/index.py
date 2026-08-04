@@ -49,7 +49,7 @@ Routes and guarantees:
   own client-side top-k {id, score} to /log (degraded/light-mode audit) — all
   correlate by rid/sid.
 Config via environment variables: LLM_API_KEY (required), LLM_BASE_URL,
-LLM_MODEL, SITE_BASE, ALLOWED_ORIGINS, RATE_LIMIT_PER_HOUR.
+LLM_MODEL, LLM_MAX_TOKENS, SITE_BASE, ALLOWED_ORIGINS, RATE_LIMIT_PER_HOUR.
 """
 
 import hashlib
@@ -641,13 +641,49 @@ def validate_chat_body(body) -> str | None:
     return None
 
 
-def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | None]:
-    url = env("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/v1/chat/completions"
-    payload = {
+LLM_MAX_TOKENS_DEFAULT = "2048"
+
+
+def llm_payload(system: str, messages: list) -> dict:
+    """Build the /v1/chat/completions request body call_llm sends.
+
+    max_tokens is an OpenAI-compatible chat-completions ceiling that bounds
+    REASONING and the visible answer TOGETHER -- there is no separate
+    reasoning budget on this protocol. The incident that forced this out of
+    a hardcoded literal: a live turn against LLM_MODEL=deepseek-v4-flash (a
+    reasoning model) with the old max_tokens: 512 came back
+
+        {"answer": "", "finish_reason": "length", "model": "deepseek-v4-flash",
+         "usage": {"prompt_tokens": 909, "completion_tokens": 512,
+                    "total_tokens": 1421,
+                    "completion_tokens_details": {"reasoning_tokens": 512}}}
+
+    -- all 512 tokens went to reasoning, nothing was left to write `content`,
+    and finish_reason hit "length". That is what the blank bot bubble with
+    source cards under it (see usable_answer(), which now rejects exactly
+    this response) looked like from the visitor's side. LLM_MAX_TOKENS is
+    configurable through env() (default 2048, 4x the old ceiling) so a
+    reasoning model has room for both a reasoning trace and an actual
+    answer. A malformed value (e.g. a typo'd console entry) falls back to
+    the default and logs it -- a bad env var must degrade one setting, not
+    take every /chat request down with a ValueError.
+    """
+    raw = env("LLM_MAX_TOKENS", LLM_MAX_TOKENS_DEFAULT)
+    try:
+        max_tokens = int(raw)
+    except ValueError:
+        log({"type": "llm_max_tokens_invalid", "value": raw, "fallback": LLM_MAX_TOKENS_DEFAULT})
+        max_tokens = int(LLM_MAX_TOKENS_DEFAULT)
+    return {
         "model": env("LLM_MODEL", "deepseek-chat"),
-        "max_tokens": 512,
+        "max_tokens": max_tokens,
         "messages": [{"role": "system", "content": system}] + messages,
     }
+
+
+def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | None]:
+    url = env("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/v1/chat/completions"
+    payload = llm_payload(system, messages)
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
