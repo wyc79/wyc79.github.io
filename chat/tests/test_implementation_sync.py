@@ -195,8 +195,8 @@ def _index_py_cjk_re():
     }
     try:
         mod.gate_decision("trigger the lazy compile")
-    except Exception:
-        pass
+    except KeyError:
+        pass  # the dummy entry's missing tokenizer/session, as described above
     assert mod.CJK_RE is not None, (
         "gate_decision did not reach its lazy CJK_RE compile -- index.py's "
         "control flow around it may have changed"

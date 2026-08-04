@@ -5,7 +5,7 @@ OpenAI-compatible chat-completions protocol (DeepSeek by default, or any
 provider that exposes /v1/chat/completions). Listens on :9000 as SCF web
 functions require; scf_bootstrap starts it.
 
-Same contract and guarantees as the Cloudflare worker:
+Routes and guarantees:
   POST /chat  {session, role, lang, question, history?} -> {answer, model, rid, sources[]}
   POST /embed {session?, text, gate_text?, gate_only?} -> {vector?, gate?, rid}
   POST /log   client-side event record -> 204

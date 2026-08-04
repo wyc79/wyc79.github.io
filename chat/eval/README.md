@@ -64,8 +64,9 @@ field serve both languages.
 `expected_keywords` adds the precision `expected_urls` gives up. A page has up
 to 31 chunks and landing on any of them scores a hit, even when the chunk
 carrying the answer never surfaced. Keywords are matched against the
-concatenated text of the post-floor top-4 — exactly the chunks that become
-`contexts` — so they answer "was the fact available to the model?".
+concatenated text of the post-floor top-4 — exactly the chunks the function puts
+in the prompt and returns as `sources` — so they answer "was the fact available
+to the model?".
 
 Read the two together:
 

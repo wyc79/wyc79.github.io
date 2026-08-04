@@ -53,7 +53,7 @@ below for the bug this fixes):
 
 | file | model | contents | git | fetched by browser |
 |---|---|---|---|---|
-| `chunks_{model_preset}.json` (`chunks_e5.json` in production) | e5 | all indexed chunks, pages + `knowledge/*.md`, both languages | committed | light mode only (never in normal mode) |
+| `chunks_{model_preset}.json` (`chunks_e5.json` in production) | e5 | all indexed chunks, pages + `knowledge/*.md`, both languages | committed | **never** in production — `localModelMatchesIndex()` fetches this file only when `meta.model` is MiniLM, i.e. a light-mode `chunks_minilm.json` build |
 | `gate_en_minilm.json` | MiniLM | English off-topic gate vectors (`knowledge/about_en.md`'s curated sections) | committed | degraded mode only |
 | `gate_zh_bge.json` | bge-zh | Chinese off-topic gate vectors (`knowledge/about_zh.md`) | **gitignored** | **never** (MiniLM, the only in-browser model, cannot embed Chinese) |
 | `chunks_en_minilm.json` | MiniLM | the retrieval corpus's English chunks, re-embedded with MiniLM | committed | degraded mode only |
@@ -280,9 +280,10 @@ cd chat && python build.py --function   # rebuilds data/ AND functions/tencent/t
 
 Then, in order: **(1) upload the new zip in the SCF console and redeploy the function
 FIRST**, confirm it's live, **(2) only then** `git add/commit/push chat/data/` and publish the
-site. Reversed, visitors get a 400 on every chat turn until the function catches up — see the
-load-bearing-order callout below for the exact mechanism, and `.claude/DEPLOY.md` (gitignored,
-local-only) for the step-by-step console walkthrough.
+site. Reversed, every visitor loses the LLM answer and falls to the widget's offline search
+path (a ~23 MB in-browser model) until the function catches up — see the load-bearing-order
+callout below for the exact mechanism, and `.claude/DEPLOY.md` (gitignored, local-only) for
+the step-by-step console walkthrough.
 
 The site works without this step — the widget stays in retrieval-only mode until
 `WORKER_URL` is set. The only backend is **Tencent SCF (chosen for China
