@@ -71,6 +71,17 @@
     return fetch(url, merged).finally(function () { clearTimeout(timer); });
   }
 
+  // How long a failed /embed suppresses further backend attempts. This used to
+  // be a sticky boolean: one SCF cold start that outlasted both attempts sent
+  // every later question in the tab to the offline-model prompt for the rest
+  // of the session, long after the function had warmed up.
+  var REMOTE_DOWN_TTL_MS = 60000;
+
+  function remoteEmbedDown() {
+    return state.remoteEmbedDownAt != null
+      && (Date.now() - state.remoteEmbedDownAt) < REMOTE_DOWN_TTL_MS;
+  }
+
   function gateThreshold() {
     return (state.meta && state.meta.gate_threshold) || OFFTOPIC_GATE;
   }
@@ -249,7 +260,7 @@
     extractor: null,
     loading: null, // Promise while core assets load
     extractorLoading: null, // Promise while the local model loads
-    remoteEmbedDown: false, // /embed said 503 or errored -> stop trying
+    remoteEmbedDownAt: null, // ms timestamp of the last /embed give-up, or null
     busy: false,
     session: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
     history: [], // [{role:'user'|'assistant', content}], alias of transcripts[role].history
@@ -454,7 +465,7 @@
     // Preferred: the backend judges the gate (no client download). One retry
     // with a pause covers cold starts and transient hiccups before we give
     // up on the backend for this session.
-    if (WORKER_URL && !state.remoteEmbedDown) {
+    if (WORKER_URL && !remoteEmbedDown()) {
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
           var res = await fetchWithTimeout(WORKER_URL + '/embed', {
@@ -472,7 +483,7 @@
         }
         if (attempt === 0) await new Promise(function (r) { setTimeout(r, 1500); });
       }
-      state.remoteEmbedDown = true;
+      state.remoteEmbedDownAt = Date.now();
       logTurn({ event: 'remote_embed_fallback' });
     }
     if (!localModelMatchesIndex()) {

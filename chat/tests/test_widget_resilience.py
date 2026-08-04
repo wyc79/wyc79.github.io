@@ -104,3 +104,36 @@ def test_normalize_answer_reports_nothing_to_render_instead_of_throwing() -> Non
     assert _normalize_answer("") == ""
     assert _normalize_answer("   ") == ""
     assert _normalize_answer(None) == ""
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_backend_down_expires_instead_of_lasting_the_whole_session() -> None:
+    """One SCF cold start used to demote every later question in the tab to
+    the offline-model prompt permanently. The backend must get another chance
+    once the TTL has passed."""
+    src = _widget_src()
+    ttl = int(extract_js_var(src, "REMOTE_DOWN_TTL_MS"))
+    script = (
+        "var state = { remoteEmbedDownAt: null };\n"
+        "var REMOTE_DOWN_TTL_MS = " + str(ttl) + ";\n"
+        "var now = 1000000;\n"
+        "Date.now = function () { return now; };\n"
+        + extract_js_function(src, "function remoteEmbedDown(") + "\n"
+        "var fresh = remoteEmbedDown();\n"
+        "state.remoteEmbedDownAt = now;\n"
+        "var justFailed = remoteEmbedDown();\n"
+        "now += REMOTE_DOWN_TTL_MS - 1;\n"
+        "var stillDown = remoteEmbedDown();\n"
+        "now += 2;\n"
+        "var recovered = remoteEmbedDown();\n"
+        "process.stdout.write(JSON.stringify({\n"
+        "  fresh: fresh, justFailed: justFailed, stillDown: stillDown, recovered: recovered,\n"
+        "}));\n"
+    )
+    got = run_node_json(script)
+
+    assert got["fresh"] is False, "a session that has not failed yet must try the backend"
+    assert got["justFailed"] is True, "a just-failed backend must not be retried immediately"
+    assert got["stillDown"] is True, "the TTL must actually hold for its full duration"
+    assert got["recovered"] is False, "after the TTL the backend must get another chance"
+    assert 0 < ttl <= 300000, "a TTL longer than a few minutes is the bug this fixes"
