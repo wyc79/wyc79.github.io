@@ -740,6 +740,71 @@ the next person edits that corpus for an unrelated reason.
 
 ---
 
+### P — Adding the 17 Chinese page summaries cost 2 `hit@4` and bought 6 `hit@4(pg)`
+
+**Status: measured near-ties, accepted, baseline updated.** The page-aware
+feature gave every page a `data-zh` meta description, so `load_page` now emits
+a summary chunk (`anchor="top"`) for the Chinese half of the index, which had
+never had one. That is 17 new legitimate zh chunks — 319 → 336 — and they
+compete for `top_k=4` like any other chunk.
+
+Full movement, English **entirely flat** (its descriptions did not change):
+
+```
+                             hit@4      hit@4(pg)    keywords
+ai_agent_recruiter/zh        11 -> 11    9 -> 10 up  18 -> 17 down
+client_dev_recruiter/zh      11 -> 10 DN 9 ->  7 DN  18 -> 17 down
+combat_design_recruiter/zh   11 -> 10 DN 5 ->  7 up  12 -> 12
+visitor/zh                   12 -> 12    5 -> 10 up  19 -> 19
+TOTAL (all 8 cells)          90 -> 88   59 -> 65    135 -> 133
+```
+
+The two `hit@4` losses are both sub-0.0025 rank-4/rank-5 near-ties, in the
+same regime as Finding O above and computed the same way:
+
+```
+combat-zh-08  "他的设计作品有没有被公开展示或选中过？"  wants game-design-workshop
+  4. 0.851400  pages/cemented-dreams.html#top:zh:0          <- new summary chunk
+  5. 0.850700  pages/game-design-workshop.html#sec7:zh:0    <- expected, margin 0.0007
+
+client-zh-08  "他是只会一个引擎，还是真的在好几个引擎里都做过东西？"  wants skills
+  2. 0.878800  pages/nothing-can-go-wrong.html#top:zh:0     <- new summary chunk
+  4. 0.876900  pages/prime-engine.html#sec3:zh:0
+  5. 0.874700  pages/skills.html#sec2:zh:0                  <- expected, margin 0.0022
+```
+
+Note the second one's mechanism: the new chunk landed at **rank 2**, so every
+chunk below it shifted down one slot and `skills.html` fell out of the window
+at a 0.0022 boundary it was already sitting on. Nothing was out-matched; the
+window moved.
+
+**Why accepted rather than tuned away.** `hit@4(pg)` — the same metric with
+`chat/knowledge/*.md`'s curated corpus excluded — rose by 6, and `visitor/zh`
+alone went 5 → 10. Finding N and the Task 24 update call the gap between
+`hit@4` and `hit@4(pg)` this project's Critical 1: a gap means the curated
+corpus, not the site's own pages, is answering the question. That gap narrowed
+31 → 23. Trading 2 corpus-answered cases for 6 page-answered ones is the
+direction this file has been asking for.
+
+The only lever that would recover the two is rewording `cemented-dreams`'s or
+`nothing-can-go-wrong`'s Chinese description to lose a similarity contest
+against an unrelated query — the exact metric-gaming pattern `eval/README.md`
+rule 1 exists to catch, and the same reasoning that left Finding O unfixed.
+Description length was checked first and ruled out as a cause: all 17 are
+65–108 CJK characters, inside the 60–100 target, so this is not overlong text
+matching too broadly.
+
+**Risk, named explicitly — same warning as Finding O, which applies to this
+entry too.** Two single-case swings at this margin were re-baselined here.
+That is the second time; the ratchet Finding O warns about is cumulative, and
+this entry is part of what it warns about. The defence is that the *aggregate*
+moved decisively the right way on the page-only metric, not that either
+individual case was inspected and forgiven. If a future change costs `hit@4`
+again **without** a corresponding `hit@4(pg)` gain, that is not this pattern
+and must not be re-baselined by pointing at this entry.
+
+---
+
 ## Deferred by user decision
 
 ### I — `test_index_carries_a_calibrated_gate` asserts on dead fields — RESOLVED

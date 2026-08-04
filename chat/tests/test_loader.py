@@ -232,3 +232,25 @@ def test_no_meta_description_carries_data_en() -> None:
                 offenders.append(path.name)
 
     assert offenders == [], f"data-en on a <meta> tag will be textContent-swapped by i18n.js: {offenders}"
+
+
+def test_every_site_page_produces_a_summary_chunk_in_both_languages() -> None:
+    """The English half is covered by
+    test_every_site_page_produces_a_summary_chunk; this is the zh half, which
+    needs data-zh on each page's meta description. Named per page so the
+    failure says which ones are still missing."""
+    from portfolio_rag.config import settings
+    from portfolio_rag.loader import load_page
+
+    site_root = settings.site_root
+    pages = [(site_root / "index.html", "index.html")] + [
+        (p, f"pages/{p.name}") for p in sorted((site_root / "pages").glob("*.html"))
+    ]
+
+    missing = {"en": [], "zh": []}
+    for path, url in pages:
+        for lang in ("en", "zh"):
+            if not any(s.anchor == "top" for s in load_page(path, url, lang)):
+                missing[lang].append(url)
+
+    assert missing == {"en": [], "zh": []}, f"pages with no summary chunk: {missing}"
