@@ -83,6 +83,7 @@ LIMITS = {
     "question": 1000,
     "history_turns": 8,
     "history_text": 1200,
+    "page_url": 200,
     "log_bytes": 4096,
     # Log-only clip lengths. CLS (日志服务) truncates very long lines, so logs
     # keep the exact LLM input/output but clip free text — ids/scores/usage
@@ -474,6 +475,71 @@ def sources_from_hits(hits: list) -> list:
     ]
 
 
+# How many of the current page's own chunks are added to the context. Six is
+# enough to summarize a page once its <meta name="description"> summary chunk
+# leads (see page_chunks); the cap exists to bound tokens on long pages like
+# game-design-workshop.html, which has 36 chunks.
+PAGE_CONTEXT_MAX = 6
+
+
+def page_chunks(chunks: list, page_url, lang: str | None) -> list:
+    """The chunks of the page the visitor is currently reading.
+
+    Deterministic selection by url, NOT retrieval. A deictic question
+    ("summarize this page", "what is this about") names no topic, so ranking it
+    against the whole index returns noise -- and when nothing cleared
+    MIN_SCORE, _chat refused it outright even though the off-topic gate had
+    passed it. Selecting the page's own chunks by url sidesteps the query
+    vector entirely: there is no intent detection in this path and no pattern
+    matching on the question text. The model decides what the question is about
+    from the labelled context (see build_context_block).
+
+    `page_url` is CLIENT-SUPPLIED and is used ONLY as a lookup key into this
+    function's own bundled index -- an unrecognised value, a non-string, or a
+    traversal-shaped string all select nothing, because nothing here treats it
+    as a path. It never reaches the prompt either: the page title in the system
+    prompt is read back off the selected chunk records.
+
+    The summary chunk (anchor "top", built from the page's <meta
+    name="description">) leads, so the model gets the page's thesis before its
+    raw sections; the rest follow in index order, capped at PAGE_CONTEXT_MAX.
+    """
+    if not isinstance(page_url, str) or not page_url:
+        return []
+    on_page = [c for c in chunks if c.get("url") == page_url]
+    if lang in ("en", "zh"):
+        # A monolingual (minilm) index carries no "lang" key at all -- keep
+        # those rather than filtering the whole page away.
+        same_lang = [c for c in on_page if c.get("lang") in (lang, None)]
+        if same_lang:
+            on_page = same_lang
+    summary = [c for c in on_page if c.get("anchor") == "top"]
+    rest = [c for c in on_page if c.get("anchor") != "top"]
+    return (summary + rest)[:PAGE_CONTEXT_MAX]
+
+
+def build_context_block(hits: list, page_ctx: list) -> str:
+    """The <chunk> block handed to the LLM: retrieved chunks first, then the
+    current page's own chunks tagged current_page="true".
+
+    That tag is the whole page-awareness mechanism. It lets the model
+    distinguish "content that matched the question" from "content of the page
+    the visitor is looking at" and decide for itself which the question is
+    about -- no classifier call on every turn, no keyword list to maintain, no
+    tuned score bonus. Pure and separate from the handler, like
+    sources_from_hits, so the contract test can assert on it directly."""
+    rows = []
+    chunks = [h["chunk"] for h in hits] + list(page_ctx)
+    for i, c in enumerate(chunks):
+        tag = ' current_page="true"' if i >= len(hits) else ""
+        rows.append(
+            '<chunk index="{}" page="{}" url="{}"{}>\n{}\n</chunk>'.format(
+                i + 1, c.get("page_title", ""), c.get("url", ""), tag, c.get("text", "")
+            )
+        )
+    return "\n".join(rows)
+
+
 def _run_embedding(bundle: dict, text: str) -> "object":
     import numpy as np
 
@@ -639,6 +705,15 @@ def validate_chat_body(body) -> str | None:
                 return "bad history role"
             if not isinstance(h.get("content"), str) or len(h["content"]) > LIMITS["history_text"]:
                 return "bad history item"
+    # `page` is optional: an old cached widget omits it and must keep working.
+    # Only the url is read, and only as a lookup key -- see page_chunks.
+    page = body.get("page")
+    if page is not None:
+        if not isinstance(page, dict):
+            return "bad page"
+        url = page.get("url")
+        if url is not None and (not isinstance(url, str) or len(url) > LIMITS["page_url"]):
+            return "bad page url"
     return None
 
 
@@ -933,13 +1008,29 @@ class Handler(BaseHTTPRequestHandler):
 
         hits = retrieve(body["question"])
 
-        if not hits:
+        # Answer in the site's active language (the widget sends it from the
+        # 中/EN toggle), regardless of the question's own language. Resolved
+        # here rather than further down because page_chunks needs it.
+        answer_lang = body.get("lang") if body.get("lang") in ("en", "zh") else None
+
+        page = body.get("page") if isinstance(body.get("page"), dict) else {}
+        seen = {h["chunk"].get("id") for h in hits}
+        page_ctx = [
+            c for c in page_chunks(_index["chunks"], page.get("url"), answer_lang)
+            if c.get("id") not in seen
+        ]
+
+        # Refuse only when BOTH are empty. Retrieval alone returning nothing is
+        # the normal outcome for a deictic question, and refusing on it is what
+        # made "summarize this page" a dead end.
+        if not hits and not page_ctx:
             log({
                 "type": "chat_refused",
                 "rid": rid,
                 "sid": sid,
                 "role": body.get("role"),
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
+                "page_url": page.get("url"),
                 "client_contexts_ignored": client_contexts_ignored,
             })
             return self._json(200, refusal_response(rid))
@@ -947,11 +1038,6 @@ class Handler(BaseHTTPRequestHandler):
         roles_data = load_roles()
         role = roles_data["roles"].get(body.get("role")) or roles_data["roles"][roles_data["default_role"]]
 
-        context_block = "\n".join(
-            f'<chunk index="{i + 1}" page="{h["chunk"].get("page_title", "")}" '
-            f'url="{h["chunk"].get("url", "")}">\n{h["chunk"]["text"]}\n</chunk>'
-            for i, h in enumerate(hits)
-        )
         # system_head = the role/persona prompt WITHOUT the injected chunks; the
         # chunks are logged separately (clipped) via log_contexts, so the whole
         # LLM input is reconstructable without a giant log line.
@@ -959,14 +1045,26 @@ class Handler(BaseHTTPRequestHandler):
             f"{roles_data['base_system_prompt']}\n\n"
             f"Visitor role: {role['label']}. {role['system_prompt']}"
         )
-        # Answer in the site's active language (the widget sends it from the
-        # 中/EN toggle), regardless of the question's own language.
-        answer_lang = body.get("lang") if body.get("lang") in ("en", "zh") else None
+        if page_ctx:
+            # The title comes off OUR OWN chunk records, never off the request.
+            # The client sends a url and nothing else, so no client-supplied
+            # string can reach the prompt through this feature.
+            system_head += (
+                '\n\nThe visitor is currently viewing the page "{}". The context chunks '
+                'tagged current_page="true" are that page\'s own content. When the '
+                'question is about the page the visitor is on ("this page", "here", '
+                '"the current page"), answer from those chunks.'.format(
+                    page_ctx[0].get("page_title", "")
+                )
+            )
         if answer_lang == "zh":
             system_head += "\n\nAlways answer in Chinese (简体中文), regardless of the language the question is written in."
         elif answer_lang == "en":
             system_head += "\n\nAlways answer in English, regardless of the language the question is written in."
-        system = f"{system_head}\n\nContext retrieved from the site for this question:\n{context_block}"
+        system = (
+            f"{system_head}\n\nContext retrieved from the site for this question:\n"
+            f"{build_context_block(hits, page_ctx)}"
+        )
         messages = list(body.get("history") or []) + [{"role": "user", "content": body["question"]}]
 
         try:
@@ -997,6 +1095,7 @@ class Handler(BaseHTTPRequestHandler):
             "in": {
                 "system_head": system_head,
                 "contexts": log_contexts(hits),
+                "page_context": [c.get("id") for c in page_ctx],
                 "messages": [
                     {"role": m.get("role"), "content": clip(m.get("content"), LIMITS["log_msg_text"])}
                     for m in messages

@@ -420,3 +420,91 @@ def test_llm_payload_unrecognised_llm_thinking_falls_back_to_disabled(monkeypatc
 
     assert payload["thinking"] == {"type": "disabled"}
     assert "maybe" not in json.dumps(payload)
+
+
+def _fixture_index() -> list:
+    """A miniature index in the real chunks.json shape: two pages, both
+    languages, each with a summary chunk (anchor "top") and sections."""
+    out = []
+    for url, title in (("pages/prime-engine.html", "Prime Engine"), ("pages/skills.html", "Skills")):
+        for lang in ("en", "zh"):
+            out.append({"id": f"{url}#top:{lang}:0", "url": url, "anchor": "top",
+                        "page_title": title, "section_title": title,
+                        "text": f"{title} summary ({lang})", "lang": lang})
+            for i in range(8):
+                out.append({"id": f"{url}#sec{i}:{lang}:0", "url": url, "anchor": f"sec{i}",
+                            "page_title": title, "section_title": f"Section {i}",
+                            "text": f"{title} section {i} ({lang})", "lang": lang})
+    return out
+
+
+def test_page_chunks_puts_the_summary_first_and_caps_the_rest() -> None:
+    """A deictic question has no useful query vector, so the page's chunks are
+    selected by url instead of ranked. The summary chunk leads so the model
+    gets the page's thesis before its raw sections."""
+    mod = _load_backend()
+    got = mod.page_chunks(_fixture_index(), "pages/prime-engine.html", "en")
+
+    assert len(got) == mod.PAGE_CONTEXT_MAX
+    assert got[0]["anchor"] == "top", "the summary chunk must lead"
+    assert all(c["url"] == "pages/prime-engine.html" for c in got)
+    assert all(c["lang"] == "en" for c in got), "an en answer must not be fed zh chunks"
+
+
+def test_page_chunks_filters_by_answer_language() -> None:
+    mod = _load_backend()
+    got = mod.page_chunks(_fixture_index(), "pages/skills.html", "zh")
+
+    assert got, "a zh visitor on a page with zh chunks must get them"
+    assert all(c["lang"] == "zh" for c in got)
+
+
+def test_page_chunks_treats_an_unknown_url_as_selecting_nothing() -> None:
+    """page_url is client-supplied and used ONLY as a lookup key into our own
+    index. Anything unrecognised selects nothing; nothing is trusted."""
+    mod = _load_backend()
+    index = _fixture_index()
+
+    assert mod.page_chunks(index, "pages/does-not-exist.html", "en") == []
+    assert mod.page_chunks(index, "", "en") == []
+    assert mod.page_chunks(index, None, "en") == []
+    assert mod.page_chunks(index, "../../etc/passwd", "en") == []
+    assert mod.page_chunks(index, {"not": "a string"}, "en") == []
+
+
+def test_build_context_block_tags_only_the_current_page_chunks() -> None:
+    """The tag is the entire mechanism: it lets the model tell 'matched the
+    question' from 'the page the visitor is looking at' with no classifier
+    call, no keyword list and nothing to tune."""
+    mod = _load_backend()
+    hits = [{"chunk": {"page_title": "Skills", "url": "pages/skills.html", "text": "retrieved"},
+             "score": 0.42}]
+    page_ctx = [{"page_title": "Prime Engine", "url": "pages/prime-engine.html", "text": "on-page"}]
+
+    block = mod.build_context_block(hits, page_ctx)
+
+    assert block.count('current_page="true"') == 1
+    assert block.index("retrieved") < block.index("on-page"), "retrieved chunks come first"
+    assert 'index="1"' in block and 'index="2"' in block
+    assert 'current_page="true"' not in block.split("</chunk>")[0], "a retrieved chunk must not be tagged"
+
+
+def test_build_context_block_with_no_page_context_is_unchanged_in_shape() -> None:
+    mod = _load_backend()
+    block = mod.build_context_block(
+        [{"chunk": {"page_title": "Skills", "url": "pages/skills.html", "text": "x"}, "score": 0.4}], []
+    )
+
+    assert "current_page" not in block
+    assert block.startswith('<chunk index="1" page="Skills" url="pages/skills.html">')
+
+
+def test_validate_chat_body_accepts_a_page_field_and_rejects_a_malformed_one() -> None:
+    mod = _load_backend()
+    base = {"question": "summarize this page", "history": []}
+
+    assert mod.validate_chat_body({**base, "page": {"url": "pages/skills.html"}}) is None
+    assert mod.validate_chat_body(base) is None, "page is optional -- an old cached widget omits it"
+    assert mod.validate_chat_body({**base, "page": "pages/skills.html"}) is not None
+    assert mod.validate_chat_body({**base, "page": {"url": 42}}) is not None
+    assert mod.validate_chat_body({**base, "page": {"url": "x" * 500}}) is not None
