@@ -364,7 +364,13 @@ def _run_ask_worker(status: int, body_js: str) -> dict:
         "var CHAT_TIMEOUT_MS = 5000;\n"
         "var state = { session: 's1', role: 'visitor', history: [] };\n"
         "function lang() { return 'en'; }\n"
+        # askWorker builds its body through chatRequestBody, which reads
+        # window.location -- extract both for real rather than stubbing the
+        # body, so a change to the request shape cannot pass unnoticed here.
+        "var window = { location: { pathname: '/pages/skills.html' } };\n"
         + extract_js_function(src, "function fetchWithTimeout(") + "\n"
+        + extract_js_function(src, "function currentPageUrl(") + "\n"
+        + extract_js_function(src, "function chatRequestBody(") + "\n"
         + extract_js_function(src, "async function askWorker(") + "\n"
         "global.fetch = function (url, opts) {\n"
         "  return Promise.resolve({\n"

@@ -50,38 +50,27 @@ def _load_backend():
     return mod
 
 
-def _extract_ask_worker_request_body_literal(src: str) -> str:
-    """The exact object literal askWorker passes to JSON.stringify(), pulled
-    from WITHIN askWorker's own body specifically (the file has other,
-    unrelated `body: JSON.stringify(...)` calls for /embed and /log)."""
-    fn_src = extract_js_function(src, "async function askWorker(")
-    marker = "body: JSON.stringify("
-    start = fn_src.index(marker) + len(marker)
-    depth, i = 1, start  # already past the opening '('
-    while depth > 0:
-        if fn_src[i] == "(":
-            depth += 1
-        elif fn_src[i] == ")":
-            depth -= 1
-        i += 1
-    return fn_src[start : i - 1]
+def _widget_chat_request_body(
+    question: str, embed_rid: str = "0804-051310-0001", pathname: str = "/pages/skills.html"
+) -> dict:
+    """Build the exact object askWorker sends, by running the widget's own
+    chatRequestBody() in a real node process with a stand-in state/lang()/
+    location.
 
-
-def _widget_chat_request_body(question: str) -> dict:
-    """Build the exact object askWorker would send for `question`, by
-    running its own object-literal source in a real node process with a
-    stand-in `state`/`lang()` (askWorker itself does the actual fetch(),
-    which needs a live server -- this test is about the request SHAPE, the
-    thing validate_chat_body cares about, not the transport)."""
+    Task 29's version brace-matched the object literal out of askWorker's
+    body. The literal now calls currentPageUrl(), so extracting the whole
+    named function is both simpler and more faithful -- same verbatim-source
+    guarantee, one fewer parser to keep in sync with the file it reads."""
     src = WIDGET_PATH.read_text(encoding="utf-8")
-    body_literal = _extract_ask_worker_request_body_literal(src)
     script = (
         "const state = { session: 'sess-smoke-test', role: 'visitor', "
         "history: [{role: 'user', content: 'hi'}, {role: 'assistant', content: 'yo'}] };\n"
         "function lang() { return 'en'; }\n"
-        f"const question = {json.dumps(question)};\n"
-        f"const body = {body_literal};\n"
-        "process.stdout.write(JSON.stringify(body));\n"
+        f"const window = {{ location: {{ pathname: {json.dumps(pathname)} }} }};\n"
+        + extract_js_function(src, "function currentPageUrl(") + "\n"
+        + extract_js_function(src, "function chatRequestBody(") + "\n"
+        f"process.stdout.write(JSON.stringify(chatRequestBody({json.dumps(question)}, "
+        f"{json.dumps(embed_rid)})));\n"
     )
     return run_node_json(script)
 
@@ -204,7 +193,7 @@ def test_widget_chat_request_body_passes_validate_chat_body() -> None:
         "askWorker must not send `contexts` -- the whole point of the Task "
         "29 contract flip is that the client stops sending it"
     )
-    for field in ("session", "role", "lang", "question", "history"):
+    for field in ("session", "role", "lang", "question", "history", "page"):
         assert field in body, f"askWorker's request body is missing {field!r}"
 
     mod = _load_backend()
@@ -508,3 +497,28 @@ def test_validate_chat_body_accepts_a_page_field_and_rejects_a_malformed_one() -
     assert mod.validate_chat_body({**base, "page": "pages/skills.html"}) is not None
     assert mod.validate_chat_body({**base, "page": {"url": 42}}) is not None
     assert mod.validate_chat_body({**base, "page": {"url": "x" * 500}}) is not None
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_request_carries_the_current_page_in_the_index_url_form() -> None:
+    """The server matches this against chunk urls verbatim, so it must be
+    site-relative ("pages/skills.html"), not a browser pathname."""
+    assert _widget_chat_request_body("summarize this page")["page"] == {"url": "pages/skills.html"}
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_landing_page_normalizes_to_index_html() -> None:
+    """The index's url for the landing page is "index.html"; the browser's
+    pathname is "/". A directory url must normalize the same way."""
+    assert _widget_chat_request_body("hi", pathname="/")["page"] == {"url": "index.html"}
+    assert _widget_chat_request_body("hi", pathname="/pages/")["page"] == {"url": "pages/index.html"}
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_widget_sends_no_page_title() -> None:
+    """Only the url crosses the wire. The page title in the system prompt is
+    read off the server's own chunk records, which is what keeps this feature
+    out of the prompt-injection surface."""
+    body = _widget_chat_request_body("summarize this page")
+
+    assert set(body["page"]) == {"url"}

@@ -791,17 +791,41 @@
   // ── LLM call via worker ───────────────────────────────────────────────
   // Task 29: the client no longer sends contexts — the function retrieves
   // from its own bundled index and returns the chunks it used as `sources`.
-  async function askWorker(question) {
+  // The page the visitor is reading, in the same site-relative form the index
+  // uses for chunk urls ('index.html', 'pages/skills.html'). The server
+  // matches this against its own chunk records verbatim, so the shape matters:
+  // a leading slash or a bare directory would simply select nothing.
+  function currentPageUrl() {
+    var path = window.location.pathname.replace(/^\/+/, '');
+    if (!path || /\/$/.test(path)) path += 'index.html';
+    return path;
+  }
+
+  // Extracted as a named function so chat/tests/test_chat_contract_sync.py can
+  // execute the REAL request builder. It used to brace-match the object
+  // literal out of askWorker's body, which stops working the moment the
+  // literal calls anything from the surrounding scope -- as it now does.
+  //
+  // `page` carries a url and nothing else, deliberately: the page title the
+  // system prompt mentions is read off the server's own chunk records, so no
+  // client-supplied string reaches the prompt through page-awareness.
+  function chatRequestBody(question, embedRid) {
+    return {
+      session: state.session,
+      role: state.role,
+      lang: lang(),
+      question: question,
+      page: { url: currentPageUrl() },
+      embed_rid: embedRid || undefined,
+      history: state.history.slice(-6),
+    };
+  }
+
+  async function askWorker(question, embedRid) {
     var r = await fetchWithTimeout(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session: state.session,
-        role: state.role,
-        lang: lang(),
-        question: question,
-        history: state.history.slice(-6),
-      }),
+      body: JSON.stringify(chatRequestBody(question, embedRid)),
     }, CHAT_TIMEOUT_MS);
     try {
       var res = r.res;
@@ -1164,7 +1188,7 @@
         record.mode = 'llm';
         var resp;
         try {
-          resp = await askWorker(question);
+          resp = await askWorker(question, emb.rid);
         } catch (chatErr) {
           // askWorker marks an error `passThrough` for a rate limit or an
           // empty-but-successful LLM answer (see askWorker above) -- the
