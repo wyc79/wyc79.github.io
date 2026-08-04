@@ -757,12 +757,40 @@
         history: state.history.slice(-6),
       }),
     }, CHAT_TIMEOUT_MS);
-    // Same rate-limit message /embed's remote branch throws (see
-    // embedQuery) -- send()'s chatErr handler bubbles this one to the
-    // generic "something went wrong" path instead of degraded mode, for the
-    // same reason: a transient rate limit isn't "the backend is down," and
-    // shouldn't prompt a 23MB offline-model download.
-    if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
+    // A rate limit and an LLM that answered with empty content are both
+    // cases where the backend IS reachable and responding -- neither means
+    // "the backend is down," so both must reach send()'s outer catch
+    // (t('somethingWrong')) instead of prompting degraded mode's 23MB
+    // offline-model download. Marking the thrown error `passThrough` (read
+    // by send()'s chatErr handler below) is one rule for that, instead of a
+    // growing set of message-string prefix checks -- see chatErr below.
+    // Same rate-limit message /embed's remote branch throws (see embedQuery)
+    // -- that path answers to a different handler (embErr) and is untouched.
+    if (res.status === 429) {
+      var rateLimited = new Error('rate limited — please wait a minute and try again');
+      rateLimited.passThrough = true;
+      throw rateLimited;
+    }
+    if (res.status === 502) {
+      // index.py returns 502 for two different reasons: a genuine LLM call
+      // failure (degraded mode is the honest answer for that) and an LLM
+      // that answered but with EMPTY content (index.py's usable_answer()
+      // guard) -- the second is not a backend outage. The body may not even
+      // be JSON (a raw gateway 502 has no body of index.py's making at all),
+      // so parsing it must not itself throw -- a gateway 502 keeps falling
+      // through to the generic `worker 502` below, exactly as before.
+      var body = null;
+      try { body = await res.json(); } catch (parseErr) { body = null; }
+      if (body && body.error === 'llm returned an empty answer') {
+        // Identical message to send()'s own client-side empty-answer guard
+        // (the `if (!answer) throw ...` below the normalizeAnswer call), so
+        // both halves of Task 3 -- server-detected and client-detected --
+        // produce the exact same visitor-facing text.
+        var emptyAnswer = new Error('the model returned an empty answer');
+        emptyAnswer.passThrough = true;
+        throw emptyAnswer;
+      }
+    }
     if (!res.ok) throw new Error('worker ' + res.status);
     return await res.json(); // {answer, model, rid, sources[], refused?}
   }
@@ -1074,7 +1102,13 @@
         try {
           resp = await askWorker(question);
         } catch (chatErr) {
-          if (String(chatErr && chatErr.message).indexOf('rate limited') === 0) throw chatErr;
+          // askWorker marks an error `passThrough` for a rate limit or an
+          // empty-but-successful LLM answer (see askWorker above) -- the
+          // backend was reachable and responding in both cases, so neither
+          // is honestly "the backend is down." Let it bubble to send()'s
+          // outer catch (t('somethingWrong')) instead of falling into
+          // degraded mode below.
+          if (chatErr && chatErr.passThrough) throw chatErr;
           // Log before falling into degradedTurn -- otherwise a /chat
           // failure left no diagnostic anywhere (degradedTurn's own
           // logTurn calls describe the offline-consent flow, not why this

@@ -270,3 +270,189 @@ def test_degraded_sources_message_is_gated_on_the_displayable_count() -> None:
     assert "sourcesForLog(retrieved.results)" in fn_src, (
         "the log must still keep the full ranked list, not the filtered one"
     )
+
+
+# ── askWorker: a 502 is not always "the backend is down" ────────────────────
+#
+# index.py returns 502 for two different reasons: a genuine LLM call failure
+# (degraded mode is the honest answer) and an LLM that answered but with
+# EMPTY content (usable_answer()'s guard, Task 3's server half) -- the second
+# means the backend is reachable and responding, so telling the visitor to
+# download a 23MB offline model would be false. The fix teaches askWorker to
+# read the 502 body and mark that one case `passThrough`; send()'s chatErr
+# handler (tested separately below) reads that flag instead of the old
+# fragile `indexOf('rate limited')` string check.
+
+
+def _run_ask_worker(status: int, body_js: str) -> dict:
+    """Execute the REAL askWorker, together with its REAL fetchWithTimeout,
+    in node against a mocked global.fetch -- so the 502-body-sniffing logic
+    runs for real rather than being redescribed in Python. `body_js` is a JS
+    statement body for the mocked response's `.json()` (e.g.
+    "return Promise.resolve({...});", or a rejection for a non-JSON gateway
+    502 body)."""
+    src = _widget_src()
+    script = (
+        "var WORKER_URL = 'http://example.invalid';\n"
+        "var CHAT_TIMEOUT_MS = 5000;\n"
+        "var state = { session: 's1', role: 'visitor', history: [] };\n"
+        "function lang() { return 'en'; }\n"
+        + extract_js_function(src, "function fetchWithTimeout(") + "\n"
+        + extract_js_function(src, "async function askWorker(") + "\n"
+        "global.fetch = function (url, opts) {\n"
+        "  return Promise.resolve({\n"
+        "    ok: " + ("true" if status < 300 else "false") + ",\n"
+        "    status: " + str(status) + ",\n"
+        "    json: function () { " + body_js + " },\n"
+        "  });\n"
+        "};\n"
+        "askWorker('who is YC').then(function (r) {\n"
+        "  process.stdout.write(JSON.stringify({ threw: false, result: r }));\n"
+        "}).catch(function (e) {\n"
+        "  process.stdout.write(JSON.stringify({\n"
+        "    threw: true, message: String(e && e.message), passThrough: !!(e && e.passThrough),\n"
+        "  }));\n"
+        "});\n"
+    )
+    return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_askworker_flags_the_empty_answer_502_for_pass_through() -> None:
+    got = _run_ask_worker(502, "return Promise.resolve({ error: 'llm returned an empty answer' });")
+
+    assert got["threw"] is True
+    assert got["passThrough"] is True, "the empty-answer 502 must be marked passThrough"
+    assert got["message"] == "the model returned an empty answer", (
+        "must match send()'s own client-side empty-answer guard message verbatim, "
+        "so the two Task 3 halves are indistinguishable to a visitor"
+    )
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_askworker_a_different_502_still_falls_to_degraded_mode() -> None:
+    """Complement: only the empty-answer 502 bypasses degraded mode. index.py's
+    OTHER 502 ("llm call failed", a genuine LLM-call failure) is a real
+    backend problem and must keep today's behavior."""
+    got = _run_ask_worker(502, "return Promise.resolve({ error: 'llm call failed' });")
+
+    assert got["threw"] is True
+    assert got["passThrough"] is False, "a genuine LLM-call-failure 502 must not pass through"
+    assert got["message"] == "worker 502"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_askworker_a_gateway_502_with_no_json_body_does_not_throw_while_parsing() -> None:
+    """A raw gateway 502 (e.g. Tencent's own error page, not index.py's JSON)
+    has no parseable body at all. Reading it for the empty-answer check must
+    not itself throw -- that would replace an honest 'worker 502' with a
+    confusing JSON-parse error, and skip degraded mode entirely."""
+    got = _run_ask_worker(502, "return Promise.reject(new Error('Unexpected token < in JSON'));")
+
+    assert got["threw"] is True
+    assert got["passThrough"] is False
+    assert got["message"] == "worker 502", "a gateway 502 must keep today's behavior, not a parse error"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_askworker_429_still_passes_through_with_an_unchanged_message() -> None:
+    """The rate-limit throw is being converted to the same `passThrough`
+    mechanism as the new empty-answer case. The message text -- what a
+    visitor ultimately sees via t('somethingWrong', err.message) -- must not
+    change in the conversion."""
+    got = _run_ask_worker(429, "return Promise.resolve({});")
+
+    assert got["threw"] is True
+    assert got["passThrough"] is True
+    assert got["message"] == "rate limited — please wait a minute and try again"
+
+
+# ── send()'s chatErr handler: passThrough decides degraded mode vs. not ─────
+
+
+def _run_chat_err_branch(err_js: str) -> dict:
+    """Execute send()'s REAL `catch (chatErr) { ... }` clause -- extracted
+    verbatim, including its passThrough condition -- against a synthetic
+    thrown error built by `err_js` (a JS expression), in node. Everything the
+    clause touches from send()'s closure (state, question, stripped, record,
+    thinking, logTurn, degradedTurn) is stubbed and recorded; `run()`'s own
+    outer try/catch is what distinguishes "chatErr rethrew" (send()'s outer
+    catch would fire) from "degradedTurn ran and the turn returned"."""
+    src = _widget_src()
+    catch_src = extract_js_function(src, "catch (chatErr) {")
+    script = (
+        "var calls = [];\n"
+        "var state = { role: 'visitor' };\n"
+        "var question = 'who is YC';\n"
+        "var stripped = '';\n"
+        "var record = {};\n"
+        "var thinking = {};\n"
+        "function logTurn(e) { calls.push('logTurn:' + e.event); }\n"
+        "async function degradedTurn(q, s, t, r) { calls.push('degradedTurn'); }\n"
+        "async function run() {\n"
+        "  try { throw (" + err_js + "); }\n"
+        + catch_src + "\n"
+        "}\n"
+        "run().then(function () {\n"
+        "  process.stdout.write(JSON.stringify({ rethrew: false, calls: calls }));\n"
+        "}).catch(function (e) {\n"
+        "  process.stdout.write(JSON.stringify({\n"
+        "    rethrew: true, calls: calls, message: String(e && e.message),\n"
+        "  }));\n"
+        "});\n"
+    )
+    return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_chat_err_rethrows_a_pass_through_error_without_degrading() -> None:
+    """The empty-answer error (askWorker, passThrough = true) must reach
+    send()'s outer catch -- t('somethingWrong') -- and must NOT trigger
+    degraded mode's "the AI answer service is unreachable" message, which
+    would be false: the backend answered, just with nothing usable."""
+    err_js = (
+        "(function () { "
+        "var e = new Error('the model returned an empty answer'); "
+        "e.passThrough = true; return e; "
+        "})()"
+    )
+    got = _run_chat_err_branch(err_js)
+
+    assert got["rethrew"] is True
+    assert got["calls"] == [], "must rethrow before logging or calling degradedTurn"
+    assert got["message"] == "the model returned an empty answer"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_chat_err_still_degrades_on_a_generic_worker_error() -> None:
+    """Complement: an ordinary askWorker failure (e.g. `worker 500`, no
+    passThrough) must still fall into degraded mode -- a test that only
+    checked the pass-through path would pass on a handler that always
+    rethrows."""
+    got = _run_chat_err_branch("new Error('worker 500')")
+
+    assert got["rethrew"] is False
+    assert "degradedTurn" in got["calls"]
+    assert any(c.startswith("logTurn:") for c in got["calls"]), (
+        "a /chat failure that falls to degraded mode must still be logged"
+    )
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_chat_err_rate_limit_behavior_is_unchanged_by_the_mechanism_switch() -> None:
+    """The rate-limit error is being converted from the old
+    `indexOf('rate limited') === 0` string check to the same `passThrough`
+    flag as the empty-answer case. This pins that the visible behavior --
+    still reaches the outer catch, still the same message -- did not move
+    when the mechanism did."""
+    err_js = (
+        "(function () { "
+        "var e = new Error('rate limited — please wait a minute and try again'); "
+        "e.passThrough = true; return e; "
+        "})()"
+    )
+    got = _run_chat_err_branch(err_js)
+
+    assert got["rethrew"] is True
+    assert got["calls"] == []
+    assert got["message"] == "rate limited — please wait a minute and try again"
