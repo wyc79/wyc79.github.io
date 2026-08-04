@@ -117,7 +117,11 @@ def load_page(path: Path, url: str, lang: str | None = None) -> list[Section]:
     # The authored <meta name="description"> is high-signal summary text
     # ("Portfolio of YC Wang — aspiring game developer with a background
     # in ...") — indexing it makes broad questions like "who is YC" land.
-    # Anchor "top" is the body id every page defines, so links stay valid.
+    # Anchor "top" is not a page-specific id -- most pages define no
+    # id="top" element at all (3d-rendering.html and game-design-workshop.html
+    # among them). Per the HTML spec, "#top" is a special fragment: the user
+    # agent scrolls to the start of the document for it regardless of whether
+    # a matching id exists, so the link stays valid on every page either way.
     # It is English-only, so skip it when building a non-English index.
     meta = soup.find("meta", attrs={"name": "description"})
     desc = (meta.get("content") or "").strip() if meta else ""

@@ -687,6 +687,13 @@
         return out.data;
       };
       var retrieved = retrieveFallback(chunks.chunks, await embedLocal(question, chunks.query_prefix));
+      // The degradedSources branch below must test what will actually be ON
+      // SCREEN, not the raw retrieved count: addSources drops hub-only cards
+      // (Task 6), so an all-hub result set has retrieved.results.length > 0
+      // but renders zero cards -- the "these pages look most relevant"
+      // sentence with nothing under it. shownDegraded is display-only; the
+      // FULL retrieved.results still goes to addSources/sourcesForLog below.
+      var shownDegraded = displayableSources(retrieved.results);
       // Gate on gateForm()'s output, not on `stripped ? stripped : question`.
       // Those differ when the name was KEPT (a bio question): gateForm then
       // normalizes the name to the gate corpus's own language, which the raw
@@ -706,7 +713,7 @@
         addStarters(state.roles.roles[state.role]);
         pushLog({ type: 'bot', text: thinking.textContent });
         pushLog({ type: 'starters' });
-      } else if (retrieved.results.length) {
+      } else if (shownDegraded.length) {
         // Task 29 Part 2: retrieved.results now names REAL chunks from
         // chunks_en_minilm.json (see retrieveFallback above), so degraded
         // mode can show real source links again, same as normal mode.

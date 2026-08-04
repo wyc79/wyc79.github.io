@@ -768,6 +768,14 @@ class Handler(BaseHTTPRequestHandler):
                 # from outside. See _check_query_prefix().
                 "query_prefix": _embed["prefix"],
                 "index_query_prefix": _index["query_prefix"],
+                # _check_query_prefix() OVERWRITES _embed["prefix"] with
+                # _index["query_prefix"] on a whitespace-only mismatch (a
+                # console env-var editor stripped a trailing space), so
+                # query_prefix == index_query_prefix is then trivially true --
+                # exactly the case the deploy checklist tells an operator to
+                # check for. This reads the env var directly, uncorrected, so
+                # a stripped console value is still visible from outside.
+                "query_prefix_env": env("QUERY_PREFIX", ""),
                 "build": BUILD_INFO,
             })
         self._json(404, {"error": "not found"})

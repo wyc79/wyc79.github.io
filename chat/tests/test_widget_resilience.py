@@ -6,6 +6,8 @@ run in a node subprocess (see tests/_node_harness.py) rather than retyped here
 which is the exact failure mode the other *_sync.py tests exist to prevent.
 """
 
+import re
+
 import pytest
 
 from portfolio_rag.config import settings
@@ -219,3 +221,52 @@ def test_source_logging_keeps_the_full_ranked_list() -> None:
     assert "displayableSources" not in dedupe, "dedupeForDisplay must stay display-neutral"
     assert "displayableSources" not in sources_for_log, "the log must keep every retrieved source"
     assert "displayableSources" in extract_js_function(src, "function addSources(")
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_degraded_sources_message_is_gated_on_the_displayable_count() -> None:
+    """Task 6 made addSources drop hub-only cards (index.html,
+    pages/projects.html) at render time. runOfflineSearch's `degradedSources`
+    branch decides WHICH sentence to show before that filter ever runs, so if
+    it still gates on the raw retrieved.results.length, an all-hub result set
+    -- exactly what a broad identity question retrieves, since 11 of 55
+    curated about_en.md sections link to a hub -- says "these pages look most
+    relevant to your question:" and then renders no cards at all: a visitor
+    who just consented to a ~23MB model download hits a dead end. The branch
+    must gate on the hub-filtered (displayable) count instead, so an all-hub
+    result set falls through to the degradedNoSources + addPageLinks branch
+    right below it, which already handles "nothing to point to" correctly."""
+    fn_src = extract_js_function(_widget_src(), "async function runOfflineSearch(")
+
+    branch = re.search(r"\}\s*else if\s*\(([^)]*)\)\s*\{[^}]*?degradedSources", fn_src, re.S)
+    assert branch, "expected a `} else if (...) { ... degradedSources ... }` branch"
+    condition = branch.group(1).strip()
+
+    assert "retrieved.results.length" not in condition, (
+        f"the degradedSources branch condition ({condition!r}) must not test the raw "
+        "retrieved count -- an all-hub result set has retrieved.results.length > 0 "
+        "but addSources renders zero cards for it, so the visitor sees the "
+        "'these pages look most relevant' sentence followed by nothing"
+    )
+
+    assign = re.search(r"var\s+(\w+)\s*=\s*displayableSources\(retrieved\.results\)", fn_src)
+    assert assign, (
+        "expected `var <name> = displayableSources(retrieved.results);` computed "
+        "before the branch, so the condition can test what will actually render"
+    )
+    shown_var = assign.group(1)
+    assert shown_var in condition, (
+        f"the degradedSources branch condition ({condition!r}) must test "
+        f"{shown_var}.length (the hub-filtered count), not something else"
+    )
+
+    # The filter must only steer WHICH message is shown -- addSources and the
+    # audit trail still need the full ranked list (Task 6's own design: the
+    # curated hub-linking chunks are good grounding even though the card for
+    # them is not worth showing).
+    assert "addSources(retrieved.results)" in fn_src, (
+        "addSources must still receive the FULL retrieved list, not the filtered one"
+    )
+    assert "sourcesForLog(retrieved.results)" in fn_src, (
+        "the log must still keep the full ranked list, not the filtered one"
+    )

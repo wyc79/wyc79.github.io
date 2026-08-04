@@ -325,6 +325,36 @@ def test_the_health_payload_reports_the_effective_and_declared_query_prefix(
     assert payload["index_query_prefix"] == "query: "
 
 
+def test_query_prefix_env_survives_the_whitespace_auto_correction(
+    no_stray_chunks_json, monkeypatch
+) -> None:
+    """_check_query_prefix() OVERWRITES _embed["prefix"] with the index's own
+    value on a whitespace-only mismatch (a console env-var editor stripped a
+    trailing space) -- so after that correction, query_prefix ==
+    index_query_prefix is trivially true, hiding exactly the case the deploy
+    checklist tells an operator to check for. query_prefix_env must keep
+    reporting the RAW env var, uncorrected, so a stripped console value is
+    still visible from the health endpoint."""
+    monkeypatch.setenv("QUERY_PREFIX", "query:")  # missing the trailing space
+    _write_index(no_stray_chunks_json, "e5")  # declares query_prefix "query: "
+    mod = _load_index_module()
+    mod.BUILD_INFO = {"preset": "e5"}
+    mod._load_index()
+    mod._embed["prefix"] = "query:"  # mirrors _load_embedder() reading the env var above
+    mod._check_query_prefix()  # adopts the index's "query: ", masking the typo in _embed["prefix"]
+
+    payload = _health_payload(mod)
+
+    assert payload["query_prefix"] == "query: ", "sanity: the auto-correction ran"
+    assert payload["index_query_prefix"] == "query: "
+    assert payload["query_prefix_env"] == "query:", (
+        "query_prefix_env must report the env var as configured, not the "
+        "auto-corrected value -- otherwise the stripped-space typo is "
+        "invisible from outside even though it is still misconfigured in "
+        "the console"
+    )
+
+
 def test_a_forgotten_query_prefix_warns_and_still_serves(no_stray_chunks_json) -> None:
     """The operator omission this tolerates: chunks.json's vectors were built
     with "query: " but the env var is unset. Must log loudly and keep
