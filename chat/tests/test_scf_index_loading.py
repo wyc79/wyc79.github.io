@@ -556,25 +556,11 @@ def test_check_query_prefix_succeeding_still_binds_as_before(monkeypatch) -> Non
 # ── whitespace-only prefix mismatch correction ──────────────────────────────
 
 
-def _fresh_backend():
-    """A fresh import of index.py so module-scope _embed/_index state from one
-    test can't leak into another."""
-    import importlib.util
-
-    from portfolio_rag.config import settings
-
-    path = settings.chat_root / "functions" / "tencent" / "index.py"
-    spec = importlib.util.spec_from_file_location("_scf_prefix_under_test", str(path))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
 def test_whitespace_only_prefix_mismatch_adopts_the_index_value() -> None:
     """The exact live failure: a console env-var editor stripped the trailing
     space from QUERY_PREFIX. That difference cannot mean anything other than
     'same prefix', so serve the index's own declared value."""
-    mod = _fresh_backend()
+    mod = _load_index_module()
     mod._index.update(matrix=object(), query_prefix="query: ", error=None)
     mod._embed.update(prefix="query:", error=None)
 
@@ -586,7 +572,7 @@ def test_whitespace_only_prefix_mismatch_adopts_the_index_value() -> None:
 def test_a_genuinely_different_prefix_is_left_alone() -> None:
     """A different prefix IS ambiguous -- warn, never rewrite. Silently
     adopting it would hide a real misconfiguration."""
-    mod = _fresh_backend()
+    mod = _load_index_module()
     mod._index.update(matrix=object(), query_prefix="query: ", error=None)
     mod._embed.update(prefix="passage: ", error=None)
 
@@ -599,7 +585,7 @@ def test_a_dead_embedder_is_not_corrected() -> None:
     """_embed['prefix'] sits at its '' default when the embedder failed to
     load. Treating that as a whitespace mismatch would fabricate a prefix on
     top of an unrelated failure."""
-    mod = _fresh_backend()
+    mod = _load_index_module()
     mod._index.update(matrix=object(), query_prefix="query: ", error=None)
     mod._embed.update(prefix="", error="RuntimeError('no model')")
 

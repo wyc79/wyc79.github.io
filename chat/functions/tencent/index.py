@@ -328,7 +328,9 @@ def _load_index() -> None:
 
 def _check_query_prefix() -> None:
     """Cross-check the effective QUERY_PREFIX against the prefix chunks.json
-    says its own document vectors were built with, and WARN on a mismatch.
+    says its own document vectors were built with. On a whitespace-only
+    mismatch (console env-var editors strip trailing spaces), silently adopt
+    the index's value. On a genuinely different prefix, WARN.
 
     QUERY_PREFIX is a manual console step (see DEPLOY.md). Forgetting it on an
     e5 deployment embeds queries without the "query: " prefix the documents
@@ -941,15 +943,17 @@ def main() -> None:
     # _load_embedder() and _load_index() already handle their own failures
     # internally (they record an error and let the route report unavailable;
     # see their docstrings) -- nothing here needs to guard those two calls
-    # again. _check_query_prefix() is different: it is a pure diagnostic with
-    # no failure path of its own today (it only reads module-scope dict keys
-    # already initialised at import and calls log()), which is exactly the
-    # "obviously safe" shape that grew teeth once before -- fix-wave finding
-    # 1.1 was a json.loads() outside its try in _load_embedder()'s gate
-    # loading, and a truncated bundled file took the whole function down
-    # before :9000 ever bound. Make the guarantee structural rather than
-    # incidental: whatever _check_query_prefix() does in the future, it must
-    # not be able to prevent the port from binding.
+    # again. _check_query_prefix() runs once here, before the port binds, and
+    # may write to _embed["prefix"] on a whitespace-only mismatch (console
+    # env-var editors strip trailing spaces). That side effect is isolated and
+    # safe: it modifies one already-initialised module-scope dict during
+    # startup, not during request handling, and has no failure path. The same
+    # reasoning that previously justified a try/except anyway (fix-wave finding
+    # 1.1: a json.loads() outside its try in _load_embedder()'s gate loading
+    # took the function down before :9000 ever bound) applies unchanged --
+    # make the guarantee structural rather than incidental: whatever
+    # _check_query_prefix() does in the future, it must not prevent the port
+    # from binding.
     try:
         _check_query_prefix()  # warn-only; both loads must have run first
     except Exception as err:
