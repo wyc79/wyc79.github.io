@@ -794,14 +794,45 @@ Description length was checked first and ruled out as a cause: all 17 are
 65–108 CJK characters, inside the 60–100 target, so this is not overlong text
 matching too broadly.
 
+**Second movement, same feature, separate cause.** Documenting page-awareness
+on `pages/chat-agent.html` (a new `<h4>` with two paragraphs, plus an expanded
+"Observable by turn") added 9 more chunks, 336 → 345. Both primary metrics
+held exactly flat — `hit@4` 88, `hit@4(pg)` 65 — and `keywords` went
+133 → 131: `aiagent-zh-04` **gained** 夹带指令, `ai_agent_recruiter/en` and
+`visitor-zh-07` each lost. The `visitor-zh-07` loss is the same near-tie
+shape:
+
+```
+visitor-zh-07  "如果只能看一个项目，你会让我先点开哪一个？"  wants projects.html
+  1. 0.883200  pages/chat-agent.html#sec2:zh:2   <- new page-awareness prose
+  2. 0.882800  pages/chat-agent.html#sec4:zh:1   <- new observability prose
+  3. 0.882400  pages/projects.html#sec3:zh:0     <- EXPECTED PAGE, still retrieved
+  4. 0.881200  pages/nothing-can-go-wrong.html#sec1:zh:0
+  --- top_k=4 cutoff ---
+  7. 0.877700  pages/projects.html#sec4:zh:0     <- carries the two keywords, 0.0035 out
+```
+
+Ranks 1–4 span 0.0020 end to end. The expected page is still retrieved at
+rank 3, so `hit@4` never moved; only the specific keyword-bearing chunk fell
+outside the window. The lever to recover it is trimming accurate portfolio
+prose about a real feature to move a 0.0035 similarity on an unrelated
+question — the same metric-gaming refusal as Finding O.
+
 **Risk, named explicitly — same warning as Finding O, which applies to this
-entry too.** Two single-case swings at this margin were re-baselined here.
-That is the second time; the ratchet Finding O warns about is cumulative, and
-this entry is part of what it warns about. The defence is that the *aggregate*
-moved decisively the right way on the page-only metric, not that either
-individual case was inspected and forgiven. If a future change costs `hit@4`
-again **without** a corresponding `hit@4(pg)` gain, that is not this pattern
-and must not be re-baselined by pointing at this entry.
+entry too.** Three single-case swings at this margin were re-baselined across
+this feature. That is the second and third time; the ratchet Finding O warns
+about is cumulative, and this entry is part of what it warns about. The
+defence is that the *aggregate* moved decisively the right way on the
+page-only metric, not that any individual case was inspected and forgiven. If
+a future change costs `hit@4` again **without** a corresponding `hit@4(pg)`
+gain, that is not this pattern and must not be re-baselined by pointing at
+this entry.
+
+**One thing worth watching.** `pages/chat-agent.html` now has the most zh
+prose of any project page and took ranks 1 and 2 on a generic
+"which project should I look at" question. That is a content-balance
+observation, not a near-tie: if it starts winning questions that are plainly
+about other projects, the fix is on that page, not in the retrieval code.
 
 ---
 
