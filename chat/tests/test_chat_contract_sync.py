@@ -32,6 +32,7 @@ functions/tencent/index.py's validate_chat_body and sources_from_hits
 
 import importlib.util
 import json
+import re
 
 import pytest
 
@@ -258,6 +259,40 @@ def test_sources_from_hits_fields_round_trip_through_resultsfromsources() -> Non
         "section_title": "Some Section",
         "text": "hello world",
     }
+
+
+def _index_empty_answer_error() -> str:
+    """The 502 body's `error` string from _chat's usable_answer guard,
+    pulled from source -- _chat has a SECOND, unrelated 502 (the call_llm
+    HTTPError branch just above it) with its own literal, so the match is
+    anchored on the usable_answer guard specifically."""
+    src = BACKEND_PATH.read_text(encoding="utf-8")
+    guard = re.search(
+        r'if not usable_answer\(answer\):.*?_json\(502, \{"error": "([^"]+)"\}\)', src, re.S
+    )
+    assert guard, "expected the usable_answer guard's 502 body in _chat"
+    return guard.group(1)
+
+
+def _widget_empty_answer_error_check() -> str:
+    """The string askWorker compares a 502 body's `error` field against, to
+    tell index.py's empty-answer 502 apart from every other 502."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    fn_src = extract_js_function(src, "async function askWorker(")
+    m = re.search(r"body\.error === '([^']+)'", fn_src)
+    assert m, "expected askWorker's empty-answer body.error comparison"
+    return m.group(1)
+
+
+def test_the_empty_answer_502_error_string_matches_between_index_py_and_the_widget() -> None:
+    """index.py's usable_answer guard and chat-widget.js's askWorker each
+    hand-type the literal 'llm returned an empty answer' with nothing
+    previously asserting the two agree -- a rename on either side would
+    silently stop matching, falling through to the generic 'worker 502' ->
+    degraded mode instead of send()'s outer catch (the pass-through path
+    this module's docstring and test_askworker_flags_the_empty_answer_502_for_pass_through
+    in test_widget_resilience.py both cover)."""
+    assert _widget_empty_answer_error_check() == _index_empty_answer_error()
 
 
 def test_usable_answer_rejects_what_would_paint_an_empty_bubble() -> None:

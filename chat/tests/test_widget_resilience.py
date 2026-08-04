@@ -14,10 +14,23 @@ from portfolio_rag.config import settings
 from tests._node_harness import extract_js_function, extract_js_var, node_available, run_node_json
 
 WIDGET_PATH = settings.site_root / "scripts" / "chat-widget.js"
+BACKEND_PATH = settings.chat_root / "functions" / "tencent" / "index.py"
 
 
 def _widget_src() -> str:
     return WIDGET_PATH.read_text(encoding="utf-8")
+
+
+def _index_call_llm_timeout() -> int:
+    """The literal seconds value from call_llm's own urlopen(...) --
+    load_roles has a second, unrelated urlopen with its own (shorter)
+    timeout, so the match is scoped to call_llm's definition specifically."""
+    src = BACKEND_PATH.read_text(encoding="utf-8")
+    fn_src = re.search(r"def call_llm\(.*?\n(?=def )", src, re.S)
+    assert fn_src, "expected to find call_llm's definition in index.py"
+    t = re.search(r"urlopen\([^)]*timeout=(\d+)", fn_src.group(0))
+    assert t, "expected call_llm's urlopen(...) to declare an explicit timeout="
+    return int(t.group(1))
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
@@ -57,28 +70,82 @@ def test_fetch_with_timeout_rejects_when_the_request_never_settles() -> None:
 def test_fetch_with_timeout_passes_through_a_normal_response() -> None:
     """Complement: the deadline must not interfere with a request that
     completes in time (a test that only checked the abort path would pass on an
-    implementation that aborts immediately)."""
+    implementation that aborts immediately). fetchWithTimeout now resolves
+    {res, done} instead of the bare Response (Item 1) -- the deadline is held
+    open until the caller's body read finishes, so callers read r.res and
+    call r.done() themselves once that read is over."""
     script = (
         extract_js_function(_widget_src(), "function fetchWithTimeout(") + "\n"
         "global.fetch = function (url, opts) { return Promise.resolve({ ok: true, url: url }); };\n"
         "fetchWithTimeout('http://example.invalid/chat', { method: 'POST' }, 5000)\n"
-        "  .then(function (r) { process.stdout.write(JSON.stringify(r)); });\n"
+        "  .then(function (r) {\n"
+        "    process.stdout.write(JSON.stringify({\n"
+        "      ok: r.res.ok, url: r.res.url, hasDone: typeof r.done === 'function',\n"
+        "    }));\n"
+        "  });\n"
     )
     got = run_node_json(script)
 
     assert got["ok"] is True
     assert got["url"] == "http://example.invalid/chat"
+    assert got["hasDone"] is True, "the caller needs done() to release the deadline once its body read finishes"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_fetch_with_timeout_aborts_a_response_whose_body_never_settles() -> None:
+    """The gap Item 1 closes: fetch() itself settles as soon as headers
+    arrive, so a deadline that stopped there (the old `.finally` on the fetch
+    promise) let a backend that sends headers and then stalls mid-body hang
+    forever -- the exact forever-spinner bug one step later. The timer must
+    stay armed past the headers and abort the still-open body read too."""
+    script = (
+        extract_js_function(_widget_src(), "function fetchWithTimeout(") + "\n"
+        # Headers arrive immediately; the body (`.json()`) never settles on
+        # its own -- only the shared abort signal can end it, same as a real
+        # Response whose body stream is tied to the request's AbortController.
+        "global.fetch = function (url, opts) {\n"
+        "  return Promise.resolve({\n"
+        "    ok: true,\n"
+        "    json: function () {\n"
+        "      return new Promise(function (resolve, reject) {\n"
+        "        opts.signal.addEventListener('abort', function () {\n"
+        "          var e = new Error('aborted'); e.name = 'AbortError'; reject(e);\n"
+        "        });\n"
+        "      });\n"
+        "    },\n"
+        "  });\n"
+        "};\n"
+        "var started = Date.now();\n"
+        "fetchWithTimeout('http://example.invalid', { method: 'POST' }, 50)\n"
+        "  .then(function (r) { return r.res.json(); })\n"
+        "  .then(function () {\n"
+        "    process.stdout.write(JSON.stringify({ settled: 'resolved' }));\n"
+        "  })\n"
+        "  .catch(function (e) {\n"
+        "    process.stdout.write(JSON.stringify({\n"
+        "      settled: 'rejected', name: e.name, elapsed: Date.now() - started,\n"
+        "    }));\n"
+        "  });\n"
+    )
+    got = run_node_json(script)
+
+    assert got["settled"] == "rejected", "a body that stalls after headers arrive must not hang forever"
+    assert got["name"] == "AbortError"
+    assert got["elapsed"] < 2000, "the deadline must fire promptly, not at some default"
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_the_chat_deadline_outlives_the_functions_own_llm_timeout() -> None:
-    """index.py's call_llm uses urlopen(timeout=60). A client deadline shorter
-    than that would abandon requests the server is still going to answer."""
+    """index.py's call_llm uses urlopen(timeout=N). A client deadline shorter
+    than that would abandon requests the server is still going to answer --
+    N is parsed from index.py's own source, not hardcoded, so raising the
+    server timeout can't leave this guard silently green."""
     src = _widget_src()
     chat_ms = int(extract_js_var(src, "CHAT_TIMEOUT_MS"))
     embed_ms = int(extract_js_var(src, "EMBED_TIMEOUT_MS"))
+    llm_timeout_s = _index_call_llm_timeout()
 
-    assert chat_ms > 60000, "the /chat deadline must sit past call_llm's own 60s timeout"
+    assert chat_ms > llm_timeout_s * 1000, "the /chat deadline must sit past call_llm's own urlopen timeout"
     assert 0 < embed_ms < chat_ms, "/embed is a short gate call and must give up sooner"
 
 
@@ -493,7 +560,7 @@ def _run_prewarm(worker_url_js: str, times: int) -> dict:
         "var state = { prewarmed: false, backendWarm: false };\n"
         "function fetchWithTimeout(url, opts, ms) {\n"
         "  calls.push({ url: url, ms: ms });\n"
-        "  return Promise.resolve({ ok: true });\n"
+        "  return Promise.resolve({ res: { ok: true }, done: function () {} });\n"
         "}\n"
         + extract_js_function(src, "function prewarm(") + "\n"
         + "\n".join(["prewarm();"] * times) + "\n"
@@ -576,7 +643,7 @@ def _run_embed_query_deadlines() -> dict:
         "var calls = [];\n"
         "function fetchWithTimeout(url, opts, ms) {\n"
         "  calls.push(ms);\n"
-        "  return Promise.resolve({ ok: false, status: 500 });\n"
+        "  return Promise.resolve({ res: { ok: false, status: 500 }, done: function () {} });\n"
         "}\n"
         + extract_js_function(src, "async function embedQuery(") + "\n"
         "embedQuery('q', 'q').then(function () {\n"
@@ -618,7 +685,8 @@ def test_embed_query_marks_the_backend_warm_on_a_successful_response() -> None:
         "function logTurn() {}\n"
         "function fetchWithTimeout(url, opts, ms) {\n"
         "  return Promise.resolve({\n"
-        "    ok: true, json: function () { return Promise.resolve({ gate: null, rid: 'r1' }); },\n"
+        "    res: { ok: true, json: function () { return Promise.resolve({ gate: null, rid: 'r1' }); } },\n"
+        "    done: function () {},\n"
         "  });\n"
         "}\n"
         + extract_js_function(src, "async function embedQuery(") + "\n"

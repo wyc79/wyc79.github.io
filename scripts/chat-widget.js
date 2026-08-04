@@ -55,20 +55,35 @@
   // builds: raw top-score >= 0.22 (the MiniLM calibration).
   var OFFTOPIC_GATE = 0.22;
 
-  // Every backend call gets a deadline. Without one, a connection that is
-  // accepted and then goes silent leaves the thinking bubble animating
-  // forever: every fallback in this widget (degraded mode, the error message,
-  // the offline-search offer) runs only when a fetch actually settles.
+  // Every backend call gets a deadline, held until the response BODY is
+  // fully read, not just the headers -- fetch() itself settles as soon as
+  // headers arrive, so a deadline that stopped there would let a backend
+  // that stalls mid-body reproduce the same forever-spinner one step later.
+  // Without one, a connection that is accepted and then goes silent leaves
+  // the thinking bubble animating forever: every fallback in this widget
+  // (degraded mode, the error message, the offline-search offer) runs only
+  // when a fetch actually settles.
   var EMBED_TIMEOUT_MS = 20000;
   var CHAT_TIMEOUT_MS = 65000; // just past index.py's own call_llm urlopen(timeout=60)
 
+  // Returns { res: <Response>, done: <clears the timer> } instead of the
+  // bare Response -- the caller still has a body to read, and clearing the
+  // timer here (as a plain .finally on the fetch) armed it only until the
+  // headers arrived. The timer stays live until the caller's done() says the
+  // body read is over; on a rejection (abort/network error) there is no body
+  // to read, so the timer is cleared immediately.
   function fetchWithTimeout(url, opts, ms) {
     var ctrl = new AbortController();
     var timer = setTimeout(function () { ctrl.abort(); }, ms);
     var merged = {};
     for (var k in opts) { if (Object.prototype.hasOwnProperty.call(opts, k)) merged[k] = opts[k]; }
     merged.signal = ctrl.signal;
-    return fetch(url, merged).finally(function () { clearTimeout(timer); });
+    return fetch(url, merged).then(function (res) {
+      return { res: res, done: function () { clearTimeout(timer); } };
+    }, function (err) {
+      clearTimeout(timer);
+      throw err;
+    });
   }
 
   // A cold container's model load was once assumed to be slow enough to need
@@ -507,21 +522,22 @@
     if (WORKER_URL && !remoteEmbedDown()) {
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
-          // Both attempts use the same flat deadline. A cold start measures
-          // 2.5-2.6s (see EMBED_TIMEOUT_MS's comment above), nowhere near
-          // EMBED_TIMEOUT_MS's 20000ms, so the first attempt never needed a
-          // longer budget than the retry.
-          var res = await fetchWithTimeout(WORKER_URL + '/embed', {
+          // Flat deadline for both attempts -- see EMBED_TIMEOUT_MS's comment above
+          // for why the first attempt needs no larger budget.
+          var r = await fetchWithTimeout(WORKER_URL + '/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text, gate_text: gateText || text, gate_only: true }),
           }, EMBED_TIMEOUT_MS);
-          if (res.ok) {
-            state.backendWarm = true; // suppress the "waking the server up" notice once the backend has answered at least once this session
-            var data = await res.json();
-            return { vector: null, gate: data.gate || null, rid: data.rid || null };
-          }
-          if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
+          try {
+            var res = r.res;
+            if (res.ok) {
+              state.backendWarm = true; // suppress the "waking the server up" notice once the backend has answered at least once this session
+              var data = await res.json();
+              return { vector: null, gate: data.gate || null, rid: data.rid || null };
+            }
+            if (res.status === 429) throw new Error('rate limited — please wait a minute and try again');
+          } finally { r.done(); }
         } catch (e) {
           if (String(e && e.message).indexOf('rate limited') === 0) throw e;
         }
@@ -767,6 +783,7 @@
     } catch (err2) {
       thinking.classList.remove('ycchat-dots');
       thinking.textContent = t('backendDown');
+      pushLog({ type: 'bot', text: thinking.textContent });
       logTurn({ event: 'error', role: state.role, question: question, error: String(err2) });
     }
   }
@@ -775,7 +792,7 @@
   // Task 29: the client no longer sends contexts — the function retrieves
   // from its own bundled index and returns the chunks it used as `sources`.
   async function askWorker(question) {
-    var res = await fetchWithTimeout(WORKER_URL + '/chat', {
+    var r = await fetchWithTimeout(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -786,42 +803,45 @@
         history: state.history.slice(-6),
       }),
     }, CHAT_TIMEOUT_MS);
-    // A rate limit and an LLM that answered with empty content are both
-    // cases where the backend IS reachable and responding -- neither means
-    // "the backend is down," so both must reach send()'s outer catch
-    // (t('somethingWrong')) instead of prompting degraded mode's 23MB
-    // offline-model download. Marking the thrown error `passThrough` (read
-    // by send()'s chatErr handler below) is one rule for that, instead of a
-    // growing set of message-string prefix checks -- see chatErr below.
-    // Same rate-limit message /embed's remote branch throws (see embedQuery)
-    // -- that path answers to a different handler (embErr) and is untouched.
-    if (res.status === 429) {
-      var rateLimited = new Error('rate limited — please wait a minute and try again');
-      rateLimited.passThrough = true;
-      throw rateLimited;
-    }
-    if (res.status === 502) {
-      // index.py returns 502 for two different reasons: a genuine LLM call
-      // failure (degraded mode is the honest answer for that) and an LLM
-      // that answered but with EMPTY content (index.py's usable_answer()
-      // guard) -- the second is not a backend outage. The body may not even
-      // be JSON (a raw gateway 502 has no body of index.py's making at all),
-      // so parsing it must not itself throw -- a gateway 502 keeps falling
-      // through to the generic `worker 502` below, exactly as before.
-      var body = null;
-      try { body = await res.json(); } catch (parseErr) { body = null; }
-      if (body && body.error === 'llm returned an empty answer') {
-        // Identical message to send()'s own client-side empty-answer guard
-        // (the `if (!answer) throw ...` below the normalizeAnswer call), so
-        // both halves of Task 3 -- server-detected and client-detected --
-        // produce the exact same visitor-facing text.
-        var emptyAnswer = new Error('the model returned an empty answer');
-        emptyAnswer.passThrough = true;
-        throw emptyAnswer;
+    try {
+      var res = r.res;
+      // A rate limit and an LLM that answered with empty content are both
+      // cases where the backend IS reachable and responding -- neither means
+      // "the backend is down," so both must reach send()'s outer catch
+      // (t('somethingWrong')) instead of prompting degraded mode's 23MB
+      // offline-model download. Marking the thrown error `passThrough` (read
+      // by send()'s chatErr handler below) is one rule for that, instead of a
+      // growing set of message-string prefix checks -- see chatErr below.
+      // Same rate-limit message /embed's remote branch throws (see embedQuery)
+      // -- that path answers to a different handler (embErr) and is untouched.
+      if (res.status === 429) {
+        var rateLimited = new Error('rate limited — please wait a minute and try again');
+        rateLimited.passThrough = true;
+        throw rateLimited;
       }
-    }
-    if (!res.ok) throw new Error('worker ' + res.status);
-    return await res.json(); // {answer, model, rid, sources[], refused?}
+      if (res.status === 502) {
+        // index.py returns 502 for two different reasons: a genuine LLM call
+        // failure (degraded mode is the honest answer for that) and an LLM
+        // that answered but with EMPTY content (index.py's usable_answer()
+        // guard) -- the second is not a backend outage. The body may not even
+        // be JSON (a raw gateway 502 has no body of index.py's making at all),
+        // so parsing it must not itself throw -- a gateway 502 keeps falling
+        // through to the generic `worker 502` below, exactly as before.
+        var body = null;
+        try { body = await res.json(); } catch (parseErr) { body = null; }
+        if (body && body.error === 'llm returned an empty answer') {
+          // Identical message to send()'s own client-side empty-answer guard
+          // (the `if (!answer) throw ...` below the normalizeAnswer call), so
+          // both halves of Task 3 -- server-detected and client-detected --
+          // produce the exact same visitor-facing text.
+          var emptyAnswer = new Error('the model returned an empty answer');
+          emptyAnswer.passThrough = true;
+          throw emptyAnswer;
+        }
+      }
+      if (!res.ok) throw new Error('worker ' + res.status);
+      return await res.json(); // {answer, model, rid, sources[], refused?}
+    } finally { r.done(); }
   }
 
   // Rebuilds the widget's internal {chunk, score} shape (what addSources,
@@ -1080,14 +1100,18 @@
       if (WORKER_URL && !state.backendWarm) {
         wakeTimer = setTimeout(function () { thinking.textContent = t('warming'); }, WARMING_NOTICE_MS);
       }
+      var embFailed = false;
       try {
         emb = await embedQuery(question, gateText);
       } catch (embErr) {
         if (String(embErr && embErr.message).indexOf('embedding service unavailable') !== 0) throw embErr;
-        await degradedTurn(question, stripped, thinking, record);
-        return;
+        embFailed = true;
       } finally {
         clearTimeout(wakeTimer);
+      }
+      if (embFailed) {
+        await degradedTurn(question, stripped, thinking, record);
+        return;
       }
       record.embed_rid = emb.rid || undefined; // correlate with the server /embed log
 
@@ -1278,21 +1302,19 @@
     });
   }
 
-  // Cold-start prewarm. functions/tencent/index.py's main() loads three ONNX
-  // models and the chunk index BEFORE binding its port -- measured at 2.5-
-  // 2.6s in production (see EMBED_TIMEOUT_MS's comment above). Still a real
-  // win even though EMBED_TIMEOUT_MS alone comfortably covers a cold start:
-  // opening the panel is the earliest signal a question is coming, so this
-  // spends the visitor's role-picking time on the spin-up instead of adding
-  // it to their first question's wait. Nothing waits on this and failures
-  // are ignored -- it is a hint to the platform, not a request we need
-  // answered.
+  // Cold-start prewarm (see EMBED_TIMEOUT_MS's comment above for the measured
+  // cold-start numbers). Still worth it even though EMBED_TIMEOUT_MS alone
+  // covers a cold start: opening the panel is the earliest signal a question
+  // is coming, so this spends the visitor's role-picking time on the spin-up
+  // instead of adding it to their first question's wait. Nothing waits on
+  // this and failures are ignored -- a hint to the platform, not a request
+  // we need answered.
   function prewarm() {
     if (state.prewarmed || !WORKER_URL) return;
     state.prewarmed = true;
     try {
       fetchWithTimeout(WORKER_URL + '/', { method: 'GET' }, EMBED_TIMEOUT_MS)
-        .then(function (res) { if (res && res.ok) state.backendWarm = true; })
+        .then(function (r) { if (r.res.ok) state.backendWarm = true; r.done(); })
         .catch(function () {});
     } catch (e) { /* prewarming must never break the chat */ }
   }
