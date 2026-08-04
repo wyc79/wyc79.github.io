@@ -137,3 +137,33 @@ def test_backend_down_expires_instead_of_lasting_the_whole_session() -> None:
     assert got["stillDown"] is True, "the TTL must actually hold for its full duration"
     assert got["recovered"] is False, "after the TTL the backend must get another chance"
     assert 0 < ttl <= 300000, "a TTL longer than a few minutes is the bug this fixes"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_an_unanswered_question_is_detected_on_replay() -> None:
+    """pushLog records the bot reply only when a turn completes, so navigating
+    away mid-flight (clicking a source card does exactly this) leaves a user
+    entry with nothing after it. Replaying that silently looks like the chat
+    ignored the question."""
+    script = (
+        extract_js_function(_widget_src(), "function lastTurnInterrupted(") + "\n"
+        "process.stdout.write(JSON.stringify({\n"
+        "  interrupted: lastTurnInterrupted([{type:'note'},{type:'user'}]),\n"
+        "  answered: lastTurnInterrupted([{type:'user'},{type:'bot'},{type:'sources'}]),\n"
+        "  empty: lastTurnInterrupted([]),\n"
+        "  starters: lastTurnInterrupted([{type:'note'},{type:'starters'}]),\n"
+        "}));\n"
+    )
+    got = run_node_json(script)
+
+    assert got["interrupted"] is True
+    assert got["answered"] is False
+    assert got["empty"] is False, "a fresh transcript is not an interrupted turn"
+    assert got["starters"] is False
+
+
+def test_the_interrupted_notice_exists_in_both_languages() -> None:
+    """Every visitor-facing string is bilingual; a missing zh key silently
+    falls back to English mid-conversation."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    assert src.count("interrupted:") == 2, "expected one `interrupted` string in STR.en and STR.zh"

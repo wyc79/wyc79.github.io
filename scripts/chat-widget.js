@@ -199,6 +199,7 @@
       offlineDeclined: 'No problem — here are some pages to explore. Ask again anytime to turn on offline search.',
       clearLabel: 'Clear',
       clearTitle: 'Clear this conversation',
+      interrupted: 'That answer didn\'t finish — the page changed while it was loading. Ask again?',
     },
     zh: {
       askBtn: '✦ 问 AI',
@@ -231,6 +232,7 @@
       offlineDeclined: '没问题 —— 这里有一些页面可以看看。你随时可以再问一次来启用离线检索。',
       clearLabel: '清空',
       clearTitle: '清空当前对话',
+      interrupted: '上一个回答没能完成 —— 加载过程中页面发生了跳转。要再问一次吗？',
     },
   };
   function t(key) {
@@ -327,6 +329,16 @@
     });
   }
 
+  // A turn whose answer never arrived persists as a trailing `user` entry:
+  // pushLog records the bot reply only once the turn completes, so navigating
+  // away mid-flight (clicking a source card does exactly that) stores the
+  // question and nothing else. Structural check on the transcript, not a guess
+  // about the text.
+  function lastTurnInterrupted(log) {
+    var last = log[log.length - 1];
+    return !!(last && last.type === 'user');
+  }
+
   // Replay a role's stored transcript into the body (on open / role switch /
   // page load). Messages keep the language they were written in; interactive
   // starters re-render in the current language.
@@ -340,6 +352,9 @@
       else if (e.type === 'pagelinks') addPageLinks();
       else if (e.type === 'starters' && state.roles && state.roles.roles[state.role]) addStarters(state.roles.roles[state.role]);
     });
+    // Derived on replay, never pushed to the log: if the turn is later
+    // completed in another tab or re-asked, the stored transcript stays clean.
+    if (lastTurnInterrupted(tr.log)) addMsg('note', t('interrupted'));
     els.body.scrollTop = els.body.scrollHeight;
   }
 
