@@ -517,7 +517,7 @@
             body: JSON.stringify({ text: text, gate_text: gateText || text, gate_only: true }),
           }, EMBED_TIMEOUT_MS);
           if (res.ok) {
-            state.backendWarm = true; // this session's next call is talking to a warm process
+            state.backendWarm = true; // suppress the "waking the server up" notice once the backend has answered at least once this session
             var data = await res.json();
             return { vector: null, gate: data.gate || null, rid: data.rid || null };
           }

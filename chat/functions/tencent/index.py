@@ -675,7 +675,11 @@ def llm_payload(system: str, messages: list) -> dict:
     was possible at all: max_tokens has to cover a reasoning trace this
     agent never asked for and gets no benefit from (it answers 2-5 sentence
     questions from context retrieval already found), so it defaults to
-    disabled here. Per DeepSeek's docs the OpenAI SDK sends this via
+    disabled here. The max_tokens ceiling is independent and remains 2048 as
+    deliberate headroom: LLM_THINKING can be re-enabled, LLM_MODEL can be a
+    reasoning model, or LLM_BASE_URL can point elsewhere, and in any case
+    the ceiling stands between a reasoning trace and empty content.
+    Per DeepSeek's docs the OpenAI SDK sends this via
     extra_body, which merges its keys into the TOP level of the request JSON
     -- call_llm builds that JSON itself with urllib rather than the SDK, so
     "thinking" goes at the top level alongside "model" and "max_tokens", not
