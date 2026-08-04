@@ -167,3 +167,55 @@ def test_the_interrupted_notice_exists_in_both_languages() -> None:
     falls back to English mid-conversation."""
     src = WIDGET_PATH.read_text(encoding="utf-8")
     assert src.count("interrupted:") == 2, "expected one `interrupted` string in STR.en and STR.zh"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_hub_pages_are_dropped_from_the_displayed_cards_only() -> None:
+    """index.html has no section anchors and pages/projects.html is a listing,
+    so a card pointing at either drops the visitor somewhere that answers
+    nothing. Curated about_en.md chunks deliberately link there, so the chunks
+    must still reach the LLM -- this filter is display-only."""
+    src = _widget_src()
+    script = (
+        "var HUB_URLS = " + extract_js_var(src, "HUB_URLS") + ";\n"
+        + extract_js_function(src, "function displayableSources(") + "\n"
+        "var results = [\n"
+        "  { chunk: { url: 'pages/prime-engine.html' }, score: 0.5 },\n"
+        "  { chunk: { url: 'index.html' }, score: 0.4 },\n"
+        "  { chunk: { url: 'pages/projects.html' }, score: 0.3 },\n"
+        "  { chunk: { url: 'pages/skills.html' }, score: 0.2 },\n"
+        "];\n"
+        "process.stdout.write(JSON.stringify({\n"
+        "  shown: displayableSources(results).map(function (r) { return r.chunk.url; }),\n"
+        "  originalLength: results.length,\n"
+        "}));\n"
+    )
+    got = run_node_json(script)
+
+    assert got["shown"] == ["pages/prime-engine.html", "pages/skills.html"]
+    assert got["originalLength"] == 4, "displayableSources must not mutate its input"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_an_all_hub_result_set_renders_no_empty_wrapper() -> None:
+    src = _widget_src()
+    script = (
+        "var HUB_URLS = " + extract_js_var(src, "HUB_URLS") + ";\n"
+        + extract_js_function(src, "function displayableSources(") + "\n"
+        "process.stdout.write(JSON.stringify(displayableSources([\n"
+        "  { chunk: { url: 'index.html' } }, { chunk: { url: 'pages/projects.html' } },\n"
+        "])));\n"
+    )
+    assert run_node_json(script) == []
+
+
+def test_source_logging_keeps_the_full_ranked_list() -> None:
+    """The filter must sit in addSources, not in dedupeForDisplay -- otherwise
+    sourcesForLog and record.retrieved lose the audit trail too."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    dedupe = extract_js_function(src, "function dedupeForDisplay(")
+    sources_for_log = extract_js_function(src, "function sourcesForLog(")
+
+    assert "displayableSources" not in dedupe, "dedupeForDisplay must stay display-neutral"
+    assert "displayableSources" not in sources_for_log, "the log must keep every retrieved source"
+    assert "displayableSources" in extract_js_function(src, "function addSources(")

@@ -540,6 +540,18 @@
       function (i) { return chunks[i].vector; }, function (i) { return chunks[i]; });
   }
 
+  // Destinations that carry no information beyond "this site": index.html has
+  // no section ids at all (its only <section> is the landing menu, so every
+  // link lands on the sphere), and pages/projects.html is a listing. Several
+  // curated knowledge/about_en.md chunks deliberately link: to both, and their
+  // TEXT is good grounding -- so this is display-only. dedupeForDisplay,
+  // sourcesForLog and record.retrieved all keep the full ranked list.
+  var HUB_URLS = { 'index.html': 1, 'pages/projects.html': 1 };
+
+  function displayableSources(results) {
+    return results.filter(function (r) { return !HUB_URLS[r.chunk.url]; });
+  }
+
   function dedupeForDisplay(results) {
     var seen = {}, out = [];
     results.forEach(function (r) {
@@ -855,9 +867,10 @@
   }
 
   function addSources(results) {
-    if (!results.length) return;
+    var shown = dedupeForDisplay(displayableSources(results));
+    if (!shown.length) return; // after filtering, so an all-hub set adds no empty wrapper
     var wrap = h('div', 'ycchat-srcs');
-    dedupeForDisplay(results).forEach(function (r) {
+    shown.forEach(function (r) {
       var href = PREFIX + r.chunk.url + (r.chunk.anchor ? '#' + r.chunk.anchor : '');
       var a = h('a', 'ycchat-src');
       a.href = href;
