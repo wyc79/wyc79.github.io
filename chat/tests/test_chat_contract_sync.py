@@ -258,3 +258,16 @@ def test_sources_from_hits_fields_round_trip_through_resultsfromsources() -> Non
         "section_title": "Some Section",
         "text": "hello world",
     }
+
+
+def test_usable_answer_rejects_what_would_paint_an_empty_bubble() -> None:
+    """A reasoner model returns its text in reasoning_content and leaves
+    content empty; a content-filter stop returns "". Both used to reach the
+    widget as a 200 and render as a blank bot bubble with no way forward."""
+    mod = _load_backend()
+
+    assert mod.usable_answer("He built Prime Engine.") is True
+    assert mod.usable_answer("") is False
+    assert mod.usable_answer("   \n  ") is False
+    assert mod.usable_answer(None) is False
+    assert mod.usable_answer(123) is False

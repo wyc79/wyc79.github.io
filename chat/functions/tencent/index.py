@@ -683,6 +683,22 @@ def refusal_response(rid: str) -> dict:
     return {"answer": REFUSAL, "refused": True, "rid": rid, "sources": []}
 
 
+def usable_answer(answer) -> bool:
+    """True when the LLM returned text worth rendering.
+
+    An empty `content` is a real, reachable outcome and used to reach the
+    widget as an ordinary 200: a reasoner model (LLM_MODEL=deepseek-reasoner)
+    puts its text in `reasoning_content` and leaves `content` empty, and a
+    content-filter stop returns "" outright. chat-widget.js assigned that
+    straight into the bubble's textContent, so the visitor watched the dots
+    disappear and got a blank bot bubble -- no answer, no error, no way
+    forward, and nothing in the logs saying anything was wrong.
+
+    Pure and separate from the handler, like sources_from_hits and
+    refusal_response, so the contract test can assert on it directly."""
+    return isinstance(answer, str) and bool(answer.strip())
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -881,6 +897,14 @@ class Handler(BaseHTTPRequestHandler):
             log({"type": "llm_error", "rid": rid, "sid": sid, "status": err.code,
                  "detail": err.read().decode("utf-8", "replace")[:500]})
             return self._json(502, {"error": "llm call failed"})
+
+        if not usable_answer(answer):
+            # 502, not a 200 with an empty string: the widget treats a failing
+            # /chat as backend-down and offers degraded mode, which is an
+            # honest dead end. A 200 here is a silent one.
+            log({"type": "llm_empty_answer", "rid": rid, "sid": sid,
+                 "finish_reason": finish, "model": model, "usage": usage})
+            return self._json(502, {"error": "llm returned an empty answer"})
 
         # Full LLM I/O for every turn: system_head + clipped chunks (ids &
         # this function's own retrieval scores kept full) + clipped messages

@@ -746,6 +746,19 @@
     });
   }
 
+  // The UI renders plain text, so strip stray markdown emphasis the LLM may
+  // emit despite the prompt (e.g. **Prime Engine**). Returns '' when there is
+  // nothing to render: `resp.answer` can legitimately be empty (a reasoner
+  // model puts its text in reasoning_content, a content-filter stop returns
+  // "") or missing, and both used to land in the bubble as-is -- an empty bot
+  // bubble with the dots gone and no error anywhere.
+  function normalizeAnswer(raw) {
+    return String(raw == null ? '' : raw)
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/^#+\s+/gm, '')
+      .trim();
+  }
+
   // ── UI ────────────────────────────────────────────────────────────────
   var els = {};
 
@@ -1056,9 +1069,8 @@
         }
         results = resultsFromSources(resp.sources);
         record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
-        // The UI renders plain text; strip stray markdown emphasis the LLM
-        // may emit despite the prompt (e.g. **Prime Engine**).
-        answer = resp.answer.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#+\s+/gm, '');
+        answer = normalizeAnswer(resp.answer);
+        if (!answer) throw new Error('the model returned an empty answer');
         thinking.classList.remove('ycchat-dots');
         thinking.textContent = answer;
       } else {

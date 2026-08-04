@@ -78,3 +78,29 @@ def test_the_chat_deadline_outlives_the_functions_own_llm_timeout() -> None:
 
     assert chat_ms > 60000, "the /chat deadline must sit past call_llm's own 60s timeout"
     assert 0 < embed_ms < chat_ms, "/embed is a short gate call and must give up sooner"
+
+
+def _normalize_answer(raw) -> str:
+    import json as _json
+
+    script = (
+        extract_js_function(_widget_src(), "function normalizeAnswer(") + "\n"
+        "process.stdout.write(JSON.stringify(normalizeAnswer(" + _json.dumps(raw) + ")));\n"
+    )
+    return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_normalize_answer_strips_markdown_the_plain_text_ui_cannot_render() -> None:
+    assert _normalize_answer("**Prime Engine** is his engine work.") == "Prime Engine is his engine work."
+    assert _normalize_answer("## Heading\nbody") == "Heading\nbody"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_normalize_answer_reports_nothing_to_render_instead_of_throwing() -> None:
+    """The blank-bubble bug: an empty or missing answer must come back as ''
+    so send() can raise, not as a value that silently paints an empty bubble --
+    and a missing field must not throw a TypeError deep inside rendering."""
+    assert _normalize_answer("") == ""
+    assert _normalize_answer("   ") == ""
+    assert _normalize_answer(None) == ""
