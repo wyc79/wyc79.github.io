@@ -522,3 +522,48 @@ def test_the_widget_sends_no_page_title() -> None:
     body = _widget_chat_request_body("summarize this page")
 
     assert set(body["page"]) == {"url"}
+
+
+def test_gate_verdict_is_one_flat_greppable_token() -> None:
+    """`gate.pass` nested in a JSON object cannot be filtered on in 日志查询:
+    a passed gate and a blocked one look alike at a glance. This is the string
+    that distinguishes them."""
+    mod = _load_backend()
+
+    assert mod.gate_verdict({"pass": True, "value": 0.4559, "lang": "en"}) == "pass"
+    assert mod.gate_verdict({"pass": False, "value": 0.1626, "lang": "en"}) == "block"
+    assert mod.gate_verdict({"pass": True, "value": None, "reason": "cjk_bypass"}) == "cjk_bypass"
+    assert mod.gate_verdict(None) == "none"
+
+
+def test_the_embed_log_line_carries_the_flat_verdict() -> None:
+    import inspect
+
+    mod = _load_backend()
+    src = inspect.getsource(mod.Handler._embed_route)
+
+    assert "gate_verdict" in src, "the /embed log line must carry the flat token, not just `gate`"
+
+
+def test_chat_log_lines_join_back_to_the_gate_decision() -> None:
+    """/embed and /chat write two lines with two different rids. Without the
+    embed_rid echoed here, a passed gate and the answer it produced can only be
+    correlated by sid and wall-clock time."""
+    import inspect
+
+    mod = _load_backend()
+    src = inspect.getsource(mod.Handler._chat)
+
+    assert src.count("embed_rid") >= 3, "both the answered and refused log lines must echo embed_rid"
+    assert '"outcome": "answered"' in src
+    assert '"outcome": "refused_no_hits"' in src
+
+
+def test_validate_chat_body_rejects_an_oversized_embed_rid() -> None:
+    mod = _load_backend()
+    base = {"question": "who is YC", "history": []}
+
+    assert mod.validate_chat_body({**base, "embed_rid": "0804-051310-0001"}) is None
+    assert mod.validate_chat_body(base) is None, "embed_rid is optional"
+    assert mod.validate_chat_body({**base, "embed_rid": "x" * 200}) is not None
+    assert mod.validate_chat_body({**base, "embed_rid": 42}) is not None

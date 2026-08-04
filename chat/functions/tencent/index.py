@@ -84,6 +84,7 @@ LIMITS = {
     "history_turns": 8,
     "history_text": 1200,
     "page_url": 200,
+    "embed_rid": 64,
     "log_bytes": 4096,
     # Log-only clip lengths. CLS (日志服务) truncates very long lines, so logs
     # keep the exact LLM input/output but clip free text — ids/scores/usage
@@ -601,6 +602,23 @@ def gate_decision(gate_text: str) -> dict | None:
     return {"pass": value >= gate["threshold"], "value": round(value, 4), "lang": lang}
 
 
+def gate_verdict(gate: dict | None) -> str:
+    """One flat, greppable token for what the gate decided: "pass", "block",
+    "cjk_bypass" or "none".
+
+    The decision itself has been logged since Task 29 -- but only as
+    `gate.pass`, nested inside a JSON object. SCF 日志查询 filters on
+    substrings, so there was no single string to search for and a passed gate
+    was, in practice, indistinguishable from a blocked one at a glance. This
+    is that string; the nested `gate` object is still logged beside it for the
+    score and language."""
+    if gate is None:
+        return "none"
+    if gate.get("reason") == "cjk_bypass":
+        return "cjk_bypass"
+    return "pass" if gate.get("pass") else "block"
+
+
 def env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
@@ -714,6 +732,12 @@ def validate_chat_body(body) -> str | None:
         url = page.get("url")
         if url is not None and (not isinstance(url, str) or len(url) > LIMITS["page_url"]):
             return "bad page url"
+    # The rid of the /embed call that gated this question. Optional (an old
+    # cached widget omits it); echoed into the chat log line so one grep joins
+    # the gate decision to the answer it produced.
+    embed_rid = body.get("embed_rid")
+    if embed_rid is not None and (not isinstance(embed_rid, str) or len(embed_rid) > LIMITS["embed_rid"]):
+        return "bad embed_rid"
     return None
 
 
@@ -971,7 +995,9 @@ class Handler(BaseHTTPRequestHandler):
             response["gate"] = gate
         # Log the gate decision only — NEVER the query vector. gate carries
         # pass/value/lang(/reason); the clipped gate_text shows what was judged.
-        log({"type": "embed", "rid": rid, "sid": sid, "gate": gate, "q": clip(gate_text, 120)})
+        # gate_verdict is the flat token; `gate` keeps the score and language.
+        log({"type": "embed", "rid": rid, "sid": sid, "gate_verdict": gate_verdict(gate),
+             "gate": gate, "q": clip(gate_text, 120)})
         self._json(200, response)
 
     def _chat(self):
@@ -999,6 +1025,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": invalid})
 
         rid, sid = new_request_id(), session_hash(body.get("session"))
+        embed_rid = body.get("embed_rid") if isinstance(body.get("embed_rid"), str) else None
 
         # An old cached widget may still send `contexts` -- ignore it
         # completely (never let client-supplied text reach the prompt) but
@@ -1028,6 +1055,8 @@ class Handler(BaseHTTPRequestHandler):
                 "type": "chat_refused",
                 "rid": rid,
                 "sid": sid,
+                "embed_rid": embed_rid,
+                "outcome": "refused_no_hits",
                 "role": body.get("role"),
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
                 "page_url": page.get("url"),
@@ -1090,6 +1119,8 @@ class Handler(BaseHTTPRequestHandler):
             "type": "chat",
             "rid": rid,
             "sid": sid,
+            "embed_rid": embed_rid,
+            "outcome": "answered",
             "role": body.get("role"),
             "client_contexts_ignored": client_contexts_ignored,
             "in": {
