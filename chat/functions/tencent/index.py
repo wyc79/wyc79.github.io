@@ -370,6 +370,29 @@ def _check_query_prefix() -> None:
         })
         return
     if _embed["prefix"] != _index["query_prefix"]:
+        # Console env-var editors strip trailing whitespace, and e5's prefix
+        # ("query: ") ends in a space -- so the overwhelmingly likely way to
+        # reach here is a QUERY_PREFIX that is correct except for that space.
+        # That case is not ambiguous: chunks.json states what its own document
+        # vectors were embedded with, and a whitespace-only difference cannot
+        # mean anything else. Adopt the index's value and say so loudly.
+        #
+        # A GENUINELY different prefix still only warns, exactly as before:
+        # that one is ambiguous, and either refusing or silently rewriting it
+        # would turn a configuration question into an outage or a lie.
+        if _embed["prefix"].strip() == _index["query_prefix"].strip():
+            log({
+                "type": "query_prefix_whitespace_corrected",
+                "was": _embed["prefix"],
+                "now": _index["query_prefix"],
+                "note": "QUERY_PREFIX differed from chunks.json's declared prefix by "
+                        "surrounding whitespace only (a console env-var editor strips "
+                        "it). Adopting the index's value so queries and documents share "
+                        "one embedding space. Fix QUERY_PREFIX in the console to silence "
+                        "this.",
+            })
+            _embed["prefix"] = _index["query_prefix"]
+            return
         log({
             "type": "query_prefix_unexpected",
             "effective": _embed["prefix"],
