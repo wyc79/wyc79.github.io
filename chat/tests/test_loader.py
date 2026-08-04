@@ -131,3 +131,29 @@ def test_load_site_walks_index_and_pages(tmp_path: Path) -> None:
     _write(tmp_path / "pages", "skills.html", PAGE)
     sections = load_site(tmp_path)
     assert {s.url for s in sections} == {"index.html", "pages/skills.html"}
+
+
+def test_every_site_page_produces_a_summary_chunk() -> None:
+    """load_page indexes <meta name="description"> as the page's summary
+    section (anchor "top"). It is what makes broad questions land, and the
+    page-context feature places it first in the injected block -- so a page
+    without one is a page the chat cannot introduce. Four pages silently had
+    none: no tag at all, two stubs, and one that missed the 40-char floor by
+    three characters."""
+    from portfolio_rag.config import settings
+    from portfolio_rag.loader import load_page
+
+    site_root = settings.site_root
+    pages = [(site_root / "index.html", "index.html")] + [
+        (p, f"pages/{p.name}") for p in sorted((site_root / "pages").glob("*.html"))
+    ]
+
+    missing = []
+    for path, url in pages:
+        sections = load_page(path, url, "en")
+        if not any(s.anchor == "top" for s in sections):
+            missing.append(url)
+
+    assert missing == [], (
+        f"these pages have no <meta name=\"description\"> long enough to index: {missing}"
+    )

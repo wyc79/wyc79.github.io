@@ -31,9 +31,14 @@ _LANGS = ("en", "zh")
 # curated sections were dropped at 26-38 raw characters, including
 # "王元辰是谁" ("who is YC") -- an identity-question shape a gate corpus
 # cannot afford to lose. load_page() has the same len()>=40 pattern for HTML
-# sections (below); it is left as-is here since it currently drops nothing on
-# the real site (verified separately) and touching it is out of this fix's
-# scope, but _effective_length is written generically enough to reuse there.
+# sections (below). It is NOT harmless: it silently dropped the summary chunks
+# of four pages (toolbox.html had no description at all; 3d-rendering.html and
+# game-design-workshop.html were stubs; education.html missed the floor by
+# three characters) until those descriptions were written. An earlier version
+# of this comment asserted it "currently drops nothing on the real site",
+# which is exactly the kind of claim that goes stale silently -- there is now
+# a test (tests/test_loader.py::test_every_site_page_produces_a_summary_chunk)
+# that fails instead.
 _MIN_SECTION_LENGTH = 40
 # 2.5 is a chosen heuristic with headroom, not a cited information-density
 # ratio -- an earlier version of this comment attributed it to CJK
