@@ -71,6 +71,26 @@
     return fetch(url, merged).finally(function () { clearTimeout(timer); });
   }
 
+  // The session's first backend call may be waiting out a cold container's
+  // model load; every later one talks to a warm process. One flat deadline
+  // cannot serve both -- sized for the warm case it aborts cold starts that
+  // would have succeeded, and sized for the cold case it makes a genuinely
+  // dead backend take over a minute to report. So: budget for the first,
+  // EMBED_TIMEOUT_MS thereafter. 75000 is a starting value, not a
+  // measurement -- functions/tencent/index.py's true cold start (three ONNX
+  // models plus the chunk index, loaded before the port even binds) has not
+  // been timed yet. Retune this one constant once it has been.
+  var COLD_START_BUDGET_MS = 75000;
+
+  function embedDeadline() {
+    return state.backendWarm ? EMBED_TIMEOUT_MS : COLD_START_BUDGET_MS;
+  }
+
+  // A slow first call is otherwise indistinguishable from a hung one --
+  // silent animated dots either way. Below this, send() swaps the thinking
+  // bubble's text to say the backend is waking up.
+  var WARMING_NOTICE_MS = 3000;
+
   // How long a failed /embed suppresses further backend attempts. This used to
   // be a sticky boolean: one SCF cold start that outlasted both attempts sent
   // every later question in the tab to the offline-model prompt for the rest
@@ -200,6 +220,10 @@
       clearLabel: 'Clear',
       clearTitle: 'Clear this conversation',
       interrupted: 'That answer didn\'t finish — the page changed while it was loading. Ask again?',
+      // No trailing ellipsis: the ycchat-dots class this bubble already has
+      // animates one via CSS ::after, so a string that also ends in one
+      // would render two.
+      warming: 'Waking the server up — the first question can take a moment',
     },
     zh: {
       askBtn: '✦ 问 AI',
@@ -233,6 +257,7 @@
       clearLabel: '清空',
       clearTitle: '清空当前对话',
       interrupted: '上一个回答没能完成 —— 加载过程中页面发生了跳转。要再问一次吗？',
+      warming: '正在唤醒服务器 —— 第一个问题可能需要等一会儿',
     },
   };
   function t(key) {
@@ -263,6 +288,8 @@
     loading: null, // Promise while core assets load
     extractorLoading: null, // Promise while the local model loads
     remoteEmbedDownAt: null, // ms timestamp of the last /embed give-up, or null
+    prewarmed: false, // prewarm() has fired this page load (at most once)
+    backendWarm: false, // a /embed has already succeeded this session -- embedDeadline() can stop budgeting for a cold start
     busy: false,
     session: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
     history: [], // [{role:'user'|'assistant', content}], alias of transcripts[role].history
@@ -483,12 +510,20 @@
     if (WORKER_URL && !remoteEmbedDown()) {
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
+          // Only the FIRST attempt may be waiting out a cold start -- if it
+          // burned the whole cold-start budget the container is either up
+          // by now or genuinely broken, and a second long wait buys nothing
+          // (see COLD_START_BUDGET_MS's comment for the cost of getting
+          // this wrong: applying it to both attempts turns a dead backend
+          // into a 150s wait before degraded mode).
+          var deadline = attempt === 0 ? embedDeadline() : EMBED_TIMEOUT_MS;
           var res = await fetchWithTimeout(WORKER_URL + '/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text, gate_text: gateText || text, gate_only: true }),
-          }, EMBED_TIMEOUT_MS);
+          }, deadline);
           if (res.ok) {
+            state.backendWarm = true; // this session's next call is talking to a warm process
             var data = await res.json();
             return { vector: null, gate: data.gate || null, rid: data.rid || null };
           }
@@ -1042,12 +1077,23 @@
       var record = { event: 'turn', role: state.role, question: question };
       var gateText = gateForm(question, stripped);
       var emb;
+      // A slow first call is otherwise indistinguishable from a hung one --
+      // tell the visitor rather than leave silent animated dots. Only
+      // scheduled when this session hasn't proven the backend warm yet;
+      // cleared in `finally` below however embedQuery settles, so the notice
+      // never lingers into the answer bubble.
+      var wakeTimer = null;
+      if (WORKER_URL && !state.backendWarm) {
+        wakeTimer = setTimeout(function () { thinking.textContent = t('warming'); }, WARMING_NOTICE_MS);
+      }
       try {
         emb = await embedQuery(question, gateText);
       } catch (embErr) {
         if (String(embErr && embErr.message).indexOf('embedding service unavailable') !== 0) throw embErr;
         await degradedTurn(question, stripped, thinking, record);
         return;
+      } finally {
+        clearTimeout(wakeTimer);
       }
       record.embed_rid = emb.rid || undefined; // correlate with the server /embed log
 
@@ -1238,12 +1284,31 @@
     });
   }
 
+  // Cold-start prewarm. functions/tencent/index.py's main() loads three ONNX
+  // models and the chunk index BEFORE binding its port, so the first request
+  // to a cold container waits out the whole load -- and Task 2's deadline
+  // would abort it, demoting the tab to the offline-model prompt for a backend
+  // that was only starting. Opening the panel is the earliest signal a
+  // question is coming; spend the visitor's role-picking time on the spin-up
+  // instead of their first question's. Nothing waits on this and failures are
+  // ignored -- it is a hint to the platform, not a request we need answered.
+  function prewarm() {
+    if (state.prewarmed || !WORKER_URL) return;
+    state.prewarmed = true;
+    try {
+      fetchWithTimeout(WORKER_URL + '/', { method: 'GET' }, COLD_START_BUDGET_MS)
+        .then(function (res) { if (res && res.ok) state.backendWarm = true; })
+        .catch(function () {});
+    } catch (e) { /* prewarming must never break the chat */ }
+  }
+
   function toggle() {
     if (!els.panel) buildPanel();
     state.open = !state.open;
     els.panel.style.display = state.open ? 'flex' : 'none';
     els.btn.setAttribute('aria-expanded', String(state.open));
     if (!state.open) return;
+    prewarm();
 
     if (!state.roles) {
       els.body.textContent = '';
