@@ -116,16 +116,33 @@ def load_page(path: Path, url: str, lang: str | None = None) -> list[Section]:
 
     # The authored <meta name="description"> is high-signal summary text
     # ("Portfolio of YC Wang — aspiring game developer with a background
-    # in ...") — indexing it makes broad questions like "who is YC" land.
+    # in ...") — indexing it makes broad questions like "who is YC" land, and
+    # it is what the backend's page-context injection puts first when a visitor
+    # asks about the page they are reading.
     # Anchor "top" is not a page-specific id -- most pages define no
     # id="top" element at all (3d-rendering.html and game-design-workshop.html
     # among them). Per the HTML spec, "#top" is a special fragment: the user
     # agent scrolls to the start of the document for it regardless of whether
     # a matching id exists, so the link stays valid on every page either way.
-    # It is English-only, so skip it when building a non-English index.
+    #
+    # Bilingual descriptions follow the site's own data-zh convention
+    # (scripts/i18n.js): English in content=, Chinese in data-zh. Read here
+    # rather than through _select_language, whose attribute folding only
+    # rewrites elements that have text of their own — <meta> is void.
+    #
+    # A zh build with no data-zh yields NO summary chunk, deliberately. Falling
+    # back to the English content= would put English text in the Chinese half
+    # of the index, where it muddies retrieval and the zh gate cannot judge it.
+    #
+    # Floor is _effective_length, not len(): 40 raw characters is a lot of
+    # Chinese (see that function's docstring), and a raw count would silently
+    # drop complete zh descriptions while admitting equally short English ones.
     meta = soup.find("meta", attrs={"name": "description"})
-    desc = (meta.get("content") or "").strip() if meta else ""
-    if len(desc) >= 40 and lang in (None, "en"):
+    desc = ""
+    if meta:
+        desc = (meta.get("data-zh") if lang == "zh" else meta.get("content")) or ""
+        desc = desc.strip()
+    if _effective_length(desc) >= _MIN_SECTION_LENGTH:
         sections.append(
             Section(url=url, anchor="top", page_title=page_title, section_title=page_title, text=desc)
         )

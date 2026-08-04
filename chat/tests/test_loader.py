@@ -157,3 +157,78 @@ def test_every_site_page_produces_a_summary_chunk() -> None:
     assert missing == [], (
         f"these pages have no <meta name=\"description\"> long enough to index: {missing}"
     )
+
+
+def test_a_zh_description_becomes_the_zh_summary_chunk(tmp_path) -> None:
+    """The Chinese index has never had per-page summary chunks: load_page
+    gated the meta description on lang in (None, "en")."""
+    from portfolio_rag.loader import load_page
+
+    page = tmp_path / "demo.html"
+    page.write_text(
+        '<html><head><title>Toolbox — YC</title>'
+        '<meta name="description" content="Small interactive tools built directly into this site."'
+        ' data-zh="网站里内置的两个小工具：一个可以调整词数和缩放的词云生成器，以及一个可以调整输出尺寸的二维码生成器。">'
+        "</head><body><main></main></body></html>",
+        encoding="utf-8",
+    )
+
+    zh = [s for s in load_page(page, "pages/demo.html", "zh") if s.anchor == "top"]
+    assert len(zh) == 1
+    assert zh[0].text.startswith("网站里内置的两个小工具")
+
+    en = [s for s in load_page(page, "pages/demo.html", "en") if s.anchor == "top"]
+    assert len(en) == 1
+    assert en[0].text == "Small interactive tools built directly into this site."
+
+
+def test_a_page_with_no_zh_description_yields_no_zh_summary(tmp_path) -> None:
+    """Falling back to content= would put English text in the Chinese half of
+    the index, where it muddies retrieval and the zh gate cannot judge it."""
+    from portfolio_rag.loader import load_page
+
+    page = tmp_path / "demo.html"
+    page.write_text(
+        '<html><head><title>Demo — YC</title>'
+        '<meta name="description" content="An English description that is comfortably past the floor.">'
+        "</head><body><main></main></body></html>",
+        encoding="utf-8",
+    )
+
+    assert [s for s in load_page(page, "pages/demo.html", "zh") if s.anchor == "top"] == []
+
+
+def test_a_short_chinese_description_clears_the_script_weighted_floor(tmp_path) -> None:
+    """40 RAW characters is a lot of Chinese. _effective_length already exists
+    for exactly this and was only wired into load_knowledge."""
+    from portfolio_rag.loader import load_page
+
+    zh_desc = "王元辰在南加州大学攻读计算机科学游戏开发方向硕士学位。"  # 25 ideographs, 26 chars
+    page = tmp_path / "demo.html"
+    page.write_text(
+        '<html><head><title>Education — YC</title>'
+        '<meta name="description" content="Academic background of Yuanchen Wang at USC and Harvard."'
+        f' data-zh="{zh_desc}">'
+        "</head><body><main></main></body></html>",
+        encoding="utf-8",
+    )
+
+    zh = [s for s in load_page(page, "pages/demo.html", "zh") if s.anchor == "top"]
+    assert len(zh) == 1, "a 26-character Chinese description must not be dropped by a 40-char floor"
+
+
+def test_no_meta_description_carries_data_en() -> None:
+    """scripts/i18n.js selects [data-en][data-zh] and assigns textContent,
+    which is meaningless on a void element. English lives in content=."""
+    import re
+
+    from portfolio_rag.config import settings
+
+    site_root = settings.site_root
+    offenders = []
+    for path in [site_root / "index.html"] + sorted((site_root / "pages").glob("*.html")):
+        for tag in re.findall(r"<meta[^>]*name=\"description\"[^>]*>", path.read_text(encoding="utf-8")):
+            if "data-en=" in tag:
+                offenders.append(path.name)
+
+    assert offenders == [], f"data-en on a <meta> tag will be textContent-swapped by i18n.js: {offenders}"
