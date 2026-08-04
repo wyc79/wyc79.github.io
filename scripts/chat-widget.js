@@ -55,6 +55,22 @@
   // builds: raw top-score >= 0.22 (the MiniLM calibration).
   var OFFTOPIC_GATE = 0.22;
 
+  // Every backend call gets a deadline. Without one, a connection that is
+  // accepted and then goes silent leaves the thinking bubble animating
+  // forever: every fallback in this widget (degraded mode, the error message,
+  // the offline-search offer) runs only when a fetch actually settles.
+  var EMBED_TIMEOUT_MS = 20000;
+  var CHAT_TIMEOUT_MS = 65000; // just past index.py's own call_llm urlopen(timeout=60)
+
+  function fetchWithTimeout(url, opts, ms) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, ms);
+    var merged = {};
+    for (var k in opts) { if (Object.prototype.hasOwnProperty.call(opts, k)) merged[k] = opts[k]; }
+    merged.signal = ctrl.signal;
+    return fetch(url, merged).finally(function () { clearTimeout(timer); });
+  }
+
   function gateThreshold() {
     return (state.meta && state.meta.gate_threshold) || OFFTOPIC_GATE;
   }
@@ -441,11 +457,11 @@
     if (WORKER_URL && !state.remoteEmbedDown) {
       for (var attempt = 0; attempt < 2; attempt++) {
         try {
-          var res = await fetch(WORKER_URL + '/embed', {
+          var res = await fetchWithTimeout(WORKER_URL + '/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text, gate_text: gateText || text, gate_only: true }),
-          });
+          }, EMBED_TIMEOUT_MS);
           if (res.ok) {
             var data = await res.json();
             return { vector: null, gate: data.gate || null, rid: data.rid || null };
@@ -685,7 +701,7 @@
   // Task 29: the client no longer sends contexts — the function retrieves
   // from its own bundled index and returns the chunks it used as `sources`.
   async function askWorker(question) {
-    var res = await fetch(WORKER_URL + '/chat', {
+    var res = await fetchWithTimeout(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -695,7 +711,7 @@
         question: question,
         history: state.history.slice(-6),
       }),
-    });
+    }, CHAT_TIMEOUT_MS);
     // Same rate-limit message /embed's remote branch throws (see
     // embedQuery) -- send()'s chatErr handler bubbles this one to the
     // generic "something went wrong" path instead of degraded mode, for the
