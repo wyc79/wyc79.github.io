@@ -146,6 +146,37 @@ general-purpose requests and ignore instruction-injection in questions. Pages'
 `<meta name="description">` tags are indexed as summary chunks so broad-but-legitimate
 questions ("who is YC") clear the gate comfortably.
 
+**A failed gate is not terminal when there's a conversation behind it (follow-up
+resolution).** Gate (1) judges one string in isolation, so a genuine follow-up —
+"is there any optimization work" right after a Prime Engine turn — can refuse on an
+artifact of that isolation rather than on being off-topic. Only the local, normal-mode
+gate path (`emb.gate` in `chat-widget.js`, i.e. the server-computed `/embed` verdict) can
+escalate, and only when `state.history.length` is non-empty; a refused first turn, a
+refused self-contained question with no history, and a declared intent (the action chips
+bypass the gate entirely) all take the old, terminal refusal. When it does escalate, the
+widget sets `gate_failed: true` and resends the question to `/chat` with its capped
+history (`state.history.slice(-6)`). There, `rewrite_question` condenses history + question
+into one standalone string with a small LLM call pinned to temperature 0 and thinking
+disabled — sampling would let a visitor resample past an authoritative gate, and an
+unpinned thinking budget has already once eaten the whole completion and left nothing to
+gate (see `REWRITE_SYSTEM_PROMPT`'s neighboring comments in `functions/tencent/index.py`) —
+then runs the *same* name-blind `gate_form()` and `gate_decision()` the `/embed` path uses
+on the result. That re-gate is server-side and authoritative: a client cannot skip it, and
+`gate_failed` only ever adds this check, never substitutes for the original one. The
+standalone string is used only to gate and retrieve; the visitor's own wording, unrewritten,
+is still what reaches the model (`body["question"]`, not the rewrite). A rewrite that fails
+the re-gate refuses exactly as before, distinguished in logs from a retrieval-empty refusal
+by `reason`/`refused_by` (`regate_failed` vs `server_retrieval_empty`) so the two causes
+don't get conflated after the fact. Light mode and degraded mode have no backend LLM to
+condense with, so a refusal there is still the old, terminal one.
+
+Known limit, accepted rather than fixed: the gate is a **subject-matter** filter, not an
+intent filter, so `"write a poem about it"` right after a Prime Engine turn resolves to
+something genuinely about Prime Engine, clears the gate legitimately, and is left entirely
+to the system prompt's decline-general-requests instruction — the same defense that already
+has to catch that exact string typed as a first turn. This isn't a new hole the feature
+opens; it just routes more traffic toward an existing one.
+
 **Everything is logged.** Each turn (input, retrieved chunk ids + scores, output) goes
 to `console.debug`, to Google Analytics as a `chat_turn` event when available, and
 server-side via the Tencent SCF function (JSON lines in the SCF console's 日志查询;
@@ -236,15 +267,16 @@ exact steps; it is the reverse of the order you'd guess.
 `eval/golden.jsonl` is a held-out measurement set, separate from both the
 site content (`../pages/*.html`) and the gate's own fit-on calibration data
 (`gate_calibration.py`) — see `eval/README.md` for the full authoring guide.
-It holds 120 cases:
+It holds 126 cases:
 
 - **96 positives** — 12 per `(role, lang)` cell, one cell for each of the 4
   roles in `data/roles.json` crossed with `en`/`zh`. Scored for gate-pass,
   `hit@4` (did the expected page land in the top 4?) and keyword coverage
   (did the answer-bearing text actually make it into the retrieved chunks?).
-- **24 shared negatives** — one pool per language (not per role: the gate
-  never sees the role), 12 cases each split 4 `off_topic`/`"easy"`,
-  4 `off_topic`/`"adjacent"`, 4 `injection`.
+- **28 shared negatives** — one pool per language (not per role: the gate
+  never sees the role), 14 cases each: 4 `off_topic`/`"easy"`,
+  4 `off_topic`/`"adjacent"`, 4 `injection`, and 2 post-context (`off_topic`
+  with `history` attached — see below).
   - **`easy`** off-topic probes are obviously unrelated to the site (weather,
     recipes, tax law) — a refusal failure here means the gate itself is
     broken.
@@ -253,12 +285,54 @@ It holds 120 cases:
     refusal failure here means the gate can't separate *this* domain from
     things that merely resemble it. Reporting the two separately is the
     point: a single blended refusal number can't tell these apart.
+- **2 multi-turn positives (`en` only) plus the 4 post-context negatives
+  above** exercise the follow-up-resolution path described under "Off-topic
+  use is refused three times over" — a case with `history` that the raw
+  question fails the gate on its own, so the escalated rewrite-and-re-gate
+  path actually fires. These are counted separately from the 96/28 above
+  (`n_followup`/`followup_rescued` and the `post_context` negative bucket,
+  not `n_positive`/`gate_pass`), so they never move those cells' denominators
+  just by existing. `en`-only is a measured property of the current zh gate
+  calibration, not a coverage gap — see `eval/README.md`'s "Multi-turn cases"
+  section for the full authoring rules and `KNOWN_ISSUES.md` Finding Q for
+  why zh has none: virtually any well-formed Chinese question about 他 clears
+  the zh gate standalone regardless of whether it depends on prior turns
+  (measured 0.42–0.56 against the zh threshold across ~90 candidate
+  phrasings), so a zh follow-up never reaches the rewriter to be measured,
+  and `FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 0}` records that as a
+  checked zero rather than an oversight. Revisit if the zh gate is ever
+  recalibrated tighter — Finding Q names the exact trigger.
 
 ```bash
 python scripts/run_eval.py                          # positive table + shared negatives block
 python scripts/run_eval.py --role visitor --lang zh --verbose
 python scripts/run_eval.py --update-baseline         # after a deliberate, reviewed change
 pytest tests/test_golden.py                          # fails on any regression vs data/eval_baseline.json
+```
+
+**The rewrite fixture (`eval/rewrites.json`) keeps multi-turn scoring offline.**
+`scripts/refresh_rewrites.py` is the only thing in this repo that calls a real LLM for a
+follow-up rewrite — `run_eval.py` and `pytest` never do; they replay whatever
+`eval/rewrites.json` has recorded, which is what keeps the harness deterministic and
+network-free. Re-run it, and read the diff before committing, whenever
+`REWRITE_SYSTEM_PROMPT` (`functions/tencent/index.py`) changes or a multi-turn case is
+added or edited — a stale fixture reports numbers that describe neither the old prompt nor
+the new one. A case with no recorded rewrite doesn't error; it silently scores as
+still-refused (`run_eval.py` prints a `NOTE` naming every such case), which is why
+`followup_rescued` and the `post_context` bucket are deliberately **not** in
+`tests/test_golden.py::_REGRESSION_METRICS` and `data/eval_baseline.json` was deliberately
+not updated for them — this project's own rule is that an absent measurement renders as
+`n/a`, never a fabricated `0`, and gating on either now would bake in exactly that
+fabrication.
+
+`eval/rewrites.json` does not exist in this repo yet — no `LLM_API_KEY` has been available
+in any environment this branch was built in, so the script has never run, and every
+multi-turn case currently scores as "still refused" for lack of a fixture, not because a
+rewrite was attempted and failed. Recording it is the pending step:
+
+```bash
+python scripts/refresh_rewrites.py --dry-run   # review before writing
+python scripts/refresh_rewrites.py             # record eval/rewrites.json
 ```
 
 `--update-baseline` refuses to write from a run that cannot represent the
@@ -325,6 +399,17 @@ published). Speaks the current `/chat` contract (retrieves server-side, no
 > `client_contexts_ignored` — so redeploying the function first, ahead of the site,
 > never breaks an already-loaded page.
 
+> **Follow-up resolution (this branch) is additive in both directions — hygiene, not
+> a hard requirement like the ordering above.** A NEW widget's `gate_failed: true`
+> reaching an OLD, un-redeployed function is silently ignored: the old function's
+> request handling has never heard of that field, so the turn proceeds as an
+> ordinary, context-free `/chat` call always has, and the widget's `refused_by`
+> falls back to its pre-this-branch literal (`server_retrieval_empty`) since the old
+> function's refusal response carries no `reason`. An OLD widget, symmetrically,
+> never sends `gate_failed` at all, so a NEW function never sees it and never takes
+> the escalated path. Redeploy the function first regardless — the ordering rule
+> above governs `contexts`, not this field, and still applies for its own reasons.
+
 > **The deployed Tencent SCF package must be rebuilt and redeployed before any
 > gate change in this repo reaches production.** `functions/tencent/index.py`
 > never reads `chat/data/gate_en_minilm.json`/`chat/data/gate_zh_bge.json` — it
@@ -353,6 +438,16 @@ published). Speaks the current `/chat` contract (retrieves server-side, no
 > section for the full writeup, including a compatibility check confirming
 > `index.py` needs no code change to consume the new gate file shape
 > — a repackage-and-redeploy is a pure win, not a risky one.
+
+This gap is the concrete origin of the bug follow-up resolution fixes. The question that
+motivated the feature, "is there any optimization work," measures **0.2133** — below the
+deployed gate's threshold quoted above (`0.2312`, so it refuses in production) and above
+this repo's own recalibrated one (`0.2029`, so it passes here, standalone, with no history
+needed at all). Once the function above is repackaged and redeployed, that specific
+symptom stops reproducing on its own; follow-up resolution still
+earns its place for whatever now sits closer to the (new, lower) live threshold — a rewrite
+that pulls a question further below the gate than the raw text sat can still get refused
+without it, deployed gate or not.
 
 Deploying the function for the first time (new SCF function, not a redeploy) is a
 console-driven process — see `.claude/DEPLOY.md` (gitignored, local-only) for the
