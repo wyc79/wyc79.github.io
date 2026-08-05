@@ -85,3 +85,52 @@ def test_every_zh_role_starter_passes_the_gate(rt) -> None:
         if not gate_passes(starter, rt)
     ]
     assert not failures, f"zh starters refused by the gate: {failures}"
+
+
+DEICTIC_EN = [
+    "summarize this page",
+    "what is this page about",
+    "tell me about the current page",
+]
+DEICTIC_ZH = [
+    "总结一下这个页面",
+    "这个页面讲了什么",
+    "介绍一下当前页面",
+]
+
+
+@pytest.mark.parametrize("question", DEICTIC_EN)
+def test_a_deictic_question_clears_the_en_gate(question: str, rt) -> None:
+    """Page-awareness is reached only if the question survives /embed's gate,
+    and a deictic question names no topic — so it sits far lower than an
+    ordinary one. Measured before knowledge/about_en.md gained its
+    "currently reading" sections: "summarize this page" scored 0.2796 against
+    a 0.2029 threshold, a 0.077 cushion on a gate whose own calibration margin
+    is 1.7%. Nothing tested it, so an unrelated reword of about_en.md could
+    have blocked the feature's whole reason for existing without any test
+    going red (see eval/KNOWN_ISSUES.md finding O — that file's wording moves
+    the threshold as directly as editing the threshold would)."""
+    d = rt.gate(question)
+    assert d.passed, (
+        f"{question!r} was blocked by the en gate (value {d.value}, threshold "
+        f"{rt.gate_meta['en']['threshold']}) — page-awareness is unreachable "
+        f"for this phrasing; check about_en.md's 'currently reading' sections"
+    )
+
+
+@pytest.mark.skipif(
+    not (settings.chat_root / "data" / "gate_zh_bge.json").exists(),
+    reason="no zh gate bundle built here (gate_zh_bge.json is gitignored)",
+)
+@pytest.mark.parametrize("question", DEICTIC_ZH)
+def test_a_deictic_question_clears_the_zh_gate(question: str, rt) -> None:
+    """The zh half of the same guarantee. Chinese has more headroom than
+    English did (0.55 against a 0.3979 threshold), so this is symmetry
+    insurance rather than a fix for a live problem — but the two gates are
+    calibrated independently against different corpora and different models,
+    so headroom on one side says nothing about the other."""
+    d = rt.gate(question)
+    assert d.passed, (
+        f"{question!r} was blocked by the zh gate (value {d.value}, threshold "
+        f"{rt.gate_meta['zh']['threshold']})"
+    )

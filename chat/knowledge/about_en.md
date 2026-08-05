@@ -383,3 +383,11 @@ at the University of Rochester.
 link: pages/gyrotris.html
 Gyrotris, the puzzle game he built solo, is published and playable on
 itch.io.
+
+## Questions about the page you are currently reading
+link: index.html
+Visitors often ask about the page in front of them: summarize this page, what
+is this page about, or tell me about the current page. Each project page on
+this site covers one piece of work — what it is, why it was built, and how it
+was implemented. The chat widget is told which page the visitor is reading and
+answers such questions from that page's own content.
