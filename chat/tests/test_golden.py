@@ -14,6 +14,7 @@ from portfolio_rag.evaluation import (
     ADJACENCY,
     BASELINE_PATH,
     CASE_TYPES,
+    FOLLOWUP_POSITIVES_PER_LANG,
     GOLDEN_PATH,
     NEGATIVES_PER_LANG,
     POSITIVES_PER_CELL,
@@ -124,10 +125,20 @@ def test_cases_are_disjoint_from_fit_data(cases) -> None:
 
 def test_positive_cells_have_the_right_composition(cases) -> None:
     """Checks every positive cell PRESENT in the file, so the suite stays
-    green while the dataset is being built out cell by cell."""
+    green while the dataset is being built out cell by cell.
+
+    History-bearing (multi-turn "follow-up") cases are excluded from this
+    count -- they measure the escalated rewrite-and-regate path, not
+    retrieval-in-isolation, so folding one in would silently grow a cell's
+    hit@4/keyword-coverage denominator for a reason that has nothing to do
+    with retrieval quality (see evaluation.FOLLOWUP_POSITIVES_PER_LANG's
+    comment). They are not merely exempted, though: see
+    test_followup_positive_pool_has_the_right_composition below, which holds
+    them to their own declared quota so this exemption can't quietly become
+    an unbounded, unbalanced pile of follow-up cases in one cell."""
     by_cell: dict[str, Counter] = {}
     for c in cases:
-        if c.type == "positive":
+        if c.type == "positive" and not c.history:
             by_cell.setdefault(c.cell, Counter())["positive"] += 1
     wrong = {
         cell: dict(counts)
@@ -137,20 +148,55 @@ def test_positive_cells_have_the_right_composition(cases) -> None:
     assert not wrong, f"positive cells with the wrong count (want {POSITIVES_PER_CELL}): {wrong}"
 
 
+def test_followup_positive_pool_has_the_right_composition(cases) -> None:
+    """The declared quota multi-turn positives are held to, in place of the
+    POSITIVES_PER_CELL count the composition test above excludes them from --
+    same "declared, not silently unprotected" contract as
+    NEGATIVES_PER_LANG's post_context entry. Without this, a case dropped
+    into one cell's history-bearing pile with no balance check of its own
+    could grow without bound and no test would notice.
+
+    FOLLOWUP_POSITIVES_PER_LANG is a per-language MAPPING, not a scalar,
+    because the languages are not symmetric here: zh is declared 0 by
+    measured finding, not omitted by oversight (see the constant's own
+    comment and KNOWN_ISSUES.md Finding Q). Asserting the full mapping,
+    including its zero, means a zh follow-up positive added later must
+    also update this constant to justify itself -- the zero is enforced,
+    not merely documented."""
+    by_lang = Counter(c.lang for c in cases if c.type == "positive" and c.history)
+    got = {lang: by_lang.get(lang, 0) for lang in FOLLOWUP_POSITIVES_PER_LANG}
+    assert got == FOLLOWUP_POSITIVES_PER_LANG, (
+        f"follow-up positive pool composition (want {FOLLOWUP_POSITIVES_PER_LANG}): {got}"
+    )
+    undeclared = set(by_lang) - set(FOLLOWUP_POSITIVES_PER_LANG)
+    assert not undeclared, f"follow-up positives for an undeclared language: {undeclared}"
+
+
 def test_shared_negative_pool_has_the_right_composition(cases) -> None:
     """Negatives share ONE pool per language, keyed by SHARED_ROLE, split by
-    off_topic's adjacency (easy/adjacent) plus injection. An off_topic case
-    with no valid adjacency buckets under 'off_topic_' + whatever it carries,
-    which cannot match NEGATIVES_PER_LANG and so surfaces as a failure instead
-    of silently miscounting. (load_cases now rejects that case outright, so
-    this is the second line of defence rather than the first -- it still fires
-    on a case constructed directly in a test, bypassing the loader.)"""
+    off_topic's adjacency (easy/adjacent), injection, and -- ahead of both,
+    mirroring evaluation.aggregate()'s own bucket selection -- whether a
+    conversation precedes the question (post_context). A post-context
+    negative tests a different failure mode (the rewriter smuggling context
+    into a question that should still be refused) than plain adjacency does,
+    so it must not be silently absorbed into off_topic_easy/adjacent's count.
+    An off_topic case with no valid adjacency buckets under 'off_topic_' +
+    whatever it carries, which cannot match NEGATIVES_PER_LANG and so
+    surfaces as a failure instead of silently miscounting. (load_cases now
+    rejects that case outright, so this is the second line of defence rather
+    than the first -- it still fires on a case constructed directly in a
+    test, bypassing the loader.)"""
     by_lang: dict[str, Counter] = {}
     for c in cases:
         if c.type == "positive":
             continue
         assert c.cell == f"{SHARED_ROLE}/{c.lang}", f"{c.id}: negative not keyed to the shared pool"
-        bucket = "injection" if c.type == "injection" else f"off_topic_{c.adjacency}"
+        if c.type == "injection":
+            bucket = "injection"
+        elif c.history:
+            bucket = "post_context"
+        else:
+            bucket = f"off_topic_{c.adjacency}"
         by_lang.setdefault(c.lang, Counter())[bucket] += 1
     wrong = {
         lang: dict(counts)
@@ -568,3 +614,160 @@ def test_load_rewrites_of_an_absent_file_is_empty(tmp_path) -> None:
     from portfolio_rag.evaluation import load_rewrites
 
     assert load_rewrites(tmp_path / "nope.json") == {}
+
+
+# --- Task 9: follow-up rescue and post-context refusal metrics --------------
+
+
+def test_followup_rescue_is_counted_only_for_multi_turn_positives() -> None:
+    """A multi-turn positive counts ONLY toward n_followup/followup_rescued,
+    never toward n_positive (or gate_pass/hit_at_4/keywords_*, exercised
+    directly by test_followup_positives_do_not_contaminate_single_turn_metrics
+    below). Folding it into n_positive too would grow that cell's hit@4 and
+    keyword-coverage DENOMINATOR every time a follow-up case is added, which
+    is exactly the contamination this task's own review caught empirically:
+    adding four follow-up positives moved two existing cells'
+    keyword_coverage against an unchanged baseline, with no change to either
+    cell's single-turn cases."""
+    from portfolio_rag.evaluation import CaseResult, GoldenCase, aggregate
+
+    single = GoldenCase(id="a", role="visitor", lang="en", type="positive", q="q",
+                        expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+    multi = GoldenCase(id="b", role="visitor", lang="en", type="positive", q="q",
+                       history=(("user", "u"), ("assistant", "a")),
+                       expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+    results = [
+        CaseResult(case=single, gate_passed=True, gate_value=0.4, gate_available=True,
+                   hit=True, top_urls=(), top_scores=()),
+        CaseResult(case=multi, gate_passed=True, gate_value=0.4, gate_available=True,
+                   hit=True, top_urls=(), top_scores=(), rescued=True),
+    ]
+
+    cell = aggregate(results)["visitor/en"]
+
+    assert cell["n_positive"] == 1, "the multi-turn case must not inflate n_positive"
+    assert cell["n_followup"] == 1, "only the multi-turn case counts toward rescue"
+    assert cell["followup_rescued"] == 1
+
+
+def test_followup_positives_do_not_contaminate_single_turn_metrics() -> None:
+    """Direct behavioural proof, not just n_positive: a multi-turn positive
+    that GATE-PASSES and HITS on its own (i.e. would inflate every single-turn
+    metric if it were folded in) must move none of gate_pass/hit_at_4/
+    hit_at_4_page_only/keywords_found/keywords_total/retrieved_langs -- only
+    n_followup/followup_rescued."""
+    from portfolio_rag.evaluation import CaseResult, GoldenCase, aggregate
+
+    single = GoldenCase(id="a", role="visitor", lang="en", type="positive", q="q",
+                        expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+    multi = GoldenCase(id="b", role="visitor", lang="en", type="positive", q="q",
+                       history=(("user", "u"), ("assistant", "a")),
+                       expected_urls=("pages/skills.html",), expected_keywords=("UE5", "Godot"))
+    only_single = aggregate([
+        CaseResult(case=single, gate_passed=True, gate_value=0.4, gate_available=True,
+                   hit=True, top_urls=("pages/skills.html",), top_scores=(0.9,),
+                   keywords_found=("UE5",), retrieved_langs={"en": 1}),
+    ])["visitor/en"]
+    with_multi = aggregate([
+        CaseResult(case=single, gate_passed=True, gate_value=0.4, gate_available=True,
+                   hit=True, top_urls=("pages/skills.html",), top_scores=(0.9,),
+                   keywords_found=("UE5",), retrieved_langs={"en": 1}),
+        CaseResult(case=multi, gate_passed=True, gate_value=0.4, gate_available=True,
+                   hit=True, top_urls=("pages/skills.html",), top_scores=(0.9,),
+                   keywords_found=("UE5", "Godot"), retrieved_langs={"en": 1}, rescued=True),
+    ])["visitor/en"]
+
+    for metric in ("gate_pass", "hit_at_4", "hit_at_4_page_only",
+                   "keywords_found", "keywords_total", "retrieved_langs"):
+        assert with_multi[metric] == only_single[metric], (
+            f"{metric} moved from {only_single[metric]} to {with_multi[metric]} "
+            "when a follow-up positive was added -- it must be invisible to "
+            "every single-turn metric"
+        )
+    assert with_multi["n_followup"] == 1 and with_multi["followup_rescued"] == 1
+
+
+def test_a_post_context_negative_gets_its_own_bucket() -> None:
+    """Bucketed by whether it has history, NOT by adjacency: adjacency measures
+    how close the QUESTION is to the domain, which is orthogonal to whether the
+    conversation could lend it topicality. Blending them would hide exactly the
+    regression this bucket exists to catch."""
+    from portfolio_rag.evaluation import CaseResult, GoldenCase, aggregate
+
+    easy = GoldenCase(id="n1", role="shared", lang="en", type="off_topic",
+                      adjacency="easy", q="what's the weather")
+    post = GoldenCase(id="n2", role="shared", lang="en", type="off_topic",
+                      adjacency="easy", q="write me a poem",
+                      history=(("user", "tell me about prime engine"), ("assistant", "...")))
+    results = [
+        CaseResult(case=easy, gate_passed=False, gate_value=0.1, gate_available=True,
+                   hit=None, top_urls=(), top_scores=()),
+        CaseResult(case=post, gate_passed=False, gate_value=0.1, gate_available=True,
+                   hit=None, top_urls=(), top_scores=()),
+    ]
+
+    cell = aggregate(results)["shared/en"]
+
+    assert cell["n_easy"] == 1 and cell["refusal_easy"] == 1
+    assert cell["n_post_context"] == 1 and cell["refusal_post_context"] == 1
+
+
+def test_a_post_context_negative_that_passes_is_counted_as_a_failure_to_refuse() -> None:
+    """The sticky-gate regression, stated as an assertion: if the rewriter
+    lends a weather question Prime Engine's topicality, this number drops."""
+    from portfolio_rag.evaluation import CaseResult, GoldenCase, aggregate
+
+    post = GoldenCase(id="n2", role="shared", lang="en", type="off_topic",
+                      adjacency="easy", q="write me a poem",
+                      history=(("user", "tell me about prime engine"), ("assistant", "...")))
+    results = [CaseResult(case=post, gate_passed=True, gate_value=0.4, gate_available=True,
+                          hit=None, top_urls=(), top_scores=())]
+
+    cell = aggregate(results)["shared/en"]
+
+    assert cell["n_post_context"] == 1
+    assert cell["refusal_post_context"] == 0
+
+
+def test_a_replayed_rewrite_that_clears_the_gate_is_scored_as_a_rescue(rt) -> None:
+    """Task 8's four score_case tests (above) never exercise a SUCCESSFUL
+    replay: every one of them asserts an ABSENCE (rewrite_used is None, or the
+    gate stays refused). Neutering the consultation block outright --
+    `if case.history and not decision.passed:` replaced with
+    `if False and ...` -- still leaves all four green. This closes that gap.
+
+    No real fixture is needed: score_case never calls an LLM itself, it only
+    replays whatever `rewrites` hands it, so a hand-written dict exercises
+    exactly the same replay code a real chat/eval/rewrites.json entry would.
+    Mirrors golden.jsonl's real followup-en-01 case, whose whole premise is
+    that the raw question cannot stand alone -- verified below rather than
+    assumed, so a future gate recalibration that happens to let it through
+    fails loudly here instead of silently invalidating the test.
+    """
+    from portfolio_rag.evaluation import GoldenCase, score_case
+
+    case = GoldenCase(
+        id="followup-en-01", role="client_dev_recruiter", lang="en", type="positive",
+        q="what about tuning it",
+        history=(("user", "tell me about prime engine"),
+                  ("assistant", "Prime Engine is a custom C++ rendering engine he built.")),
+        expected_urls=("pages/prime-engine.html",), expected_keywords=("Prime Engine",),
+    )
+    rewrite = "Is there any tuning or optimization work on Prime Engine?"
+
+    raw = score_case(rt, case)
+    assert not raw.gate_passed, (
+        "fixture assumption: the raw follow-up must fail the gate on its own "
+        "or this test cannot distinguish a real rescue from a case that never "
+        "needed one -- see followup-en-01's note in golden.jsonl"
+    )
+
+    result = score_case(rt, case, rewrites={case.id: rewrite})
+
+    assert result.rewrite_used == rewrite
+    assert result.gate_passed, "the replayed rewrite should clear the gate"
+    assert result.top_urls != raw.top_urls, (
+        "retrieval must actually be re-run against the rewrite, not just labeled"
+    )
+    assert result.hit, "the replayed rewrite's retrieval should land the expected page"
+    assert result.rescued is True

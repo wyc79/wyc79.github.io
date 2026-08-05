@@ -41,13 +41,19 @@ def _load_run_eval():
 
 
 class _StubCase:
-    """Only the three fields main()'s --role/--lang filter reads. Chosen to
-    MATCH both filters, so a filtered run still reaches the --update-baseline
-    block instead of exiting early at "no cases matched the filter"."""
+    """Only the fields main() reads: type/role/lang for the --role/--lang
+    filter (chosen to MATCH both, so a filtered run still reaches the
+    --update-baseline block instead of exiting early at "no cases matched
+    the filter"), plus id/history for the task-9 missing-rewrites check
+    main() now runs on every `selected` case. history=() means this stub
+    is never treated as a multi-turn case, so it never appears in that
+    check's `missing` list."""
 
     type = "positive"
     role = "combat_design_recruiter"
     lang = "en"
+    id = "stub"
+    history = ()
 
 
 class _StubRuntime:
@@ -67,7 +73,11 @@ def _stub_pipeline(mod, monkeypatch, tmp_path: Path, stale: set[str]) -> Path:
     monkeypatch.setattr(mod, "BASELINE_PATH", baseline)
     monkeypatch.setattr(mod, "load_runtime", lambda: _StubRuntime(stale))
     monkeypatch.setattr(mod, "load_cases", lambda path: [_StubCase()])
-    monkeypatch.setattr(mod, "run_cases", lambda rt, cases: [])
+    # load_rewrites/run_cases stubbed explicitly rather than relying on the
+    # real load_rewrites() incidentally returning {} for a missing file --
+    # this module's docstring promises "nothing real is read or written".
+    monkeypatch.setattr(mod, "load_rewrites", lambda: {})
+    monkeypatch.setattr(mod, "run_cases", lambda rt, cases, rewrites=None: [])
     monkeypatch.setattr(mod, "aggregate", lambda results: {})
     monkeypatch.setattr(mod, "build_baseline", lambda rt, cells: {"stub": True})
     return baseline

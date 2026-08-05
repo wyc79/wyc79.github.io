@@ -16,7 +16,7 @@ import sys
 
 from portfolio_rag.evaluation import (
     BASELINE_PATH, GOLDEN_PATH, SHARED_ROLE, aggregate, build_baseline, format_margin,
-    load_cases, run_cases,
+    load_cases, load_rewrites, run_cases,
 )
 from portfolio_rag.runtime import load_runtime
 
@@ -94,24 +94,28 @@ def print_positive_table(cells: dict) -> None:
 
 
 def print_shared_table(cells: dict) -> None:
-    """shared/lang cells: refusal broken out by adjacency bucket. Never
-    blended with the positive table above, and the three buckets are never
-    blended with each other -- a gate that refuses easy off-topic but not
-    adjacent off-topic is broken in a completely different way than one that
-    refuses nothing."""
+    """shared/lang cells: refusal broken out by bucket. Never blended with the
+    positive table above, and the four buckets are never blended with each
+    other -- a gate that refuses easy off-topic but not adjacent off-topic is
+    broken in a completely different way than one that refuses nothing, and a
+    post-context refusal failure (task 9) means the REWRITER is smuggling
+    conversational context into a question that should still be refused,
+    which is a different failure again from the raw gate missing an easy or
+    adjacent probe."""
     print(f"\n{'shared negatives':<16} {'off_topic/easy':>16} {'off_topic/adjacent':>20} "
-          f"{'injection':>12}")
-    print("-" * 68)
+          f"{'injection':>12} {'post_context':>14}")
+    print("-" * 83)
     for name in sorted(cells):
         c = cells[name]
         if c["gate_available"]:
             easy = f"{c['refusal_easy']}/{c['n_easy']}"
             adjacent = f"{c['refusal_adjacent']}/{c['n_adjacent']}"
             injection = f"{c['refusal_injection']}/{c['n_injection']}"
+            post_context = f"{c['refusal_post_context']}/{c['n_post_context']}"
         else:
-            easy = adjacent = injection = "n/a"
-        print(f"{c['lang']:<16} {easy:>16} {adjacent:>20} {injection:>12}")
-    print("-" * 68)
+            easy = adjacent = injection = post_context = "n/a"
+        print(f"{c['lang']:<16} {easy:>16} {adjacent:>20} {injection:>12} {post_context:>14}")
+    print("-" * 83)
 
 
 def print_verbose(results: list) -> None:
@@ -190,7 +194,12 @@ def main() -> int:
         print("no cases matched the filter", file=sys.stderr)
         return 2
 
-    results = run_cases(rt, selected)
+    # Loaded unconditionally (empty dict when the fixture is absent, e.g. this
+    # branch's own dry runs -- see load_rewrites) so run_eval.py stays
+    # offline/deterministic either way: a missing rewrites.json scores every
+    # multi-turn case as still-refused rather than skipping the replay.
+    rewrites = load_rewrites()
+    results = run_cases(rt, selected, rewrites)
     cells = aggregate(results)
     positive_cells = {k: v for k, v in cells.items() if v["role"] != SHARED_ROLE}
     shared_cells = {k: v for k, v in cells.items() if v["role"] == SHARED_ROLE}
@@ -208,11 +217,29 @@ def main() -> int:
         print("\nMetrics are reported side by side on purpose -- a blended score cannot")
         print("distinguish a gate problem from a retrieval problem, and hit@4 passing")
         print("while keywords fail means the right PAGE came back with the wrong chunk.")
-        print("The shared negatives block is never blended with positives, and its three")
-        print("adjacency buckets are never blended with each other -- see eval/README.md.")
+        print("The shared negatives block is never blended with positives, and its four")
+        print("buckets are never blended with each other -- see eval/README.md.")
         print("hit@4(pg) excludes chat/knowledge/*.md's curated sections from retrieval --")
         print("a gap between hit@4 and hit@4(pg) means the corpus, not the site's own")
         print("pages, is answering the question (task 24 review, Critical 1).\n")
+
+        # Task 9: multi-turn positives are excluded from the positive table's
+        # gate/hit@4/keyword columns entirely (aggregate() counts them only
+        # toward n_followup/followup_rescued, never n_positive -- see its
+        # comment) and reported here instead, so a cell's single-turn numbers
+        # never move just because a follow-up case was added to it.
+        followup_cells = {k: c for k, c in cells.items() if c.get("n_followup")}
+        if followup_cells:
+            print("follow-up resolution (multi-turn positives)")
+            for name, c in sorted(followup_cells.items()):
+                print(f"  {name:<28} rescued {c['followup_rescued']}/{c['n_followup']}")
+        missing = [c.id for c in selected if c.history and c.id not in rewrites]
+        if missing:
+            print(
+                f"\n  NOTE: {len(missing)} multi-turn case(s) have no recorded rewrite "
+                f"and scored as still-refused: {missing}\n"
+                "  Run scripts/refresh_rewrites.py to record them."
+            )
 
     if args.update_baseline:
         if args.role or args.lang:

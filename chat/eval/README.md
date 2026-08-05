@@ -31,16 +31,36 @@ One JSON object per line. Adding a case is a one-line diff.
 | `expected_urls` | positives only | site-relative page paths; a hit is a non-empty intersection with the top-4 |
 | `expected_keywords` | positives only | 1–4 terms that must appear in the retrieved text; scored as coverage |
 | `adjacency` | `off_topic` only | `"easy"` or `"adjacent"` — how close the probe sits to the site's domain. Empty on `positive` and `injection` (an injection is always adjacent by design: it is worded to look on-topic) |
+| `history` | no | prior conversation turns, `[{"role": "user"/"assistant", "content": "..."}, ...]`. Empty (or omitted) for the single-turn cases that make up most of the set. See "Multi-turn cases" below. |
 | `note` | no | why this case exists |
 
 **Positives are per (role, lang).** Every `(role, lang)` cell holds exactly
-12 `positive` cases — one cell per role in `roles.json` crossed with `en`/`zh`.
+12 `positive` cases with no `history` (`POSITIVES_PER_CELL` in
+`evaluation.py`) — one cell per role in `roles.json` crossed with `en`/`zh`.
+Multi-turn positives (see below) are **not** part of this count — they are
+excluded from it deliberately, both in the dataset invariant
+(`test_positive_cells_have_the_right_composition`) and in
+`evaluation.aggregate()`'s runtime counting, and are held to their own
+separate, per-language quota instead (`FOLLOWUP_POSITIVES_PER_LANG` in
+`evaluation.py`, a mapping — currently `{"en": 2, "zh": 0}`, enforced by
+`test_followup_positive_pool_has_the_right_composition`). **zh is a declared
+zero, not a missing case:** at this project's current zh gate calibration,
+essentially any natural, well-formed Chinese question about 他 clears the
+threshold standing alone (measured 0.42–0.56 against threshold 0.3979 across
+~90 candidate phrasings), so a zh follow-up is never refused and the
+rewrite-and-rescue path it would test never fires — follow-up refusal is an
+EN phenomenon at current calibration. See `KNOWN_ISSUES.md` Finding Q for the
+full evidence, and its trigger condition for revisiting this (a tighter zh
+gate recalibration).
 
 **Negatives are one shared pool per language**, not per role: the gate either
 refuses off-domain and injected probes or it doesn't, and that has nothing to
 do with which role's system prompt is loaded. Each language's pool holds
-exactly 4 `off_topic` tagged `"easy"`, 4 `off_topic` tagged `"adjacent"`, and
-4 `injection` (`NEGATIVES_PER_LANG` in `evaluation.py`).
+exactly 4 `off_topic` tagged `"easy"`, 4 `off_topic` tagged `"adjacent"`, 4
+`injection`, and 2 post-context negatives (`off_topic` with `history` — see
+below) (`NEGATIVES_PER_LANG` in `evaluation.py`). A negative with `history` is
+bucketed as `post_context` regardless of its `adjacency` tag — see "Multi-turn
+cases" below for why.
 
 `adjacency` splits `off_topic` into two questions that demand opposite fixes:
 
@@ -110,6 +130,85 @@ edge is ASCII alphanumeric, so `AI` will not match inside "available" while
    picking the easy bucket for a case that's actually adjacent (or vice
    versa) quietly corrupts that signal instead of raising a visible error.
 
+## Multi-turn cases (Task 9)
+
+A case with `history` exercises the *escalated follow-up path*: the widget
+condenses the conversation plus the new question into a standalone rewrite,
+but only after the raw question, judged alone, fails the off-topic gate — a
+follow-up that clears the gate on its own never reaches the rewriter, in
+production or in `score_case`'s replay of it. `history` is a list of
+`{"role": "user"/"assistant", "content": "..."}` turns and must **alternate,
+start on `user`, and end on `assistant`** — the widget's own conversation
+state is only ever appended to in user/assistant pairs, so a case whose
+history could not have come from a real session is rejected by `load_cases`
+rather than silently accepted.
+
+**Rewrites are recorded, not called live.** `chat/eval/rewrites.json` (case
+id → the recorded standalone rewrite) is written *only* by
+`scripts/refresh_rewrites.py`, the one thing in this repo that calls a real
+LLM for a rewrite. `run_eval.py` and `pytest` replay that recorded fixture
+instead — never the live model — which is what keeps the harness
+deterministic and network-free. **Re-run `refresh_rewrites.py` whenever
+`REWRITE_SYSTEM_PROMPT` (in `functions/tencent/index.py`) changes, or
+whenever a multi-turn case is added or edited**, and read the diff before
+committing: a rewrite that starts smuggling a project name into an
+off-topic follow-up is exactly the regression the post-context negatives
+below exist to catch, and it shows up in that diff first, in plain text. A
+case added without a matching `rewrites.json` entry does not error — it
+silently scores as still-refused (an absent measurement, never a fabricated
+pass; see `load_rewrites`'s docstring) — so `run_eval.py` prints a `NOTE`
+naming every multi-turn case with no recorded rewrite, on every run where
+one exists.
+
+**A good multi-turn positive is a question that genuinely cannot stand
+alone.** The raw `q`, judged with no conversation behind it, must fail the
+gate — if it passes on its own, `history` is decorative and the case is
+measuring nothing about the rewrite path (this is checkable offline with
+`rt.gate(case.q)`, no fixture needed, and was the concrete failure mode Task
+9 found empirically: several natural-sounding follow-up phrasings — elided
+arguments like "is there any optimization work," dangling pronouns like "how
+was it tested" — turned out to pass the gate standing alone against this
+project's live, calibrated gate, even though an equivalent-sounding
+production symptom had failed against an older deployed gate at a different
+threshold over a different corpus; see `KNOWN_ISSUES.md` Finding A). A
+hand-written *resolved* form — what a correct rewriter should produce — must
+both pass the gate and retrieve `expected_urls`/`expected_keywords`; verify
+both before recording the real fixture, so a broken case is caught before it
+ever reaches `refresh_rewrites.py`.
+
+**A good post-context negative is a question with nothing to resolve, paired
+with on-topic history.** The point is *echo-and-refuse*: a correct rewriter
+adds nothing (there is no dangling reference to resolve — "make up a poem for
+me" after a Prime Engine question is just as off-topic as it would be with no
+history at all), so the resolved form is the same text and must still fail
+the gate, exactly like the raw form. **The regression this case exists to
+catch is a rewrite that resolves it anyway** — if a rewriter turns "make up a
+poem for me" into "write a poem about Prime Engine" because Prime Engine was
+mentioned one turn earlier, the gate now has real, on-topic-sounding text to
+pass, and the off-topic gate has effectively gone permanently open for the
+rest of that conversation. Like multi-turn positives, the raw `q` must fail
+the gate on its own — otherwise the escalated path never fires and the case
+never exercises the rewriter at all — so verify with `rt.gate(case.q)` before
+committing, not after.
+
+`evaluation.aggregate()` reports multi-turn cases in dedicated cells, never
+blended with the single-turn numbers: positive cells gain `n_followup` /
+`followup_rescued` (a rescue requires a REPLAYED rewrite — one the raw
+question actually needed — to both clear the gate and land the expected page;
+see `CaseResult.rescued`'s docstring), and shared negative cells gain a fourth
+bucket, `post_context`, alongside `easy`/`adjacent`/`injection` — bucketed by
+whether the case carries `history`, ahead of `adjacency`, because a
+post-context regression is a different failure (the rewriter leaking context)
+than an adjacency one (the raw gate itself failing to separate the domain)
+and averaging them into the `easy`/`adjacent` numbers would hide exactly the
+regression this bucket exists to catch. Multi-turn positives are *excluded*
+from `n_positive`/`gate_pass`/`hit_at_4`/`hit_at_4_page_only`/
+`keywords_found`/`keywords_total`/`retrieved_langs` entirely — folding them in
+would grow those cells' denominators every time a follow-up case is added,
+moving numbers for cells the case was never meant to touch. A follow-up's
+retrieval quality is already captured by `rescued`, which requires landing
+the expected page.
+
 ## Running
 
 ```bash
@@ -125,11 +224,15 @@ Both refusals exist because the baseline is what `test_no_metric_regressed`
 compares against: a baseline captured from a state that does not represent the
 system silently re-anchors the regression gate.
 
-The table prints two blocks that are never blended into each other: a
+The table prints blocks that are never blended into each other: a
 per-`(role, lang)` positive-cell table (gate-pass, `hit@4`, keyword coverage,
-retrieved languages), then a shared-negatives block with one row per
-language showing `off_topic/easy`, `off_topic/adjacent` and `injection`
-refusal counts side by side.
+retrieved languages — single-turn cases only, see "Multi-turn cases" above),
+a shared-negatives block with one row per language showing `off_topic/easy`,
+`off_topic/adjacent`, `injection`, and `post_context` refusal counts side by
+side, and — only when the golden set holds multi-turn positives — a
+follow-up-resolution block (`rescued N/M` per cell) plus a `NOTE` naming any
+multi-turn case with no recorded `rewrites.json` entry (see "Multi-turn
+cases" above).
 
 `--role` filters the positive table only — negatives belong to no role, so
 the shared-negatives block always covers the full pool for whichever

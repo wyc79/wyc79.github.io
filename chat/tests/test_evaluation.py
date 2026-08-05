@@ -282,22 +282,37 @@ def test_load_cases_rejects_adjacency_on_a_case_type_that_must_not_carry_it(tmp_
 
 def test_load_cases_accepts_the_real_golden_set() -> None:
     """Control: the validation above must not be satisfiable by rejecting
-    everything. The committed dataset is fully migrated and must load."""
+    everything. The committed dataset is fully migrated and must load.
+
+    120 -> 126: Task 9 appended 6 cases (2 EN multi-turn positives, 4
+    post-context negatives). zh multi-turn positives were deliberately NOT
+    added -- see FOLLOWUP_POSITIVES_PER_LANG's comment and KNOWN_ISSUES.md
+    Finding Q: at this project's current zh gate calibration, essentially
+    any natural zh follow-up question passes the gate standing alone, so
+    there is no rescue phenomenon for a zh case to measure."""
     cases = load_cases(GOLDEN_PATH)
-    assert len(cases) == 120
+    assert len(cases) == 126
     assert all(c.adjacency in ADJACENCY for c in cases if c.type == "off_topic")
     assert not any(c.adjacency for c in cases if c.type != "off_topic")
 
 
 def test_aggregate_buckets_every_negative_it_is_given(rt) -> None:
-    """With the dynamic bucket gone, aggregate's three shared buckets must
-    account for every negative -- n_easy + n_adjacent + n_injection ==
-    n_negative, with no invented keys left over."""
+    """With the dynamic bucket gone, aggregate's four shared buckets (task 9
+    added post_context, bucketed ahead of adjacency -- see aggregate()'s
+    comment) must account for every negative -- n_easy + n_adjacent +
+    n_injection + n_post_context == n_negative, with no invented keys left
+    over. OFF_TOPIC (above) carries no history, so it lands in n_easy and
+    n_post_context stays 0 -- present as a key (the cell template always
+    carries all four buckets) but not part of the sum this single case
+    produces."""
     cells = aggregate(run_cases(rt, [OFF_TOPIC]))
     shared = cells["shared/en"]
-    assert shared["n_easy"] + shared["n_adjacent"] + shared["n_injection"] == shared["n_negative"]
+    assert (
+        shared["n_easy"] + shared["n_adjacent"] + shared["n_injection"] + shared["n_post_context"]
+        == shared["n_negative"]
+    )
     assert {k for k in shared if k.startswith("n_")} == {
-        "n_positive", "n_negative", "n_easy", "n_adjacent", "n_injection"
+        "n_positive", "n_negative", "n_easy", "n_adjacent", "n_injection", "n_post_context"
     }
 
 

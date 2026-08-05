@@ -601,6 +601,86 @@ is the concrete, measured cost of the disjointness authoring rule
 (`eval/README.md` rule 1) existing at all: without it, this class of case
 would silently overstate the gate's real permissiveness.
 
+### Q — The zh gate does not reliably refuse generic "do this task for me" requests, and barely refuses well-formed anaphoric follow-ups at all (Task 9)
+
+Found while authoring Task 9's post-context negative golden cases (the ones
+that pair an off-topic question with prior on-topic conversation, to check
+that a rewrite cannot smuggle topicality into a question that should still be
+refused — see `eval/README.md`'s Task 9 section). One candidate,
+`帮我翻译一下这段话` ("help me translate this passage") — a plain
+general-assistant task request, off-topic by any reading — measured
+**0.4209** against the live zh gate threshold **0.3979**: it passes on its
+own, with no conversation needed at all. The case was retuned to a phrasing
+that does fail (`帮我写封邮件`, "help me write an email," measured 0.3825) so
+`neg-post-zh-02` itself is not compromised, but the underlying gap is not
+fixed. It is not an isolated surprise: `gate_calibration.OFF_TOPIC_ZH`'s own
+calibration set already contains two near-identical task requests that pass
+this same gate — `帮我写作业` (0.4338) and `帮我写一段Python代码` (0.5169) —
+so roughly 1 in 8 of the zh gate's own fit-on off-topic set reads as on-topic
+by its own threshold (the zero-false-refusal policy, see
+`gate_calibration.py`'s module docstring, only ever promises to catch a
+*subset*).
+
+**A second, broader symptom surfaced empirically while retuning Task 9's zh
+follow-up positives**, worth recording alongside this one because it's the
+same mechanism at larger scale: of roughly 90 candidate short/elliptical
+Chinese phrasings tried (elided arguments, dangling pronouns, "那...呢"
+topic-shift continuations, generic temporal fillers, task-agnostic
+"他/这个 + interrogative" questions), essentially none scored below the
+0.3979 threshold on their own — most land 0.42-0.56 regardless of topic,
+including phrasings with **no specific referent to any prior turn at all**
+(e.g. `那这个是谁做的`, `那这个用了什么工具` — both score >0.5 with zero
+context). The only candidates found under threshold were content-free
+continuation fillers (`那后来呢` 0.3957, `再后来` 0.3768) with 0.002-0.021
+margins — too thin to be robust given this gate's documented history of
+threshold instability across rebuilds (`eval/README.md`'s Known Limits:
+0.3979 today, 0.4919 in an earlier corpus version, non-separating
+in between). **Reading: the current zh gate's "top" statistic, calibrated
+against `about_zh.md`'s broad Q&A-shaped corpus, gives almost any
+grammatically well-formed Chinese question about "他" a high floor
+regardless of whether it is actually on-topic or resolvable from context** —
+a strictly weaker separation than the English gate exhibits for the
+equivalent shapes (see the EN candidates tried for the same task, which
+found off-threshold phrasings easily, several with >0.05 margin). This
+generalizes Finding M (adjacency) to a new axis (task-request phrasing and
+anaphoric-completeness).
+
+**Conclusion (reframed after review): this is not "Task 9 couldn't author a
+zh case," it is a measured property of the system — follow-up refusal is an
+EN phenomenon at current calibration, and a zh visitor does not hit the bug
+this feature fixes.** The rewrite-and-rescue path this task adds only ever
+fires when the RAW question, judged alone, fails the gate (see
+`eval/README.md`'s Task 9 section on the escalated path). If essentially
+every natural zh question about 他 clears 0.3979 regardless of context or
+actual topicality, then no natural zh follow-up ever reaches that path — zh
+has no rescue phenomenon to measure, not a gap in coverage. This is
+corroborated, not contradicted, by the FIRST half of this finding: Task 9's
+zh post-context *negatives* (`neg-post-zh-01`/`02`) refuse correctly on their
+own — `帮我写封邮件` at 0.3825, comfortably under threshold. So the zh gate
+does separate clearly-off-topic requests from on-topic ones; it just also
+admits essentially any domain-adjacent-sounding question standalone,
+including ones a rewrite would need to resolve to make truly on-topic. Both
+things are true about the same gate at once, and the follow-up-authoring
+sweep is what surfaced the second one. `FOLLOWUP_POSITIVES_PER_LANG` in
+`evaluation.py` therefore declares `{"en": 2, "zh": 0}` — a checked,
+enforced zero (`test_followup_positive_pool_has_the_right_composition`), not
+an absent key indistinguishable from an oversight.
+
+**Trigger condition — revisit if the zh gate is ever recalibrated tighter.**
+This is not hypothetical: zh calibration moves with `about_zh.md`'s content
+(every edit to that file moves the threshold, per this document's own
+"Coupled cost, same root cause" note on the EN side), and the zh gate's
+threshold has already ranged from 0.3979 (current local build) to 0.4919
+(an earlier corpus version, and — per the CRITICAL section at the top of
+this document — what the currently DEPLOYED backend still runs). A tighter
+zh gate would make natural zh follow-ups start failing standalone, at which
+point zh follow-up positives become both authorable and necessary, and
+`FOLLOWUP_POSITIVES_PER_LANG["zh"]` should move off 0. Not classified as
+fixed by this task, since fixing the underlying separation (if it is even
+a defect to fix, rather than the zero-false-refusal policy working as
+designed) means recalibrating or reconsidering the gate statistic, out of
+this task's scope.
+
 ### Right-page/wrong-chunk: full catalog, this run
 
 Every positive case, classified by the `hit@4` x `keywords` quadrant defined
