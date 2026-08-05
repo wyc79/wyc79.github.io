@@ -372,7 +372,13 @@ def _run_ask_worker(status: int, body_js: str) -> dict:
         + extract_js_function(src, "function currentPageUrl(") + "\n"
         + extract_js_function(src, "function chatRequestBody(") + "\n"
         + extract_js_function(src, "async function askWorker(") + "\n"
+        # Record what askWorker actually handed to fetch(). The stub used to
+        # accept opts and discard it, so nothing in this repo ever read the wire
+        # body -- every other request-shape test calls chatRequestBody() standalone,
+        # which cannot see askWorker dropping it.
+        "var sentBody = null;\n"
         "global.fetch = function (url, opts) {\n"
+        "  sentBody = opts && opts.body;\n"
         "  return Promise.resolve({\n"
         "    ok: " + ("true" if status < 300 else "false") + ",\n"
         "    status: " + str(status) + ",\n"
@@ -380,10 +386,11 @@ def _run_ask_worker(status: int, body_js: str) -> dict:
         "  });\n"
         "};\n"
         "askWorker('who is YC').then(function (r) {\n"
-        "  process.stdout.write(JSON.stringify({ threw: false, result: r }));\n"
+        "  process.stdout.write(JSON.stringify({ threw: false, result: r, sentBody: sentBody }));\n"
         "}).catch(function (e) {\n"
         "  process.stdout.write(JSON.stringify({\n"
         "    threw: true, message: String(e && e.message), passThrough: !!(e && e.passThrough),\n"
+        "    sentBody: sentBody,\n"
         "  }));\n"
         "});\n"
     )
@@ -704,3 +711,29 @@ def test_embed_query_marks_the_backend_warm_on_a_successful_response() -> None:
 
     assert got["backendWarm"] is True
     assert got["rid"] == "r1"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_wire_body_is_what_chat_request_body_built() -> None:
+    """The bytes askWorker actually hands to fetch(), not the builder in
+    isolation.
+
+    _run_ask_worker's mock used to accept (url, opts) and discard opts, so
+    nothing in this repo read the wire body -- and the comment in the harness
+    claimed the opposite. Every other request-shape test calls chatRequestBody()
+    standalone, which cannot see askWorker dropping it. This closes that: it
+    parses what was sent and checks the two fields page-awareness added."""
+    got = _run_ask_worker(200, "return Promise.resolve({ answer: 'x', sources: [] });")
+
+    import json as _json
+
+    assert got.get("sentBody"), "askWorker sent no request body"
+    sent = _json.loads(got["sentBody"])
+
+    assert sent["page"] == {"url": "pages/skills.html"}, (
+        "the page url must reach the wire in the index's site-relative form"
+    )
+    assert set(sent["page"]) == {"url"}, "only the url crosses the wire"
+    assert sent["question"] == "who is YC"
+    for field in ("session", "role", "lang", "history"):
+        assert field in sent, f"the wire body is missing {field!r}"

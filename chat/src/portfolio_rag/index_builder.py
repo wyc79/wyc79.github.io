@@ -322,6 +322,12 @@ def build_index(site_root: Path | None = None) -> dict:
                 "section_title": sec.section_title,
                 "text": piece,
             }
+            # Only emitted when true, so a page chunk's record is unchanged and
+            # the index does not grow by a false flag per chunk. Consumers read
+            # it with .get("curated") and treat absence as "page content", which
+            # is also the right answer for an index built before this existed.
+            if sec.curated:
+                chunk["curated"] = True
             if lang is not None:
                 chunk["lang"] = lang
             chunks.append(chunk)

@@ -178,8 +178,16 @@
       : question.replace(/王元辰/g, 'YC');
   }
 
-  var inSubpage = /\/pages\//.test(window.location.pathname);
-  var PREFIX = inSubpage ? '../' : '';
+  // Both of these answer "where is the site root from here", and they used to
+  // answer it with two different rules: PREFIX tested the pathname for /pages/,
+  // while currentPageUrl stripped leading slashes to build a site-root-absolute
+  // url. Under a base path (a project site rather than a user site) those
+  // disagree -- PREFIX keeps working while currentPageUrl returns
+  // "repo/pages/x.html", which matches no chunk url, and page-awareness stops
+  // silently. Deriving PREFIX from currentPageUrl's own output leaves one rule
+  // with one source of truth. Safe at this point in the file: currentPageUrl is
+  // a hoisted function declaration.
+  var PREFIX = currentPageUrl().indexOf('pages/') === 0 ? '../' : '';
 
   // ── i18n: the widget follows the site's 中/EN toggle (scripts/i18n.js) ──
   // Reads the active language on open and re-localizes on the 'yc-langchange'
@@ -795,10 +803,17 @@
   // uses for chunk urls ('index.html', 'pages/skills.html'). The server
   // matches this against its own chunk records verbatim, so the shape matters:
   // a leading slash or a bare directory would simply select nothing.
+  // Takes only the last path segment and re-roots it, rather than stripping a
+  // leading slash off the whole pathname: the index's urls are site-relative
+  // ("index.html", "pages/skills.html"), so any base path in front of them has
+  // to come off. A directory url (no dot in the last segment, or none at all)
+  // means index.html. PREFIX above is derived from this, so the two cannot
+  // drift apart again.
   function currentPageUrl() {
-    var path = window.location.pathname.replace(/^\/+/, '');
-    if (!path || /\/$/.test(path)) path += 'index.html';
-    return path;
+    var segs = window.location.pathname.split('/').filter(Boolean);
+    var file = segs.length ? segs[segs.length - 1] : '';
+    if (!file || file.indexOf('.') === -1) file = 'index.html';
+    return /\/pages\//.test(window.location.pathname) ? 'pages/' + file : file;
   }
 
   // Extracted as a named function so chat/tests/test_chat_contract_sync.py can

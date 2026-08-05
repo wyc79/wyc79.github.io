@@ -6,7 +6,8 @@ provider that exposes /v1/chat/completions). Listens on :9000 as SCF web
 functions require; scf_bootstrap starts it.
 
 Routes and guarantees:
-  POST /chat  {session, role, lang, question, history?} -> {answer, model, rid, sources[]}
+  POST /chat  {session, role, lang, question, history?, page?, embed_rid?}
+              -> {answer, model, rid, sources[]}
   POST /embed {session?, text, gate_text?, gate_only?} -> {vector?, gate?, rid}
   POST /log   client-side event record -> 204
   GET  /      health
@@ -18,10 +19,19 @@ Routes and guarantees:
   call.
 - WHICH GUARDS ARE SERVER-SIDE, precisely (these are two different things and
   the boundary is easy to misread):
-    * The retrieval-empty refusal above IS a server-side backstop, and it is
-      the one that is genuinely independent of what the client sends: it is
-      computed from this function's own index over the client's question, and
-      no client field can turn it off. Rate limiting is the other one.
+    * The retrieval-empty refusal above is a server-side backstop, but it is
+      NOT independent of what the client sends and no longer refuses on
+      retrieval alone. Page-awareness relaxed it to `if not hits and not
+      page_ctx` (see _chat), and page_ctx is selected by a client-supplied
+      url -- so a request naming any real page url reaches the LLM whatever
+      retrieval scored. Rate limiting is the one guard no client field
+      touches. Two things bound the practical exposure and neither is this
+      refusal: rate_limited(), and the calibrated gate on /embed described
+      below, which is where an off-topic question is actually stopped. Worth
+      knowing before treating this line as a wall: MIN_SCORE (0.18) is also
+      far below where e5 cosines sit for this index -- measured, off-topic
+      questions score ~0.80 -- so `not hits` was already close to
+      unreachable before page-awareness relaxed the condition at all.
     * The CALIBRATED OFF-TOPIC GATE IS NOT a server-side backstop. It lives on
       /embed, it judges `gate_text` — a string the CLIENT computes and sends —
       and /chat has no gate at all. Any client that skips /embed, ignores its
@@ -504,10 +514,24 @@ def page_chunks(chunks: list, page_url, lang: str | None) -> list:
     The summary chunk (anchor "top", built from the page's <meta
     name="description">) leads, so the model gets the page's thesis before its
     raw sections; the rest follow in index order, capped at PAGE_CONTEXT_MAX.
+
+    Curated chunks are excluded, and that exclusion is load-bearing rather than
+    tidiness. chat/knowledge/about_*.md sections carry the url of their `link:`
+    target, so by url alone they are indistinguishable from the page's own
+    content -- and this function's whole output is labelled current_page="true",
+    which the system prompt tells the model IS that page's own content. Measured
+    before the "curated" flag existed: on pages/skills.html four of the six
+    selected chunks were about_en.md prose, and once dedup against the retrieval
+    hits removed the page's real chunks the prompt's page title came off a
+    curated section and read 'the page "Languages he speaks"'. The flag is
+    written at build time by index_builder (see loader.Section.curated) because
+    no structural test separates the two exactly -- anchor=="" plus
+    page_title==section_title has ten false positives on real page sections
+    whose heading happens to match their page title.
     """
     if not isinstance(page_url, str) or not page_url:
         return []
-    on_page = [c for c in chunks if c.get("url") == page_url]
+    on_page = [c for c in chunks if c.get("url") == page_url and not c.get("curated")]
     if lang in ("en", "zh"):
         # A monolingual (minilm) index carries no "lang" key at all -- keep
         # those rather than filtering the whole page away.
@@ -995,7 +1019,6 @@ class Handler(BaseHTTPRequestHandler):
             response["gate"] = gate
         # Log the gate decision only — NEVER the query vector. gate carries
         # pass/value/lang(/reason); the clipped gate_text shows what was judged.
-        # gate_verdict is the flat token; `gate` keeps the score and language.
         log({"type": "embed", "rid": rid, "sid": sid, "gate_verdict": gate_verdict(gate),
              "gate": gate, "q": clip(gate_text, 120)})
         self._json(200, response)

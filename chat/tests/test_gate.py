@@ -87,16 +87,26 @@ def test_every_zh_role_starter_passes_the_gate(rt) -> None:
     assert not failures, f"zh starters refused by the gate: {failures}"
 
 
+# Deliberately NOT the phrasings seeded into knowledge/about_*.md. The gate
+# stat is a max over that corpus, so asserting that seeded text scores highly
+# is close to asserting the corpus contains itself -- the same circularity
+# test_disjointness.py guards for the calibration/golden edge, which never sees
+# this file's literals. These are paraphrases a visitor would plausibly type and
+# that appear nowhere in the corpus; they are what actually measures the lift.
 DEICTIC_EN = [
-    "summarize this page",
-    "what is this page about",
-    "tell me about the current page",
+    "what's on this page",
+    "give me the gist of what I'm reading",
+    "quick rundown of what I've got open",
 ]
 DEICTIC_ZH = [
-    "总结一下这个页面",
-    "这个页面讲了什么",
-    "介绍一下当前页面",
+    "这一页在讲什么",
+    "我现在看的这个能简单说说吗",
+    "帮我把眼前这页概括一下",
 ]
+# One seeded phrasing per language, kept as a canary: if the corpus section is
+# deleted outright these fail alongside the paraphrases, which distinguishes
+# "the section is gone" from "the section stopped generalising".
+DEICTIC_SEEDED = ["summarize this page", "总结一下这个页面"]
 
 
 @pytest.mark.parametrize("question", DEICTIC_EN)
@@ -134,3 +144,14 @@ def test_a_deictic_question_clears_the_zh_gate(question: str, rt) -> None:
         f"{question!r} was blocked by the zh gate (value {d.value}, threshold "
         f"{rt.gate_meta['zh']['threshold']})"
     )
+
+
+@pytest.mark.parametrize("question", DEICTIC_SEEDED)
+def test_the_seeded_deictic_phrasings_still_clear_their_gate(question: str, rt) -> None:
+    """Canary for the corpus section existing at all. Weaker than the tests
+    above by construction -- these strings ARE in about_*.md -- so it is kept
+    separate rather than mixed in, and it is not evidence the gate generalises."""
+    d = rt.gate(question)
+    if d.value is None:
+        pytest.skip("no gate bundle for this language here")
+    assert d.passed, f"{question!r} was blocked; the about_*.md section may be gone"

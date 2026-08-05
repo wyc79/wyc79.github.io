@@ -2,8 +2,10 @@
 
 **This IS gate-calibration data, not just supplementary retrieval text.** The
 English gate is wired to this file: it scores against this file's curated
-`## Heading` sections (currently 55), not against raw page chunks the way an
-earlier version of this project did. Edit accordingly: a section reworded for
+`## Heading` sections, not against raw page chunks the way an
+earlier version of this project did. (The section count is not quoted here on
+purpose — it moves whenever this file is edited. `grep -c '^## '` gives the
+current one, and the build log's gate line reports what was calibrated.) Edit accordingly: a section reworded for
 retrieval phrasing can move or erase the gate's separation margin. Unlike the
 Chinese gate (below), there is no silent-disable fallback for English —
 `index_builder.py`'s `_check_en_gate_margin` **raises and aborts the build**
@@ -15,9 +17,11 @@ this file needs another look before the index can be regenerated at all.
 **The lesson from the Chinese file, and why the English gate's build now
 raises instead of warning:** commit 10be374 reworded about_zh.md by a single
 line, with no sections added or removed, and dropped its calibration margin
-from healthy to near zero. The zh gate has been disabled ever since (still
-the case today) — undetected by any test at the time, because the corpus
-still read fine; only the calibration number showed the damage. That failure
+from healthy to near zero, disabling the zh gate — undetected by any test at
+the time, because the corpus still read fine; only the calibration number
+showed the damage. (That outage has since been repaired: the zh gate is
+enabled again. Read the current state off the build log's gate line rather
+than from any status quoted in this file.) That failure
 mode is exactly what the English gate's build-time guard exists to prevent
 for this file: silent margin decay is no longer possible for English, because
 the build itself refuses to ship one.

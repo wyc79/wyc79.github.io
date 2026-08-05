@@ -193,7 +193,7 @@ def test_widget_chat_request_body_passes_validate_chat_body() -> None:
         "askWorker must not send `contexts` -- the whole point of the Task "
         "29 contract flip is that the client stops sending it"
     )
-    for field in ("session", "role", "lang", "question", "history", "page"):
+    for field in ("session", "role", "lang", "question", "history", "page", "embed_rid"):
         assert field in body, f"askWorker's request body is missing {field!r}"
 
     mod = _load_backend()
@@ -420,6 +420,16 @@ def _fixture_index() -> list:
             out.append({"id": f"{url}#top:{lang}:0", "url": url, "anchor": "top",
                         "page_title": title, "section_title": title,
                         "text": f"{title} summary ({lang})", "lang": lang})
+            # A curated knowledge section that `link:`s to this page. It carries
+            # the PAGE's url, which is exactly why url alone cannot separate the
+            # two -- the earlier fixture had no such record, so the leak it
+            # models was unrepresentable and went unnoticed until a review
+            # replayed page_chunks against the real index.
+            out.append({"id": f"{url}#curated{lang}:0", "url": url, "anchor": "",
+                        "page_title": f"A curated heading about {title}",
+                        "section_title": f"A curated heading about {title}",
+                        "text": f"curated prose linking to {title} ({lang})",
+                        "lang": lang, "curated": True})
             for i in range(8):
                 out.append({"id": f"{url}#sec{i}:{lang}:0", "url": url, "anchor": f"sec{i}",
                             "page_title": title, "section_title": f"Section {i}",
@@ -536,27 +546,135 @@ def test_gate_verdict_is_one_flat_greppable_token() -> None:
     assert mod.gate_verdict(None) == "none"
 
 
-def test_the_embed_log_line_carries_the_flat_verdict() -> None:
-    import inspect
+class _StubHandler:
+    """The minimal `self` _chat needs, so the REAL handler body runs with no
+    socket and no server -- the same shape test_scf_index_loading.py uses.
+    `_json` is the sink every reply goes through, so recording it captures the
+    real status and the real payload the handler built."""
 
+    def __init__(self, body: bytes, origin: str = "https://wyc79.github.io"):
+        self.path = "/chat"
+        self._body = body
+        self.responses: list = []
+
+    def _origin(self):
+        return "https://wyc79.github.io"
+
+    def _ip(self) -> str:
+        return "203.0.113.7"
+
+    def _read_body(self, cap: int = 64 * 1024) -> bytes:
+        return self._body
+
+    def _json(self, status: int, obj: dict) -> None:
+        self.responses.append((status, obj))
+
+
+def _drive_chat(mod, monkeypatch, body: dict, hits: list, answer: str = "an answer"):
+    """Run the real Handler._chat against `body`, with retrieval and the LLM
+    stubbed, and return (captured log records, handler responses).
+
+    This replaces two earlier tests that asserted on `inspect.getsource(...)`
+    substrings. Those passed whenever an identifier merely APPEARED in the
+    method's source -- proven by mutation: replacing the whole refusal
+    condition with `if False:` left the entire suite green. Driving the handler
+    and reading the emitted record is what actually pins the behaviour."""
+    records: list = []
+    monkeypatch.setattr(mod, "log", lambda rec: records.append(rec))
+    monkeypatch.setattr(mod, "retrieve", lambda q: list(hits))
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setattr(mod, "call_llm", lambda system, messages: (answer, "test-model", {}, "stop"))
+    monkeypatch.setattr(mod, "load_roles", lambda: {
+        "default_role": "visitor",
+        "base_system_prompt": "base",
+        "roles": {"visitor": {"label": "Visitor", "system_prompt": "be helpful"}},
+    })
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+
+    handler = _StubHandler(json.dumps(body).encode("utf-8"))
+    mod.Handler._chat(handler)
+    return records, handler.responses
+
+
+def test_the_refused_log_line_carries_embed_rid_and_outcome(monkeypatch) -> None:
+    """/embed and /chat write two lines with two different rids. Without
+    embed_rid echoed here, a gate decision and the answer it produced can only
+    be correlated by sid and wall-clock time."""
     mod = _load_backend()
-    src = inspect.getsource(mod.Handler._embed_route)
+    records, responses = _drive_chat(
+        mod, monkeypatch,
+        {"question": "who is YC", "history": [], "embed_rid": "0804-051310-0001"},
+        hits=[],
+    )
 
-    assert "gate_verdict" in src, "the /embed log line must carry the flat token, not just `gate`"
+    assert responses and responses[0][0] == 200
+    assert responses[0][1].get("refused") is True, (
+        "with no retrieval hits and no page context, /chat must refuse -- this "
+        "is the assertion that a mutation to the refusal condition has to break"
+    )
+    refused = [r for r in records if r.get("type") == "chat_refused"]
+    assert len(refused) == 1, f"expected one chat_refused record, got {records}"
+    assert refused[0]["outcome"] == "refused_no_hits"
+    assert refused[0]["embed_rid"] == "0804-051310-0001"
 
 
-def test_chat_log_lines_join_back_to_the_gate_decision() -> None:
-    """/embed and /chat write two lines with two different rids. Without the
-    embed_rid echoed here, a passed gate and the answer it produced can only be
-    correlated by sid and wall-clock time."""
-    import inspect
-
+def test_the_answered_log_line_carries_embed_rid_and_outcome(monkeypatch) -> None:
     mod = _load_backend()
-    src = inspect.getsource(mod.Handler._chat)
+    hit = {"chunk": {"id": "pages/skills.html#skills:en:0", "url": "pages/skills.html",
+                     "anchor": "skills", "page_title": "Skills", "section_title": "Skills",
+                     "text": "UE5, Unity, C++ and C#."}, "score": 0.42}
+    records, responses = _drive_chat(
+        mod, monkeypatch,
+        {"question": "what engines", "history": [], "embed_rid": "0804-051310-0002"},
+        hits=[hit],
+    )
 
-    assert src.count("embed_rid") >= 3, "both the answered and refused log lines must echo embed_rid"
-    assert '"outcome": "answered"' in src
-    assert '"outcome": "refused_no_hits"' in src
+    assert responses and responses[0][0] == 200
+    assert responses[0][1]["answer"] == "an answer"
+    chat = [r for r in records if r.get("type") == "chat"]
+    assert len(chat) == 1, f"expected one chat record, got {records}"
+    assert chat[0]["outcome"] == "answered"
+    assert chat[0]["embed_rid"] == "0804-051310-0002"
+
+
+def test_an_absent_embed_rid_logs_as_none_rather_than_being_omitted(monkeypatch) -> None:
+    """An old cached widget sends no embed_rid. The field must still be present
+    in the record -- a missing key and a null one look different to a log query,
+    and 'this turn had no gate call' is a fact worth being able to search for."""
+    mod = _load_backend()
+    records, _ = _drive_chat(mod, monkeypatch, {"question": "who is YC", "history": []}, hits=[])
+
+    refused = [r for r in records if r.get("type") == "chat_refused"]
+    assert len(refused) == 1, f"expected one chat_refused record, got {records}"
+    assert "embed_rid" in refused[0] and refused[0]["embed_rid"] is None
+
+
+def test_the_embed_log_line_carries_the_flat_verdict(monkeypatch) -> None:
+    """`gate.pass` nested in a JSON object cannot be filtered on in the log
+    console: a passed gate and a blocked one look alike at a glance. This
+    asserts on the emitted record, not on the method's source text."""
+    mod = _load_backend()
+    records: list = []
+    monkeypatch.setattr(mod, "log", lambda rec: records.append(rec))
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setattr(mod, "gate_decision",
+                        lambda t: {"pass": False, "value": 0.1626, "lang": "en"})
+    monkeypatch.setattr(mod, "embed_text", lambda t: [0.0])
+    monkeypatch.setitem(mod._embed, "session", object())
+
+    handler = _StubHandler(json.dumps({"text": "poem about cats", "gate_only": True}).encode("utf-8"))
+    handler.path = "/embed"
+    mod.Handler._embed_route(handler)
+
+    embed = [r for r in records if r.get("type") == "embed"]
+    assert len(embed) == 1, f"expected one embed record, got {records}"
+    assert embed[0]["gate_verdict"] == "block", (
+        "the /embed log line must carry the flat token, not only the nested gate object"
+    )
+    assert embed[0]["gate"]["value"] == 0.1626, "the nested object stays, for the score"
 
 
 def test_validate_chat_body_rejects_an_oversized_embed_rid() -> None:
@@ -567,3 +685,63 @@ def test_validate_chat_body_rejects_an_oversized_embed_rid() -> None:
     assert mod.validate_chat_body(base) is None, "embed_rid is optional"
     assert mod.validate_chat_body({**base, "embed_rid": "x" * 200}) is not None
     assert mod.validate_chat_body({**base, "embed_rid": 42}) is not None
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_ask_worker_builds_its_body_with_chat_request_body() -> None:
+    """Task 29's version brace-matched the object literal out of askWorker, so
+    the request-shape tests were pinned to what askWorker actually sends. The
+    replacement calls chatRequestBody() standalone, which leaves askWorker free
+    to stop using it while every shape test stays green. This is the assertion
+    that closes that gap: it reads askWorker's own source for the call, which is
+    a structural claim about wiring rather than about behaviour, and behaviour is
+    covered by test_the_wire_body_is_what_chat_request_body_built in
+    test_widget_resilience.py, which asserts on the bytes handed to fetch()."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    fn = extract_js_function(src, "async function askWorker(")
+
+    assert "chatRequestBody(" in fn, (
+        "askWorker no longer builds its body through chatRequestBody -- the "
+        "request-shape tests in this file are now testing a function the real "
+        "request path does not use"
+    )
+    assert "JSON.stringify(chatRequestBody(" in " ".join(fn.split()), (
+        "askWorker must serialise chatRequestBody's output directly"
+    )
+
+
+def test_page_chunks_never_returns_curated_knowledge_sections() -> None:
+    """chat/knowledge/about_*.md sections carry the url of their `link:` target,
+    so selecting a page's chunks by url alone picks them up too -- and every
+    chunk this returns is labelled current_page="true", which the system prompt
+    states IS that page's own content. Measured on the real index before the
+    build-time `curated` flag existed: four of the six chunks selected for
+    pages/skills.html were about_en.md prose, and once dedup against the
+    retrieval hits removed the page's real chunks the prompt's page title came
+    off a curated section and read 'the page "Languages he speaks"'."""
+    mod = _load_backend()
+    index = _fixture_index()
+    assert any(c.get("curated") for c in index), "fixture must contain a curated chunk"
+
+    got = mod.page_chunks(index, "pages/skills.html", "en")
+
+    assert got, "the page's own chunks must still be selected"
+    assert not any(c.get("curated") for c in got), (
+        "curated knowledge prose was selected as the page's own content"
+    )
+    assert all(c["url"] == "pages/skills.html" for c in got)
+    assert got[0]["anchor"] == "top", "the page's summary chunk must still lead"
+
+
+def test_page_chunks_treats_a_missing_curated_flag_as_page_content() -> None:
+    """An index built before the flag existed carries no `curated` key at all.
+    Absence must read as "page content" rather than excluding everything, or a
+    stale bundled index would silently turn page-awareness off."""
+    mod = _load_backend()
+    index = [dict(c) for c in _fixture_index()]
+    for c in index:
+        c.pop("curated", None)
+
+    got = mod.page_chunks(index, "pages/skills.html", "en")
+
+    assert len(got) == mod.PAGE_CONTEXT_MAX, "an unflagged index must still yield page context"

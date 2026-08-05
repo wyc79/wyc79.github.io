@@ -79,6 +79,15 @@ class Section:
     page_title: str
     section_title: str
     text: str
+    # True for chat/knowledge/about_*.md sections, False for a real page's own
+    # content. A curated section carries the url of its `link:` target, so url
+    # alone cannot tell the two apart -- and any consumer that groups chunks BY
+    # url (the backend's page-context injection does exactly that) would
+    # otherwise hand a page's visitors curated prose labelled as that page's own
+    # content. Runtime.knowledge_chunk_ids infers the same distinction from a
+    # structural signature for callers reading an index built before this field
+    # existed; this is the authoritative version, recorded at build time.
+    curated: bool = False
 
 
 def _select_language(soup: BeautifulSoup, lang: str) -> None:
@@ -203,7 +212,8 @@ def load_knowledge(knowledge_dir: Path, lang: str | None = None) -> list[Section
             text = " ".join(" ".join(body).split())
             if _effective_length(text) >= _MIN_SECTION_LENGTH:
                 sections.append(
-                    Section(url=url, anchor="", page_title=heading, section_title=heading, text=text)
+                    Section(url=url, anchor="", page_title=heading, section_title=heading,
+                            text=text, curated=True)
                 )
     return sections
 
