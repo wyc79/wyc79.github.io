@@ -745,3 +745,133 @@ def test_page_chunks_treats_a_missing_curated_flag_as_page_content() -> None:
     got = mod.page_chunks(index, "pages/skills.html", "en")
 
     assert len(got) == mod.PAGE_CONTEXT_MAX, "an unflagged index must still yield page context"
+
+
+def test_validate_chat_body_accepts_a_known_intent_and_rejects_anything_else() -> None:
+    """`intent` is a closed set checked by membership, never used to build a
+    prompt, an id or a path -- so an unrecognised value is a bad request rather
+    than something to sanitise and carry on with."""
+    mod = _load_backend()
+    base = {"question": "summarize this page", "history": []}
+
+    assert mod.validate_chat_body({**base, "intent": "summarize_page"}) is None
+    assert mod.validate_chat_body(base) is None, "intent is optional -- an old cached widget omits it"
+    assert mod.validate_chat_body({**base, "intent": "summarise_page"}) is not None, "near-miss spelling"
+    assert mod.validate_chat_body({**base, "intent": "../../etc/passwd"}) is not None
+    assert mod.validate_chat_body({**base, "intent": 42}) is not None
+    assert mod.validate_chat_body({**base, "intent": ""}) is not None
+
+
+def test_summarize_page_does_not_retrieve(monkeypatch) -> None:
+    """The whole point of the declared intent. Ranking a deictic question
+    against the index returns chunks about other pages -- measured on the live
+    index, "summarize this page" asked from pages/gyrotris.html retrieved two
+    index.html chunks and two chat-agent.html ones, none about Gyrotris. They
+    would be injected as retrieved context AND rendered as source cards, since
+    `sources` is built from hits. On this path retrieve() must not be called at
+    all."""
+    mod = _load_backend()
+    called: list = []
+
+    def _boom(q):
+        called.append(q)
+        return [{"chunk": {"id": "x", "url": "pages/other.html", "anchor": "",
+                           "page_title": "Other", "section_title": "Other", "text": "noise"},
+                 "score": 0.85}]
+
+    monkeypatch.setattr(mod, "retrieve", _boom)
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setattr(mod, "call_llm", lambda s, m: ("a summary", "test-model", {}, "stop"))
+    monkeypatch.setattr(mod, "load_roles", lambda: {
+        "default_role": "visitor", "base_system_prompt": "base",
+        "roles": {"visitor": {"label": "Visitor", "system_prompt": "be helpful"}}})
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [
+        {"id": "pages/skills.html#top:en:0", "url": "pages/skills.html", "anchor": "top",
+         "page_title": "Skills", "section_title": "Skills", "text": "the page's own summary",
+         "lang": "en"}])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    records: list = []
+    monkeypatch.setattr(mod, "log", lambda r: records.append(r))
+
+    handler = _StubHandler(json.dumps({
+        "question": "Summarize this page", "history": [], "lang": "en",
+        "page": {"url": "pages/skills.html"}, "intent": "summarize_page"}).encode("utf-8"))
+    mod.Handler._chat(handler)
+
+    assert called == [], "retrieve() must not run on the summarize_page path"
+    status, payload = handler.responses[0]
+    assert status == 200 and payload["answer"] == "a summary"
+    assert payload["sources"] == [], (
+        "sources is built from hits, which is empty here -- so no card may point "
+        "at a page the answer did not come from"
+    )
+    chat = [r for r in records if r.get("type") == "chat"][0]
+    assert chat["intent"] == "summarize_page"
+    assert chat["in"]["contexts"] == [], "no retrieved contexts were used"
+    assert chat["in"]["page_context"] == ["pages/skills.html#top:en:0"]
+    assert "asked for a summary of this page" in chat["in"]["system_head"]
+
+
+def test_an_ordinary_question_still_retrieves(monkeypatch) -> None:
+    """Complement: the skip is scoped to the declared intent. A test that only
+    checked the skip would pass on an implementation that never retrieves."""
+    mod = _load_backend()
+    called: list = []
+    monkeypatch.setattr(mod, "retrieve", lambda q: called.append(q) or [])
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setattr(mod, "log", lambda r: None)
+
+    handler = _StubHandler(json.dumps({"question": "what engines", "history": []}).encode("utf-8"))
+    mod.Handler._chat(handler)
+
+    assert called == ["what engines"], "an ordinary question must still retrieve"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_intent_reaches_the_request_body_and_is_absent_otherwise() -> None:
+    """The chip's whole contribution is this field. Absent on an ordinary
+    question so the server's `intent is not None` check means what it says."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+
+    def body(intent_js: str) -> dict:
+        script = (
+            "const state = { session: 's', role: 'visitor', history: [] };\n"
+            "function lang() { return 'en'; }\n"
+            "const window = { location: { pathname: '/pages/skills.html' } };\n"
+            + extract_js_function(src, "function currentPageUrl(") + "\n"
+            + extract_js_function(src, "function chatRequestBody(") + "\n"
+            "process.stdout.write(JSON.stringify(chatRequestBody('q', 'rid', " + intent_js + ")));\n"
+        )
+        return run_node_json(script)
+
+    assert body("'summarize_page'")["intent"] == "summarize_page"
+    assert "intent" not in body("undefined"), (
+        "an ordinary question must omit intent entirely, not send null or ''"
+    )
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_widget_only_ever_declares_intents_the_backend_accepts() -> None:
+    """Both sides hold the same closed set and there is no build step to keep
+    them in sync, so this is the only thing that would catch a rename on one
+    side -- the same cross-implementation drift test_retrieval_sync.py exists
+    for."""
+    import re
+
+    mod = _load_backend()
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    # The first argument is itself a call -- send(t('summarizePage'), '...') --
+    # so the pattern must tolerate nested parens, bounded to one statement.
+    declared = set(re.findall(r"\bsend\([^;\n]*?,\s*'([a-z_]+)'\s*\)", src))
+
+    assert declared, "expected the widget to declare at least one intent via send(text, intent)"
+    assert declared <= set(mod.INTENTS), (
+        f"widget sends {sorted(declared - set(mod.INTENTS))}, which index.py's "
+        f"INTENTS {mod.INTENTS} would reject as a bad request"
+    )

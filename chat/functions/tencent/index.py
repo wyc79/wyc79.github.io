@@ -6,7 +6,7 @@ provider that exposes /v1/chat/completions). Listens on :9000 as SCF web
 functions require; scf_bootstrap starts it.
 
 Routes and guarantees:
-  POST /chat  {session, role, lang, question, history?, page?, embed_rid?}
+  POST /chat  {session, role, lang, question, history?, page?, embed_rid?, intent?}
               -> {answer, model, rid, sources[]}
   POST /embed {session?, text, gate_text?, gate_only?} -> {vector?, gate?, rid}
   POST /log   client-side event record -> 204
@@ -492,6 +492,18 @@ def sources_from_hits(hits: list) -> list:
 # game-design-workshop.html, which has 36 chunks.
 PAGE_CONTEXT_MAX = 6
 
+# Declared intents the widget may send. A CLOSED SET, checked by membership --
+# never used to build a prompt, an id or a path, so an unrecognised value is
+# rejected outright rather than sanitised. "summarize_page" is the chip in the
+# starter row: it says the visitor asked about the page they are on, which is
+# the one thing retrieval cannot work out for itself. A deictic question names
+# no topic, so its query vector is noise -- and e5's cosines sit in a narrow
+# band (measured: gibberish scores 0.84 against this index, real questions
+# 0.85), so no score threshold can separate "found nothing" from "found
+# something". Rather than infer the intent, take it from the one party that
+# already knows.
+INTENTS = ("summarize_page",)
+
 
 def page_chunks(chunks: list, page_url, lang: str | None) -> list:
     """The chunks of the page the visitor is currently reading.
@@ -762,6 +774,11 @@ def validate_chat_body(body) -> str | None:
     embed_rid = body.get("embed_rid")
     if embed_rid is not None and (not isinstance(embed_rid, str) or len(embed_rid) > LIMITS["embed_rid"]):
         return "bad embed_rid"
+    # Optional, and a closed set: an old cached widget omits it, and anything
+    # not in INTENTS is a bad request rather than a value to fall back from.
+    intent = body.get("intent")
+    if intent is not None and intent not in INTENTS:
+        return "bad intent"
     return None
 
 
@@ -1056,12 +1073,25 @@ class Handler(BaseHTTPRequestHandler):
         client_contexts = body.get("contexts")
         client_contexts_ignored = len(client_contexts) if isinstance(client_contexts, list) else 0
 
-        hits = retrieve(body["question"])
+        intent = body.get("intent") if body.get("intent") in INTENTS else None
 
         # Answer in the site's active language (the widget sends it from the
         # 中/EN toggle), regardless of the question's own language. Resolved
         # here rather than further down because page_chunks needs it.
         answer_lang = body.get("lang") if body.get("lang") in ("en", "zh") else None
+
+        # The declared-intent path does NOT retrieve, and that is the point.
+        # Ranking a deictic question against the whole index returns four
+        # chunks about other pages -- measured on the live index, "summarize
+        # this page" asked from pages/gyrotris.html retrieved two index.html
+        # chunks and two chat-agent.html ones, none of them about Gyrotris.
+        # They would then be injected under "Context retrieved from the site
+        # for this question" and, worse, rendered as source cards, since
+        # `sources` is built from hits. Skipping retrieval outright is cheaper
+        # than any attempt to detect that afterwards, and it makes sources: []
+        # on this path mean something true: the answer came from the page the
+        # visitor is on.
+        hits = [] if intent == "summarize_page" else retrieve(body["question"])
 
         page = body.get("page") if isinstance(body.get("page"), dict) else {}
         seen = {h["chunk"].get("id") for h in hits}
@@ -1072,7 +1102,10 @@ class Handler(BaseHTTPRequestHandler):
 
         # Refuse only when BOTH are empty. Retrieval alone returning nothing is
         # the normal outcome for a deictic question, and refusing on it is what
-        # made "summarize this page" a dead end.
+        # made "summarize this page" a dead end. On the summarize_page path
+        # hits is empty by construction, so this refuses exactly when the
+        # client named a page that is not in the index -- which is the honest
+        # answer there: nothing is known about it.
         if not hits and not page_ctx:
             log({
                 "type": "chat_refused",
@@ -1080,6 +1113,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sid": sid,
                 "embed_rid": embed_rid,
                 "outcome": "refused_no_hits",
+                "intent": intent,
                 "role": body.get("role"),
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
                 "page_url": page.get("url"),
@@ -1109,6 +1143,17 @@ class Handler(BaseHTTPRequestHandler):
                     page_ctx[0].get("page_title", "")
                 )
             )
+            if intent == "summarize_page":
+                # The visitor pressed a button, so there is no ambiguity left to
+                # resolve and no other context to weigh -- hits is empty on this
+                # path. Say what the page covers, and do not pad it out with the
+                # rest of the site: on a short page (index.html and skills.html
+                # carry two chunks each) the honest summary is two sentences.
+                system_head += (
+                    " The visitor asked for a summary of this page specifically. "
+                    "Summarize what this page covers, using only the chunks above, "
+                    "and keep it proportionate to how much the page actually says."
+                )
         if answer_lang == "zh":
             system_head += "\n\nAlways answer in Chinese (简体中文), regardless of the language the question is written in."
         elif answer_lang == "en":
@@ -1144,6 +1189,7 @@ class Handler(BaseHTTPRequestHandler):
             "sid": sid,
             "embed_rid": embed_rid,
             "outcome": "answered",
+            "intent": intent,
             "role": body.get("role"),
             "client_contexts_ignored": client_contexts_ignored,
             "in": {

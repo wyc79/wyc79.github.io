@@ -19,9 +19,9 @@ raises instead of warning:** commit 10be374 reworded about_zh.md by a single
 line, with no sections added or removed, and dropped its calibration margin
 from healthy to near zero, disabling the zh gate — undetected by any test at
 the time, because the corpus still read fine; only the calibration number
-showed the damage. (That outage has since been repaired: the zh gate is
-enabled again. Read the current state off the build log's gate line rather
-than from any status quoted in this file.) That failure
+showed the damage. That is history, not a status: whether a zh gate ships
+today is decided per build and is deliberately not stated here — see the
+paragraph below. That failure
 mode is exactly what the English gate's build-time guard exists to prevent
 for this file: silent margin decay is no longer possible for English, because
 the build itself refuses to ship one.
@@ -387,11 +387,3 @@ at the University of Rochester.
 link: pages/gyrotris.html
 Gyrotris, the puzzle game he built solo, is published and playable on
 itch.io.
-
-## Questions about the page you are currently reading
-link: index.html
-Visitors often ask about the page in front of them: summarize this page, what
-is this page about, or tell me about the current page. Each project page on
-this site covers one piece of work — what it is, why it was built, and how it
-was implemented. The chat widget is told which page the visitor is reading and
-answers such questions from that page's own content.

@@ -1,7 +1,7 @@
 {
   "k": 4,
-  "generated_at": "2026-08-05T02:42:17+00:00",
-  "index_built_at": "2026-08-05T02:40:36+00:00",
+  "generated_at": "2026-08-05T04:15:01+00:00",
+  "index_built_at": "2026-08-05T04:13:12+00:00",
   "gate": {
     "en": {
       "stat": "top",
@@ -96,7 +96,7 @@
       "n_positive": 12,
       "n_negative": 0,
       "gate_pass": 12,
-      "hit_at_4": 12,
+      "hit_at_4": 11,
       "hit_at_4_page_only": 10,
       "keywords_found": 18,
       "keywords_total": 24,

@@ -208,6 +208,8 @@
       closeAria: 'Close chat',
       placeholder: 'Ask about projects, skills…',
       send: 'Send',
+      summarizePage: 'Summarize this page',
+      summarizePageAria: 'Summarize the page you are reading',
       loadingGeneric: 'Loading…',
       loadingModel: 'Loading the on-device search model (~23 MB, cached after the first visit)…',
       loadingModelPct: function (pct) { return 'Loading the on-device search model… ' + pct + '%'; },
@@ -255,6 +257,8 @@
       closeAria: '关闭聊天',
       placeholder: '问问项目、技能…',
       send: '发送',
+      summarizePage: '总结一下这个页面',
+      summarizePageAria: '总结你正在阅读的页面',
       loadingGeneric: '加载中…',
       loadingModel: '正在加载本地检索模型（约 23 MB，首次访问后会缓存）…',
       loadingModelPct: function (pct) { return '正在加载本地检索模型… ' + pct + '%'; },
@@ -824,7 +828,7 @@
   // `page` carries a url and nothing else, deliberately: the page title the
   // system prompt mentions is read off the server's own chunk records, so no
   // client-supplied string reaches the prompt through page-awareness.
-  function chatRequestBody(question, embedRid) {
+  function chatRequestBody(question, embedRid, intent) {
     return {
       session: state.session,
       role: state.role,
@@ -832,15 +836,19 @@
       question: question,
       page: { url: currentPageUrl() },
       embed_rid: embedRid || undefined,
+      // A fixed enum, never free text -- the server validates it against its
+      // own list and ignores anything else, so this adds no surface a typed
+      // question does not already have. Absent for an ordinary question.
+      intent: intent || undefined,
       history: state.history.slice(-6),
     };
   }
 
-  async function askWorker(question, embedRid) {
+  async function askWorker(question, embedRid, intent) {
     var r = await fetchWithTimeout(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(chatRequestBody(question, embedRid)),
+      body: JSON.stringify(chatRequestBody(question, embedRid, intent)),
     }, CHAT_TIMEOUT_MS);
     try {
       var res = r.res;
@@ -1101,6 +1109,18 @@
 
   function addStarters(role) {
     var starters = h('div', 'ycchat-starters');
+    // The page-summary chip leads, because it is the one suggestion whose
+    // answer depends on where the visitor is standing rather than on who they
+    // said they were. Clicking it declares the intent outright: the request
+    // carries intent='summarize_page' and the backend answers from the current
+    // page's own chunks without retrieving. Typing the same words still works
+    // -- it just goes through ordinary retrieval like any other question, with
+    // no guarantee the gate keeps admitting that phrasing.
+    var sum = h('button', 'ycchat-starter', t('summarizePage'));
+    sum.type = 'button';
+    sum.setAttribute('aria-label', t('summarizePageAria'));
+    sum.addEventListener('click', function () { send(t('summarizePage'), 'summarize_page'); });
+    starters.appendChild(sum);
     (L(role, 'starters') || []).forEach(function (q) {
       var chip = h('button', 'ycchat-starter', q);
       chip.type = 'button';
@@ -1111,7 +1131,7 @@
     els.body.scrollTop = els.body.scrollHeight;
   }
 
-  async function send(question) {
+  async function send(question, intent) {
     question = (question || els.input.value).trim();
     if (!question || state.busy || !state.role) return;
     els.input.value = '';
@@ -1203,7 +1223,7 @@
         record.mode = 'llm';
         var resp;
         try {
-          resp = await askWorker(question, emb.rid);
+          resp = await askWorker(question, emb.rid, intent);
         } catch (chatErr) {
           // askWorker marks an error `passThrough` for a rate limit or an
           // empty-but-successful LLM answer (see askWorker above) -- the
