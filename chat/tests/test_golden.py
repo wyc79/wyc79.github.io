@@ -432,3 +432,79 @@ def test_a_metric_at_the_floor_genuinely_cannot_fire() -> None:
     # ...and the control: the one shared metric NOT at the floor does fire.
     worse = {"shared/zh": {**current_cells["shared/zh"], "refusal_easy": 2}}
     assert _find_regressions(baseline_cells, worse) == ["shared/zh.refusal_easy: 3 -> 2"]
+
+
+def test_history_defaults_to_empty_and_round_trips(tmp_path) -> None:
+    from portfolio_rag.evaluation import load_cases
+
+    path = tmp_path / "cases.jsonl"
+    path.write_text(
+        json.dumps({"id": "a", "role": "visitor", "lang": "en", "type": "positive",
+                    "q": "what engines", "expected_urls": ["pages/skills.html"],
+                    "expected_keywords": ["UE5"]}) + "\n"
+        + json.dumps({"id": "b", "role": "visitor", "lang": "en", "type": "positive",
+                      "q": "is there any optimization work",
+                      "history": [{"role": "user", "content": "tell me about prime engine"},
+                                  {"role": "assistant", "content": "a custom C++ renderer"}],
+                      "expected_urls": ["pages/prime-engine.html"],
+                      "expected_keywords": ["Prime Engine"]}) + "\n",
+        encoding="utf-8",
+    )
+
+    cases = load_cases(path)
+
+    assert cases[0].history == ()
+    assert cases[1].history == (
+        ("user", "tell me about prime engine"),
+        ("assistant", "a custom C++ renderer"),
+    )
+    assert cases[1].messages == [
+        {"role": "user", "content": "tell me about prime engine"},
+        {"role": "assistant", "content": "a custom C++ renderer"},
+    ]
+
+
+def test_a_case_with_history_stays_hashable() -> None:
+    """GoldenCase is frozen, so it generates __hash__ from its fields. A dict
+    or list history field would make every multi-turn case unhashable and blow
+    up anything that puts cases in a set."""
+    from portfolio_rag.evaluation import GoldenCase
+
+    assert hash(GoldenCase(id="a", role="visitor", lang="en", type="positive", q="q",
+                           history=(("user", "hi"),)))
+
+
+def test_history_must_alternate_and_end_on_an_assistant_turn(tmp_path) -> None:
+    """A case whose history ends on a user turn is not a conversation the
+    widget could ever have produced -- state.history is only ever appended to
+    in user/assistant pairs."""
+    from portfolio_rag.evaluation import load_cases
+
+    path = tmp_path / "cases.jsonl"
+    path.write_text(
+        json.dumps({"id": "a", "role": "visitor", "lang": "en", "type": "positive",
+                    "q": "q", "expected_urls": ["pages/skills.html"],
+                    "expected_keywords": ["UE5"],
+                    "history": [{"role": "user", "content": "hi"}]}) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="assistant"):
+        load_cases(path)
+
+
+def test_history_rejects_a_bad_role(tmp_path) -> None:
+    from portfolio_rag.evaluation import load_cases
+
+    path = tmp_path / "cases.jsonl"
+    path.write_text(
+        json.dumps({"id": "a", "role": "visitor", "lang": "en", "type": "positive",
+                    "q": "q", "expected_urls": ["pages/skills.html"],
+                    "expected_keywords": ["UE5"],
+                    "history": [{"role": "system", "content": "hi"},
+                                {"role": "assistant", "content": "yo"}]}) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="role"):
+        load_cases(path)

@@ -82,6 +82,18 @@ class GoldenCase:
     # Required on off_topic ("easy" or "adjacent"); empty on positive and
     # injection. See ADJACENCY, and load_cases, which enforces it.
     adjacency: str = ""
+    # Prior conversation turns, as (role, content) pairs -- pairs rather than
+    # dicts because this dataclass is frozen and therefore hashable, which a
+    # dict field would break. Empty for the single-turn cases that make up most
+    # of the set. A case WITH history exercises the escalated follow-up path:
+    # the question is judged in isolation first, and only if that fails does the
+    # recorded rewrite come into play (see score_case).
+    history: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def messages(self) -> list[dict]:
+        """The history in the {role, content} shape the rewrite call takes."""
+        return [{"role": r, "content": c} for r, c in self.history]
 
     @property
     def cell(self) -> str:
@@ -132,6 +144,36 @@ def load_cases(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
                 f"adjacency (has {adjacency!r}) -- injections are adjacent by definition "
                 "and positives have no adjacency at all."
             )
+        raw_history = raw.get("history", [])
+        if not isinstance(raw_history, list):
+            raise ValueError(f"{path.name}:{lineno}: case {raw['id']!r} has a non-list history")
+        history = []
+        for turn in raw_history:
+            if not isinstance(turn, dict) or turn.get("role") not in ("user", "assistant"):
+                raise ValueError(
+                    f"{path.name}:{lineno}: case {raw['id']!r} has a history turn with role "
+                    f"{turn.get('role') if isinstance(turn, dict) else turn!r}, not 'user' or "
+                    "'assistant'"
+                )
+            if not isinstance(turn.get("content"), str):
+                raise ValueError(
+                    f"{path.name}:{lineno}: case {raw['id']!r} has a history turn with "
+                    "non-string content"
+                )
+            history.append((turn["role"], turn["content"]))
+        if history:
+            roles = [r for r, _ in history]
+            if roles != ["user" if i % 2 == 0 else "assistant" for i in range(len(roles))]:
+                raise ValueError(
+                    f"{path.name}:{lineno}: case {raw['id']!r} has a history that does not "
+                    "alternate user/assistant starting with user -- the widget only ever "
+                    "appends in pairs, so this is not a conversation it could have produced"
+                )
+            if roles[-1] != "assistant":
+                raise ValueError(
+                    f"{path.name}:{lineno}: case {raw['id']!r} has a history ending on a user "
+                    "turn -- it must end on the assistant turn the follow-up follows"
+                )
         cases.append(
             GoldenCase(
                 id=raw["id"],
@@ -143,6 +185,7 @@ def load_cases(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
                 expected_keywords=tuple(raw.get("expected_keywords", ())),
                 note=raw.get("note", ""),
                 adjacency=adjacency,
+                history=tuple(history),
             )
         )
     return cases
