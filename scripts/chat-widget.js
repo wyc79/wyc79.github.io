@@ -967,11 +967,11 @@
       ' border-radius:999px;padding:.15rem .55rem;cursor:pointer;background:var(--bg,#fff);}',
       '.ycchat-actions{display:flex;align-items:center;gap:.5rem;padding:.45rem .9rem;',
       ' border-bottom:1px solid var(--border,#ccc);background:var(--card,#f7f7f8);}',
-      '.ycchat-actionchip{margin-left:auto;font-size:.72rem;color:var(--fg,#131313);',
+      '.ycchat-actionchip{font-size:.72rem;color:var(--fg,#131313);',
       ' border:1px solid var(--border,#ccc);border-radius:999px;padding:.15rem .6rem;',
       ' cursor:pointer;background:var(--bg,#fff);}',
       '.ycchat-actionchip:hover{border-color:var(--link,#0b57d0);}',
-      '.ycchat-clearchip{font-size:.72rem;color:var(--muted,#666);border:1px solid var(--border,#ccc);',
+      '.ycchat-clearchip{margin-left:auto;font-size:.72rem;color:var(--muted,#666);border:1px solid var(--border,#ccc);',
       ' border-radius:999px;padding:.15rem .55rem;cursor:pointer;background:var(--bg,#fff);}',
       '.ycchat-clearchip:hover{border-color:var(--link,#0b57d0);}',
       '.ycchat-x{border:0;background:none;color:var(--muted,#666);font-size:1.1rem;cursor:pointer;padding:.2rem .4rem;}',
@@ -1374,11 +1374,6 @@
     // element up there ("Client dev recruiter"), so pairing Clear with the
     // action chip below it evens the two rows out.
     els.actions = h('div', 'ycchat-actions');
-    els.clearBtn = h('button', 'ycchat-clearchip', t('clearLabel')); // TODO#3
-    els.clearBtn.type = 'button';
-    els.clearBtn.title = t('clearTitle');
-    els.clearBtn.addEventListener('click', function () { if (state.role) clearChat(); });
-    els.actions.appendChild(els.clearBtn);
     els.pageActionBtn = h('button', 'ycchat-actionchip', t(pageAction().key));
     els.pageActionBtn.type = 'button';
     els.pageActionBtn.setAttribute('aria-label', t(pageAction().key + 'Aria'));
@@ -1387,6 +1382,11 @@
       if (state.role) send(t(a.key), a.intent);
     });
     els.actions.appendChild(els.pageActionBtn);
+    els.clearBtn = h('button', 'ycchat-clearchip', t('clearLabel')); // TODO#3
+    els.clearBtn.type = 'button';
+    els.clearBtn.title = t('clearTitle');
+    els.clearBtn.addEventListener('click', function () { if (state.role) clearChat(); });
+    els.actions.appendChild(els.clearBtn);
 
     els.body = h('div', 'ycchat-body');
     els.body.setAttribute('aria-live', 'polite');
