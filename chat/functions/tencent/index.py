@@ -1434,6 +1434,8 @@ class Handler(BaseHTTPRequestHandler):
                 "client_contexts_ignored": client_contexts_ignored,
                 "rewrite": clip(query, LIMITS["log_msg_text"]) if rewrite_outcome else None,
                 "rewrite_outcome": rewrite_outcome,
+                "gate_verdict": gate_verdict(regate),
+                "gate": regate,
             })
             return self._json(200, refusal_response(rid))
 
@@ -1524,6 +1526,8 @@ class Handler(BaseHTTPRequestHandler):
             "client_contexts_ignored": client_contexts_ignored,
             "rewrite": clip(query, LIMITS["log_msg_text"]) if rewrite_outcome else None,
             "rewrite_outcome": rewrite_outcome,
+            "gate_verdict": gate_verdict(regate),
+            "gate": regate,
             "in": {
                 "system_head": system_head,
                 "contexts": log_contexts(hits),

@@ -625,14 +625,23 @@ def _drive_chat(mod, monkeypatch, body: dict, hits: list, answer: str = "an answ
     condition with `if False:` left the entire suite green. Driving the handler
     and reading the emitted record is what actually pins the behaviour.
 
-    `retrieve` and `call_llm` are stubbed here only when the caller has not
-    already monkeypatched one -- callers on the escalated path (Task 5) need
-    their OWN stub live (to record the query it was called with, or the
-    messages it was sent) instead of this function's generic one, and
-    monkeypatch.setattr applied here after the caller's own call would
-    silently win and discard it. `__name__` distinguishes "still the real
-    module function" from "already replaced by a lambda" without needing a
-    pristine module reference to compare against."""
+    `retrieve`, `call_llm`, and `call_llm_raw` are stubbed here only when the
+    caller has not already monkeypatched one -- callers on the escalated path
+    (Task 5) need their OWN stub live (to record the query it was called
+    with, or the messages it was sent) instead of this function's generic
+    one, and monkeypatch.setattr applied here after the caller's own call
+    would silently win and discard it. `__name__` distinguishes "still the
+    real module function" from "already replaced by a lambda" without
+    needing a pristine module reference to compare against.
+
+    call_llm_raw is the network seam behind rewrite_question (-> _post_llm ->
+    urlopen). A caller that drives an escalated body (gate_failed + history +
+    no intent) without monkeypatching rewrite_question itself would otherwise
+    hit rewrite_question's real implementation, which calls call_llm_raw --
+    and, unstubbed, that is a real outbound request to LLM_BASE_URL. The
+    default here returns a blank/malformed completion so an un-stubbed
+    escalated call degrades to rewrite_question's own "malformed" fallback
+    (the original question, unchanged) instead of touching the network."""
     records: list = []
     monkeypatch.setattr(mod, "log", lambda rec: records.append(rec))
     if mod.retrieve.__name__ == "retrieve":
@@ -640,6 +649,8 @@ def _drive_chat(mod, monkeypatch, body: dict, hits: list, answer: str = "an answ
     monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
     if mod.call_llm.__name__ == "call_llm":
         monkeypatch.setattr(mod, "call_llm", lambda system, messages: (answer, "test-model", {}, "stop"))
+    if mod.call_llm_raw.__name__ == "call_llm_raw":
+        monkeypatch.setattr(mod, "call_llm_raw", lambda payload: ("", "stop"))
     monkeypatch.setattr(mod, "load_roles", lambda: {
         "default_role": "visitor",
         "base_system_prompt": "base",
@@ -1387,3 +1398,101 @@ def test_no_rewrite_happens_with_gate_failed_but_empty_history(monkeypatch) -> N
 
     assert called == []
     assert responses[0][1]["refused"] is True
+
+
+def test_no_rewrite_happens_with_a_declared_intent(monkeypatch) -> None:
+    """A declared intent bypasses the gate by design (the escalation condition's
+    `and intent is None`) and must not take the rewrite path even when
+    gate_failed is set and history is present. Mutation testing (deleting `and
+    intent is None`) left the whole suite green before this test existed."""
+    mod = _load_backend()
+    called: list = []
+    monkeypatch.setattr(mod, "rewrite_question", lambda h, q: called.append(q) or (q, "rewritten"))
+    _drive_chat(
+        mod, monkeypatch,
+        {"question": "summarize this page", "gate_failed": True, "intent": "summarize_page",
+         "history": [{"role": "user", "content": "hi"}], "page": {"url": "pages/skills.html"}},
+        hits=[],
+    )
+
+    assert called == []
+
+
+def test_the_answered_log_line_carries_rewrite_fields_as_none_when_no_rewrite_ran(monkeypatch) -> None:
+    """Mirrors test_an_absent_embed_rid_logs_as_none_rather_than_being_omitted
+    for the rewrite/rewrite_outcome pair Step 5 added: a missing key and a null
+    one look different to a log query, and "this turn had no rewrite" is a fact
+    worth being able to search for. Mutation testing (deleting these two keys
+    from the answered record) left the whole suite green before this test
+    existed."""
+    mod = _load_backend()
+    hit = {"chunk": {"id": "x", "url": "pages/skills.html", "anchor": "",
+                     "page_title": "S", "section_title": "S", "text": "t"}, "score": 0.4}
+    records, _ = _drive_chat(mod, monkeypatch, {"question": "what engines", "history": []}, hits=[hit])
+
+    chat = [r for r in records if r.get("type") == "chat"]
+    assert len(chat) == 1, f"expected one chat record, got {records}"
+    assert "rewrite" in chat[0] and chat[0]["rewrite"] is None
+    assert "rewrite_outcome" in chat[0] and chat[0]["rewrite_outcome"] is None
+
+
+def test_the_refused_no_hits_log_line_carries_rewrite_fields_as_none_when_no_rewrite_ran(monkeypatch) -> None:
+    """The refused_no_hits sibling of the test above. Same mutation-testing
+    gap: deleting `rewrite`/`rewrite_outcome` from this record left the whole
+    suite green before this test existed."""
+    mod = _load_backend()
+    records, _ = _drive_chat(mod, monkeypatch, {"question": "who is YC", "history": []}, hits=[])
+
+    refused = [r for r in records if r.get("type") == "chat_refused"]
+    assert len(refused) == 1, f"expected one chat_refused record, got {records}"
+    assert "rewrite" in refused[0] and refused[0]["rewrite"] is None
+    assert "rewrite_outcome" in refused[0] and refused[0]["rewrite_outcome"] is None
+
+
+def test_the_escalation_proceeds_when_no_gate_is_packaged(monkeypatch) -> None:
+    """gate_decision returns None when no gate is packaged at all -- there is
+    nothing to re-judge, so the escalated path must proceed to retrieval on
+    the rewrite rather than refuse. Mutation testing (flipping the guard to
+    `if regate is None or not regate.get("pass")`) left the whole suite green
+    before this test existed."""
+    mod = _load_backend()
+    retrieved: list = []
+    hit = {"chunk": {"id": "x", "url": "pages/prime-engine.html", "anchor": "",
+                     "page_title": "Prime Engine", "section_title": "S", "text": "t"}, "score": 0.4}
+    monkeypatch.setattr(mod, "rewrite_question",
+                        lambda h, q: ("Is there optimization work in Prime Engine?", "rewritten"))
+    monkeypatch.setattr(mod, "gate_decision", lambda t: None)
+    monkeypatch.setattr(mod, "retrieve", lambda q: retrieved.append(q) or [hit])
+    records, responses = _drive_chat(
+        mod, monkeypatch,
+        {"question": "is there any optimization work", "gate_failed": True,
+         "history": [{"role": "user", "content": "tell me about prime engine"}]},
+        hits=[hit],
+    )
+
+    assert retrieved == ["Is there optimization work in Prime Engine?"]
+    assert responses[0][0] == 200 and responses[0][1]["answer"] == "an answer"
+
+
+def test_the_escalation_proceeds_on_a_cjk_bypass(monkeypatch) -> None:
+    """gate_decision's cjk_bypass mode returns pass: True explicitly when no zh
+    gate is packaged -- the escalated path must let it through like any other
+    passing regate, not treat the missing threshold as a refusal."""
+    mod = _load_backend()
+    retrieved: list = []
+    hit = {"chunk": {"id": "x", "url": "pages/prime-engine.html", "anchor": "",
+                     "page_title": "Prime Engine", "section_title": "S", "text": "t"}, "score": 0.4}
+    monkeypatch.setattr(mod, "rewrite_question",
+                        lambda h, q: ("Prime Engine 优化工作", "rewritten"))
+    monkeypatch.setattr(mod, "gate_decision",
+                        lambda t: {"pass": True, "value": None, "reason": "cjk_bypass"})
+    monkeypatch.setattr(mod, "retrieve", lambda q: retrieved.append(q) or [hit])
+    records, responses = _drive_chat(
+        mod, monkeypatch,
+        {"question": "有没有优化工作", "gate_failed": True,
+         "history": [{"role": "user", "content": "介绍一下 Prime Engine"}]},
+        hits=[hit],
+    )
+
+    assert retrieved == ["Prime Engine 优化工作"]
+    assert responses[0][0] == 200 and responses[0][1]["answer"] == "an answer"
