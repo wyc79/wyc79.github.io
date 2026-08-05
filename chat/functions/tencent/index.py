@@ -980,9 +980,118 @@ def llm_payload(system: str, messages: list) -> dict:
     return payload
 
 
-def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | None]:
+# ── Follow-up resolution: condensation ─────────────────────────────────────
+#
+# Runs ONLY on the escalated path (the client's gate failed and the
+# conversation is non-empty), so a first turn and a self-contained question
+# never pay for it.
+#
+# The echo condition is a DISJUNCTION, and that is the safety property.
+# Echoing is safe; rewriting is risky, because every rewrite is a chance to
+# inject topicality the visitor did not ask for. So the risky path requires
+# BOTH a dangling reference AND an antecedent for it, while the safe path
+# needs only one. The relatedness judgment is safe specifically because its
+# errors are asymmetric: judged wrongly "no antecedent" -> echo -> refuse,
+# which is today's behaviour; judged wrongly "has an antecedent" -> the model
+# must still produce a rewrite, bounded by the dangling-reference rule. No
+# error in that judgment opens the gate on its own.
+
+REWRITE_MAX_TOKENS = 128
+
+REWRITE_SYSTEM_PROMPT = (
+    "You rewrite a follow-up question into a single standalone question, using "
+    "the conversation only to resolve references. You are not answering "
+    "anything.\n\n"
+    "Resolve ONLY dangling references: pronouns (it, they, that one), definite "
+    "descriptions with no antecedent inside the question (the renderer, the "
+    "second one), and elided arguments (\"is there any optimization work\" -- on "
+    "what?).\n\n"
+    "Echo the question VERBATIM if EITHER every referring expression already "
+    "has its referent inside the question, OR the conversation contains no "
+    "antecedent for the dangling reference.\n\n"
+    "Never add a topic, project name, or qualifier the question did not ask "
+    "for, and never introduce a person's name.\n\n"
+    "Reply with the question and nothing else: one line, no preamble, no "
+    "quotes, no explanation."
+)
+
+
+def rewrite_payload(history: list, question: str) -> dict:
+    """The rewrite request, pinning every parameter rather than inheriting
+    llm_payload's (which serves the answer call).
+
+    - temperature 0: the rewrite feeds an AUTHORITATIVE gate decision, so a
+      sampled rewrite would let a visitor resample until one slips past.
+    - thinking disabled UNCONDITIONALLY, ignoring LLM_THINKING including its
+      "" escape hatch: the default model reasons, so an omitted field is not a
+      neutral escape -- it restores thinking at effort "high".
+    - its own small ceiling, not LLM_MAX_TOKENS' 2048 reasoning headroom.
+    """
+    return {
+        "model": env("LLM_MODEL", "deepseek-v4-flash"),
+        "max_tokens": REWRITE_MAX_TOKENS,
+        "temperature": 0,
+        "thinking": {"type": "disabled"},
+        "messages": (
+            [{"role": "system", "content": REWRITE_SYSTEM_PROMPT}]
+            + list(history or [])
+            + [{"role": "user", "content": question}]
+        ),
+    }
+
+
+def validate_rewrite(text) -> str | None:
+    """The cleaned rewrite, or None if it cannot be used as a query string.
+
+    A malformed rewrite is not a loud failure -- it becomes a bad query vector,
+    which scores low, which refuses. That is indistinguishable to the visitor
+    from "your question was off-topic", so it must be caught here and reported,
+    never used.
+    """
+    if not isinstance(text, str):
+        return None
+    cleaned = text.strip()
+    if not cleaned or "\n" in cleaned or len(cleaned) > LIMITS["question"]:
+        return None
+    return cleaned
+
+
+def rewrite_question(history: list, question: str) -> tuple[str, str]:
+    """(text to gate and retrieve on, outcome).
+
+    Outcomes: "rewritten", "echoed", "malformed", "thinking_starved", "error".
+    Every non-success outcome returns `question` unchanged, so the re-gate then
+    refuses exactly as it does today. No failure path opens the gate.
+    """
+    try:
+        content, finish_reason = call_llm_raw(rewrite_payload(history, question))
+    except Exception as err:  # noqa: BLE001 -- a rewrite must never take /chat down
+        log({"type": "rewrite_error", "detail": clip(str(err), 200)})
+        return question, "error"
+    if not (content or "").strip() and finish_reason == "length":
+        # The documented incident's signature: the completion budget went to a
+        # reasoning trace and left content empty. Its own outcome because the
+        # fix differs from a malformed rewrite's (the thinking flag, not the
+        # prompt).
+        return question, "thinking_starved"
+    cleaned = validate_rewrite(content)
+    if cleaned is None:
+        return question, "malformed"
+    return cleaned, ("echoed" if cleaned == question.strip() else "rewritten")
+
+
+def _post_llm(payload: dict) -> dict:
+    """POST an already-built payload to the LLM endpoint and return the
+    parsed JSON response.
+
+    The shared transport behind call_llm and call_llm_raw: URL, headers, and
+    timeout are decided in exactly one place, so a payload built with the
+    rewrite's own parameters (rewrite_payload) travels the identical path a
+    llm_payload one does. Errors (HTTPError, timeouts, malformed JSON) are
+    left to propagate -- call_llm's caller already handles HTTPError, and
+    rewrite_question wraps its own call in try/except.
+    """
     url = env("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/v1/chat/completions"
-    payload = llm_payload(system, messages)
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -992,7 +1101,26 @@ def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | 
         },
     )
     with urllib.request.urlopen(req, timeout=60) as res:
-        data = json.load(res)
+        return json.load(res)
+
+
+def call_llm_raw(payload: dict) -> tuple[str, str | None]:
+    """POST an already-built payload and return (content, finish_reason).
+
+    The transport half of call_llm, split out so rewrite_question can post a
+    payload with its own parameters. Returns only what the rewrite path needs;
+    call_llm still reads model/usage off the same response for its own
+    logging, via _post_llm directly rather than through this function --
+    call_llm_raw's contract is fixed at (content, finish_reason) so it cannot
+    also hand back model/usage without a second request.
+    """
+    data = _post_llm(payload)
+    choice = data["choices"][0]
+    return choice["message"]["content"], choice.get("finish_reason")
+
+
+def call_llm(system: str, messages: list) -> tuple[str, str, dict | None, str | None]:
+    data = _post_llm(llm_payload(system, messages))
     choice = data["choices"][0]
     return choice["message"]["content"], data.get("model", ""), data.get("usage"), choice.get("finish_reason")
 

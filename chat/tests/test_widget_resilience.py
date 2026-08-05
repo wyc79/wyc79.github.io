@@ -22,14 +22,21 @@ def _widget_src() -> str:
 
 
 def _index_call_llm_timeout() -> int:
-    """The literal seconds value from call_llm's own urlopen(...) --
-    load_roles has a second, unrelated urlopen with its own (shorter)
-    timeout, so the match is scoped to call_llm's definition specifically."""
+    """The literal seconds value from the urlopen(...) call that serves
+    call_llm -- load_roles has a second, unrelated urlopen with its own
+    (shorter) timeout, so the match must not simply be the first hit in the
+    file.
+
+    The follow-up condensation call (rewrite_question / call_llm_raw) shares
+    call_llm's transport via a private _post_llm helper rather than a second
+    copy of the request-building code, so the timeout literal now lives
+    there; scoped to _post_llm's definition rather than call_llm's own, for
+    the same load_roles-exclusion reason as before."""
     src = BACKEND_PATH.read_text(encoding="utf-8")
-    fn_src = re.search(r"def call_llm\(.*?\n(?=def )", src, re.S)
-    assert fn_src, "expected to find call_llm's definition in index.py"
+    fn_src = re.search(r"def _post_llm\(.*?\n(?=def )", src, re.S)
+    assert fn_src, "expected to find _post_llm's definition in index.py"
     t = re.search(r"urlopen\([^)]*timeout=(\d+)", fn_src.group(0))
-    assert t, "expected call_llm's urlopen(...) to declare an explicit timeout="
+    assert t, "expected _post_llm's urlopen(...) to declare an explicit timeout="
     return int(t.group(1))
 
 

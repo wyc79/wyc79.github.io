@@ -1003,3 +1003,165 @@ def test_top_projects_recommends_nothing_it_cannot_link(monkeypatch) -> None:
     mod.Handler._chat(handler)
 
     assert handler.responses[0][1]["sources"] == []
+
+
+# ── rewrite_payload / rewrite_question: follow-up resolution ────────────────
+#
+# The rewrite feeds an AUTHORITATIVE gate decision, so its parameters are a
+# gate-integrity concern rather than a tuning preference, and it pins all four
+# rather than inheriting llm_payload's (which serves the answer call).
+
+_REWRITE_HISTORY = [
+    {"role": "user", "content": "tell me about prime engine"},
+    {"role": "assistant", "content": "Prime Engine is a custom C++ renderer."},
+]
+
+
+def test_rewrite_payload_uses_greedy_decoding(monkeypatch) -> None:
+    """Sampled, the same off-topic follow-up yields a different rewrite per
+    attempt, so a visitor who retries gets a fresh roll against the gate.
+    Retry-until-pass is a real bypass; greedy decoding keeps a refused
+    follow-up refused."""
+    mod = _load_backend()
+
+    payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert payload["temperature"] == 0
+
+
+def test_rewrite_payload_disables_thinking_regardless_of_llm_thinking(monkeypatch) -> None:
+    """LLM_THINKING's "" escape hatch omits the field entirely, which is a safe
+    neutral only for a non-reasoning model. The default model reasons, so an
+    omitted field silently restores high-effort thinking on the rewrite path."""
+    mod = _load_backend()
+    for value in ("", "enabled", "maybe"):
+        monkeypatch.setenv("LLM_THINKING", value)
+
+        payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+        assert payload["thinking"] == {"type": "disabled"}, (
+            f"LLM_THINKING={value!r} leaked into the rewrite payload"
+        )
+
+
+def test_rewrite_payload_keeps_its_own_small_ceiling(monkeypatch) -> None:
+    """Not llm_payload's 2048 reasoning headroom -- this call emits one
+    sentence. LLM_MAX_TOKENS is the answer call's knob and must not move it."""
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_MAX_TOKENS", "4096")
+
+    payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert payload["max_tokens"] == mod.REWRITE_MAX_TOKENS
+    assert payload["max_tokens"] < 512
+
+
+def test_rewrite_payload_carries_history_then_the_question(monkeypatch) -> None:
+    mod = _load_backend()
+
+    payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert payload["messages"][0]["role"] == "system"
+    assert payload["messages"][0]["content"] == mod.REWRITE_SYSTEM_PROMPT
+    assert payload["messages"][1:-1] == _REWRITE_HISTORY
+    assert payload["messages"][-1] == {"role": "user", "content": "is there any optimization work"}
+
+
+def test_the_rewrite_prompt_states_the_disjunction_and_forbids_adding_a_topic() -> None:
+    """The echo condition is a DISJUNCTION on purpose: rewriting is the risky
+    operation, so it requires both a dangling reference and an antecedent,
+    while echoing needs only one. A prompt that dropped either branch would
+    still produce plausible rewrites and would only show up as a slow drift in
+    the post-context negatives."""
+    mod = _load_backend()
+    prompt = mod.REWRITE_SYSTEM_PROMPT.lower()
+
+    assert "verbatim" in prompt
+    assert "no antecedent" in prompt or "not present" in prompt
+    assert "never add" in prompt
+    assert "name" in prompt, "the prompt must forbid introducing a person name"
+
+
+def test_validate_rewrite_rejects_what_would_become_a_bad_query_vector() -> None:
+    """A malformed rewrite is not a loud failure: it is just a bad query
+    string, which scores low, which refuses -- the exact symptom this feature
+    exists to remove, silently reintroduced."""
+    mod = _load_backend()
+
+    assert mod.validate_rewrite("Is there optimization work in Prime Engine?") == (
+        "Is there optimization work in Prime Engine?"
+    )
+    assert mod.validate_rewrite("  padded  ") == "padded"
+    assert mod.validate_rewrite("") is None
+    assert mod.validate_rewrite("   ") is None
+    assert mod.validate_rewrite(None) is None
+    assert mod.validate_rewrite(42) is None
+    assert mod.validate_rewrite("line one\nline two") is None
+    assert mod.validate_rewrite("x" * (mod.LIMITS["question"] + 1)) is None
+
+
+def test_rewrite_question_returns_the_rewrite_on_success(monkeypatch) -> None:
+    mod = _load_backend()
+    monkeypatch.setattr(
+        mod, "call_llm_raw",
+        lambda payload: ("Is there any optimization work in Prime Engine?", "stop"),
+    )
+
+    text, outcome = mod.rewrite_question(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert text == "Is there any optimization work in Prime Engine?"
+    assert outcome == "rewritten"
+
+
+def test_rewrite_question_reports_an_echo_distinctly(monkeypatch) -> None:
+    """An echoed question is a correct, expected outcome -- 'write me a poem'
+    after a Prime Engine turn has nothing to resolve. It must not be logged as
+    a rewriter failure."""
+    mod = _load_backend()
+    monkeypatch.setattr(mod, "call_llm_raw", lambda payload: ("write me a poem", "stop"))
+
+    text, outcome = mod.rewrite_question(_REWRITE_HISTORY, "write me a poem")
+
+    assert text == "write me a poem"
+    assert outcome == "echoed"
+
+
+def test_rewrite_question_detects_thinking_starvation(monkeypatch) -> None:
+    """The documented incident's signature: empty content with
+    finish_reason 'length' means the completion budget went to a reasoning
+    trace. Distinguishable from a generic malformed rewrite because the fix is
+    different (the thinking flag, not the prompt)."""
+    mod = _load_backend()
+    monkeypatch.setattr(mod, "call_llm_raw", lambda payload: ("", "length"))
+
+    text, outcome = mod.rewrite_question(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert text == "is there any optimization work", "must fall back to the original"
+    assert outcome == "thinking_starved"
+
+
+def test_rewrite_question_falls_back_on_a_malformed_rewrite(monkeypatch) -> None:
+    mod = _load_backend()
+    monkeypatch.setattr(mod, "call_llm_raw", lambda payload: ("one\ntwo", "stop"))
+
+    text, outcome = mod.rewrite_question(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert text == "is there any optimization work"
+    assert outcome == "malformed"
+
+
+def test_rewrite_question_falls_back_when_the_call_raises(monkeypatch) -> None:
+    """Every failure path degrades to today's behaviour -- the original
+    question, which then fails the re-gate and refuses -- never to an open
+    gate."""
+    mod = _load_backend()
+
+    def _boom(payload):
+        raise OSError("connection reset")
+
+    monkeypatch.setattr(mod, "call_llm_raw", _boom)
+
+    text, outcome = mod.rewrite_question(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert text == "is there any optimization work"
+    assert outcome == "error"
