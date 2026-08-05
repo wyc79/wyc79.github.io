@@ -165,9 +165,13 @@ on the result. That re-gate is server-side and authoritative: a client cannot sk
 `gate_failed` only ever adds this check, never substitutes for the original one. The
 standalone string is used only to gate and retrieve; the visitor's own wording, unrewritten,
 is still what reaches the model (`body["question"]`, not the rewrite). A rewrite that fails
-the re-gate refuses exactly as before, distinguished in logs from a retrieval-empty refusal
-by `reason`/`refused_by` (`regate_failed` vs `server_retrieval_empty`) so the two causes
-don't get conflated after the fact. Light mode and degraded mode have no backend LLM to
+the re-gate refuses exactly as before, distinguished from a retrieval-empty refusal by the
+server's own `reason` field (`regate_failed` vs the default `retrieval_empty`) so the two
+causes don't get conflated after the fact. The client's `refused_by` is not the same
+vocabulary: it is `resp.reason` when the (redeployed) server sent one, but falls back to a
+distinct literal, `server_retrieval_empty`, only when it's missing — i.e. only against an
+old, un-redeployed function that predates this field entirely (see the deployment callout
+below for exactly that scenario). Light mode and degraded mode have no backend LLM to
 condense with, so a refusal there is still the old, terminal one.
 
 Known limit, accepted rather than fixed: the gate is a **subject-matter** filter, not an
