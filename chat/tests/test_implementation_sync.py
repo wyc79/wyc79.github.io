@@ -352,3 +352,81 @@ def test_chat_widget_js_agrees_with_runtime_py_on_gate_form() -> None:
         "scripts/chat-widget.js's gateForm() disagrees with runtime.py's "
         f"gate_form() on (string, python_result, js_result): {mismatches!r}"
     )
+
+
+# ── Items 1-3 and 5, widened to three-way (Task: follow-up resolution) ──────
+#
+# index.py used to receive gate_text as a parameter and never strip a name
+# itself, which is why the scope note above says "two implementations, not
+# three" for everything except CJK_RE. The authoritative re-gate on the
+# escalated /chat path changed that: index.py now computes gate_form() on a
+# rewrite it produced itself, with no client involved, so its copies of
+# NAME_RE / BIO_STUB_RE / strip_name / gate_form are live code on a real
+# request path and get the same treatment every other copy does.
+
+
+def _index_py_module():
+    """Load functions/tencent/index.py fresh. Unlike _index_py_cjk_re above,
+    nothing here needs the lazy CJK_RE compile forced by hand -- gate_form()
+    calls _ensure_cjk_re() itself."""
+    spec = importlib.util.spec_from_file_location("_scf_index_gateform_under_test", str(BACKEND_PATH))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_index_py_agrees_with_runtime_py_on_name_match() -> None:
+    mod = _index_py_module()
+    mismatches = [
+        (s, bool(NAME_RE.search(s)), bool(mod.NAME_RE.search(s)))
+        for s in PROBE_STRINGS
+        if bool(NAME_RE.search(s)) != bool(mod.NAME_RE.search(s))
+    ]
+    assert not mismatches, (
+        "functions/tencent/index.py's NAME_RE disagrees with runtime.py's on "
+        f"(string, runtime_match, index_match): {mismatches!r}"
+    )
+
+
+def test_index_py_agrees_with_runtime_py_on_bio_stub_re() -> None:
+    mod = _index_py_module()
+    mismatches = [
+        (s, bool(BIO_STUB_RE.search(s)), bool(mod.BIO_STUB_RE.search(s)))
+        for s in BIO_STUB_PROBES
+        if bool(BIO_STUB_RE.search(s)) != bool(mod.BIO_STUB_RE.search(s))
+    ]
+    assert not mismatches, (
+        "functions/tencent/index.py's BIO_STUB_RE disagrees with runtime.py's on "
+        f"(string, runtime_result, index_result): {mismatches!r}"
+    )
+
+
+def test_index_py_agrees_with_runtime_py_on_strip_name() -> None:
+    mod = _index_py_module()
+    mismatches = [
+        (s, strip_name(s), mod.strip_name(s))
+        for s in PROBE_STRINGS
+        if strip_name(s) != mod.strip_name(s)
+    ]
+    assert not mismatches, (
+        "functions/tencent/index.py's strip_name() disagrees with runtime.py's on "
+        f"(string, runtime_result, index_result): {mismatches!r}"
+    )
+
+
+def test_index_py_agrees_with_runtime_py_on_gate_form() -> None:
+    """The composite, and the one that matters: this is exactly the text the
+    authoritative re-gate judges on the escalated /chat path. A divergence here
+    means the server gates a rewrite differently than the widget would have
+    gated the same string -- the failure mode the two-way version of this test
+    was written for, now with a third place to go wrong."""
+    mod = _index_py_module()
+    mismatches = [
+        (s, gate_form(s), mod.gate_form(s))
+        for s in PROBE_STRINGS
+        if gate_form(s) != mod.gate_form(s)
+    ]
+    assert not mismatches, (
+        "functions/tencent/index.py's gate_form() disagrees with runtime.py's on "
+        f"(string, runtime_result, index_result): {mismatches!r}"
+    )

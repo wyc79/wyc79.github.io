@@ -66,6 +66,7 @@ RATE_LIMIT_PER_HOUR.
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -650,23 +651,96 @@ def embed_text(text: str) -> list[float]:
     return [round(float(v), 6) for v in _run_embedding(_embed, text)]
 
 
+# ── Gate text normalization (third copy -- see the sync test) ───────────────
+#
+# scripts/chat-widget.js and src/portfolio_rag/runtime.py hold the other two.
+# This file cannot import runtime.py (the SCF package is stdlib-only), which is
+# the same constraint that already forced it to duplicate the read path.
+# chat/tests/test_implementation_sync.py executes all three against one probe
+# list and fails on any disagreement.
+#
+# Until the escalated /chat path existed, this file received gate_text as a
+# parameter and never stripped a name itself. It does now: the authoritative
+# re-gate judges a rewrite this process produced, with no client involved.
+#
+# CJK_RE is written with EXPLICIT \u escapes, NOT literal characters: the
+# compatibility-range start char is a homoglyph of the unified-range one and is
+# easy to mistype invisibly.
+
+NAME_RE = re.compile(r"(?<![a-zA-Z0-9_])(yuanchen|wang|yc)(?:'s)?(?![a-zA-Z0-9_])|王元辰", re.I)
+
+BIO_STUB_RE = re.compile(
+    r"^(who\s+is|who'?s|about|tell\s+me\s+(?:more\s+)?about|introduce|what\s+about|more\s+about)(?![a-zA-Z0-9_])"
+    r"|^$|介绍|简介|谁是|是谁|关于"
+    r"|(?:都会什么|会做什么|会什么|擅长什么)[?？。!！\s]*$"
+    r"|有(?:哪些|什么)?技能",
+    re.I,
+)
+
+_WS_RE = re.compile(r"\s+")
+_EDGE_PUNCT_RE = re.compile(r"^[\s:;,.!?—-]+|[\s:;,.!?—-]+$")
+
+
+def _ensure_cjk_re():
+    """Compile CJK_RE on first use and return it.
+
+    CJK_RE was previously compiled inline inside gate_decision. gate_form needs
+    it too, so the compile moved here rather than being duplicated -- both call
+    sites go through this. gate_decision still triggers the compile on its own
+    first call, which is what test_implementation_sync.py's _index_py_cjk_re
+    helper relies on.
+    """
+    global CJK_RE
+    if CJK_RE is None:
+        CJK_RE = re.compile("[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
+    return CJK_RE
+
+
+def strip_name(question: str) -> str | None:
+    """The name-stripped remainder, or None when the name should be kept.
+
+    None means "gate on the whole question": either it never mentioned YC, or
+    what remained after removing the name was a bio-intent stub.
+    """
+    if not NAME_RE.search(question):
+        return None
+    remainder = _EDGE_PUNCT_RE.sub("", _WS_RE.sub(" ", NAME_RE.sub(" ", question)).strip())
+    return None if BIO_STUB_RE.search(remainder) else remainder
+
+
+def gate_form(question: str) -> str:
+    """Exactly what the gate should judge for `question`.
+
+    When the name was stripped, gate on the remainder. When it was KEPT, the
+    name is normalized to the gate's own language -- each gate corpus is
+    single-language, so a Chinese question saying "YC" (or an English one
+    saying 王元辰) would otherwise miss it.
+
+    The language branch is a PRESENCE check for CJK characters, not a majority
+    vote; changing that silently changes which questions get refused.
+    """
+    stripped = strip_name(question)
+    if stripped is not None:
+        return stripped
+    if _ensure_cjk_re().search(question):
+        return NAME_RE.sub("王元辰", question)
+    return question.replace("王元辰", "YC")
+
+
 def gate_decision(gate_text: str) -> dict | None:
     """Language-routed off-topic gate; None when no gate is packaged.
 
-    `gate_text` is CLIENT-SUPPLIED (see _embed_route). This function is the
-    whole of the calibrated gate on the server side, it is reachable only via
-    /embed, and /chat never calls it -- so this is a UX filter computed on the
-    client's behalf, not an enforcement point. See the module docstring's
-    "which guards are server-side" note; the server-side backstops are the
-    retrieval-empty refusal in _chat and rate_limited()."""
-    global CJK_RE
+    `gate_text` is CLIENT-SUPPLIED when this is reached via /embed, which is a
+    UX filter computed on the client's behalf. It is SERVER-COMPUTED when
+    reached via _chat's escalated path, where gate_form() is applied to a
+    rewrite this process produced and the verdict is authoritative -- a client
+    cannot skip it, and sending `gate_failed` only ever ADDS this check. See
+    the module docstring's "which guards are server-side" note; the other
+    server-side backstops are the retrieval-empty refusal in _chat and
+    rate_limited()."""
     if _gates["en"] is None:
         return None
-    if CJK_RE is None:
-        import re
-
-        CJK_RE = re.compile("[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
-    if CJK_RE.search(gate_text):
+    if _ensure_cjk_re().search(gate_text):
         gate = _gates["zh"]
         if gate is None:
             # No zh gate packaged/enabled - let CJK questions through to the
