@@ -1356,6 +1356,69 @@ def test_the_rewrite_prompt_states_the_disjunction_and_forbids_adding_a_topic() 
     assert "name" in prompt, "the prompt must forbid introducing a person name"
 
 
+def test_the_rewrite_prompt_exemplifies_both_branches_of_the_disjunction() -> None:
+    """Regression guard for a real live-API oscillation: round 1 hardened the
+    anti-answer clause and added exactly one worked example (ECHO, per the
+    task's own instruction to demonstrate "an off-topic imperative echoing
+    verbatim"). Measured against the real API afterwards, both positive
+    multi-turn cases -- which must RESOLVE a dangling pronoun -- started
+    echoing unchanged too: refresh_rewrites.py's own "positive case(s) echoed
+    unchanged" warning caught it. The rule was always a two-branch
+    disjunction, but only one branch had ever been SHOWN, and the model
+    generalised the one demonstrated behaviour (echo) to everything -- a
+    reasonable reading of a one-sided example set, not a reasoning failure.
+
+    This test would fail if either worked example were deleted, or if the
+    prompt reverted to describing the disjunction without demonstrating both
+    halves of it: it pins concrete, distinctive substrings from each example
+    (not just the words "resolve"/"echo", which the surrounding prose also
+    uses), so a future edit cannot satisfy it by leaving one example's label
+    in place while gutting its content.
+    """
+    mod = _load_backend()
+    prompt = mod.REWRITE_SYSTEM_PROMPT
+    lower = prompt.lower()
+
+    assert "resolve" in lower and "echo" in lower
+    # RESOLVE worked example: a dangling pronoun actually gets substituted.
+    assert "trailmap" in lower, "the RESOLVE worked example was deleted or gutted"
+    assert "battery life" in lower
+    assert "was it optimized for battery life" in lower, "the dangling follow-up"
+    assert "was the offline map renderer for trailmap optimized" in lower, (
+        "the example must show the substitution actually happening, not just "
+        "assert that resolution is possible"
+    )
+    # ECHO worked example: an off-topic imperative left untouched.
+    assert "给我讲个笑话" in prompt, "the ECHO worked example was deleted or gutted"
+    assert prompt.count("给我讲个笑话") >= 2, (
+        "the example must show the SAME text as both the follow-up and the "
+        "correct output -- i.e. actually echoed, not paraphrased"
+    )
+    # Neither example is drawn from the six golden multi-turn cases (do not
+    # tune the prompt on the measurement set).
+    golden_questions = (
+        "what about tuning it", "was it tested", "make up a poem for me",
+        "is it raining there right now", "给我写首诗", "帮我写封邮件",
+    )
+    for q in golden_questions:
+        assert q not in prompt, f"prompt example must not reuse a golden-case question: {q!r}"
+
+
+def test_the_rewrite_prompt_distinguishes_resolving_a_reference_from_answering() -> None:
+    """The anti-answer clause and the RESOLVE branch are not in tension --
+    substituting a referent is required, not an answer -- but a model could
+    read a strengthened anti-answer clause as 'never change the question at
+    all' unless the prompt says otherwise explicitly. Guards the specific
+    sentence that heads off that misreading."""
+    mod = _load_backend()
+    prompt = mod.REWRITE_SYSTEM_PROMPT.lower()
+
+    assert "substitut" in prompt, (
+        "the prompt must explicitly say that substituting a referent is not "
+        "answering, or a hardened anti-answer clause can suppress resolution too"
+    )
+
+
 def test_the_rewrite_prompt_hardens_the_anti_answer_clause_and_requires_matching_language() -> None:
     """The live-API defect (see
     test_rewrite_payload_never_replays_history_as_message_turns) was a role
