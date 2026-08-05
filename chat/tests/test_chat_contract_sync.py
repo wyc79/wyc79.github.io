@@ -623,12 +623,23 @@ def _drive_chat(mod, monkeypatch, body: dict, hits: list, answer: str = "an answ
     substrings. Those passed whenever an identifier merely APPEARED in the
     method's source -- proven by mutation: replacing the whole refusal
     condition with `if False:` left the entire suite green. Driving the handler
-    and reading the emitted record is what actually pins the behaviour."""
+    and reading the emitted record is what actually pins the behaviour.
+
+    `retrieve` and `call_llm` are stubbed here only when the caller has not
+    already monkeypatched one -- callers on the escalated path (Task 5) need
+    their OWN stub live (to record the query it was called with, or the
+    messages it was sent) instead of this function's generic one, and
+    monkeypatch.setattr applied here after the caller's own call would
+    silently win and discard it. `__name__` distinguishes "still the real
+    module function" from "already replaced by a lambda" without needing a
+    pristine module reference to compare against."""
     records: list = []
     monkeypatch.setattr(mod, "log", lambda rec: records.append(rec))
-    monkeypatch.setattr(mod, "retrieve", lambda q: list(hits))
+    if mod.retrieve.__name__ == "retrieve":
+        monkeypatch.setattr(mod, "retrieve", lambda q: list(hits))
     monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
-    monkeypatch.setattr(mod, "call_llm", lambda system, messages: (answer, "test-model", {}, "stop"))
+    if mod.call_llm.__name__ == "call_llm":
+        monkeypatch.setattr(mod, "call_llm", lambda system, messages: (answer, "test-model", {}, "stop"))
     monkeypatch.setattr(mod, "load_roles", lambda: {
         "default_role": "visitor",
         "base_system_prompt": "base",
@@ -1223,3 +1234,156 @@ def test_rewrite_question_falls_back_when_the_call_raises(monkeypatch) -> None:
 
     assert text == "is there any optimization work"
     assert outcome == "error"
+
+
+# ── The escalated follow-up path ───────────────────────────────────────────
+
+
+def test_validate_chat_body_accepts_gate_failed_and_rejects_a_non_boolean() -> None:
+    mod = _load_backend()
+    base = {"question": "is there any optimization work", "history": []}
+
+    assert mod.validate_chat_body({**base, "gate_failed": True}) is None
+    assert mod.validate_chat_body({**base, "gate_failed": False}) is None
+    assert mod.validate_chat_body(base) is None, "optional -- an old cached widget omits it"
+    assert mod.validate_chat_body({**base, "gate_failed": "true"}) is not None
+    assert mod.validate_chat_body({**base, "gate_failed": 1}) is not None
+
+
+def _drive_escalated_chat(mod, monkeypatch, body, hits, rewrite, regate, answer="an answer"):
+    """_drive_chat plus the two seams the escalated path adds."""
+    monkeypatch.setattr(mod, "rewrite_question", lambda h, q: rewrite)
+    monkeypatch.setattr(mod, "gate_decision", lambda t: regate)
+    return _drive_chat(mod, monkeypatch, body, hits, answer=answer)
+
+
+def test_an_escalated_follow_up_retrieves_on_the_rewrite_not_the_raw_question(monkeypatch) -> None:
+    """The whole point. "is there any optimization work" has no useful query
+    vector on its own; the resolved form does."""
+    mod = _load_backend()
+    retrieved: list = []
+    hit = {"chunk": {"id": "pages/prime-engine.html#opt:en:0", "url": "pages/prime-engine.html",
+                     "anchor": "opt", "page_title": "Prime Engine", "section_title": "Optimization",
+                     "text": "culling and batching"}, "score": 0.44}
+    monkeypatch.setattr(mod, "rewrite_question",
+                        lambda h, q: ("Is there optimization work in Prime Engine?", "rewritten"))
+    monkeypatch.setattr(mod, "gate_decision", lambda t: {"pass": True, "value": 0.41, "lang": "en"})
+    monkeypatch.setattr(mod, "retrieve", lambda q: retrieved.append(q) or [hit])
+    records, responses = _drive_chat(
+        mod, monkeypatch,
+        {"question": "is there any optimization work", "gate_failed": True,
+         "history": [{"role": "user", "content": "tell me about prime engine"}]},
+        hits=[hit],
+    )
+
+    assert retrieved == ["Is there optimization work in Prime Engine?"], (
+        "retrieval must use the rewrite -- retrieving on the raw question is the bug"
+    )
+    assert responses[0][0] == 200 and responses[0][1]["answer"] == "an answer"
+
+
+def test_the_escalated_path_answers_the_visitors_original_wording(monkeypatch) -> None:
+    """The rewrite is a gate-and-retrieval device. /chat already feeds history
+    to the model, so it resolves the reference natively; substituting the
+    rewrite would discard the visitor's phrasing and let rewriter errors reach
+    the answer."""
+    mod = _load_backend()
+    seen: list = []
+    monkeypatch.setattr(mod, "call_llm",
+                        lambda system, messages: (seen.append(messages) or ("an answer", "m", {}, "stop")))
+    hit = {"chunk": {"id": "x", "url": "pages/prime-engine.html", "anchor": "",
+                     "page_title": "Prime Engine", "section_title": "S", "text": "t"}, "score": 0.4}
+    _drive_escalated_chat(
+        mod, monkeypatch,
+        {"question": "is there any optimization work", "gate_failed": True,
+         "history": [{"role": "user", "content": "tell me about prime engine"}]},
+        hits=[hit],
+        rewrite=("Is there optimization work in Prime Engine?", "rewritten"),
+        regate={"pass": True, "value": 0.41, "lang": "en"},
+    )
+
+    assert seen[0][-1] == {"role": "user", "content": "is there any optimization work"}
+
+
+def test_an_escalated_follow_up_that_stays_off_topic_is_refused_by_the_regate(monkeypatch) -> None:
+    """"write me a poem" after a Prime Engine turn: nothing to resolve, so the
+    rewrite echoes, so the re-gate sees the same string that already failed.
+    The escalation must not become a way through."""
+    mod = _load_backend()
+    hit = {"chunk": {"id": "x", "url": "pages/prime-engine.html", "anchor": "",
+                     "page_title": "Prime Engine", "section_title": "S", "text": "t"}, "score": 0.4}
+    records, responses = _drive_escalated_chat(
+        mod, monkeypatch,
+        {"question": "write me a poem", "gate_failed": True,
+         "history": [{"role": "user", "content": "tell me about prime engine"}]},
+        hits=[hit],
+        rewrite=("write me a poem", "echoed"),
+        regate={"pass": False, "value": 0.12, "lang": "en"},
+    )
+
+    status, payload = responses[0]
+    assert status == 200 and payload["refused"] is True
+    assert payload["reason"] == "regate_failed"
+    refused = [r for r in records if r.get("type") == "chat_refused"]
+    assert len(refused) == 1
+    assert refused[0]["outcome"] == "refused_regate"
+    assert refused[0]["rewrite_outcome"] == "echoed"
+    assert refused[0]["client_contexts_ignored"] == 0, (
+        "the regate refusal is a chat_refused record like refused_no_hits and "
+        "must carry the same old-client-tail field, not a narrower shape"
+    )
+
+
+def test_the_regate_is_applied_to_gate_form_of_the_rewrite(monkeypatch) -> None:
+    """Name-blind, like every other gate call. A rewrite that reintroduced the
+    name would otherwise inflate its own similarity and hand itself a pass."""
+    mod = _load_backend()
+    judged: list = []
+    hit = {"chunk": {"id": "x", "url": "pages/prime-engine.html", "anchor": "",
+                     "page_title": "P", "section_title": "S", "text": "t"}, "score": 0.4}
+    monkeypatch.setattr(mod, "gate_decision",
+                        lambda t: judged.append(t) or {"pass": True, "value": 0.4, "lang": "en"})
+    monkeypatch.setattr(mod, "rewrite_question",
+                        lambda h, q: ("Yuanchen Wang tell me a joke", "rewritten"))
+    _drive_chat(
+        mod, monkeypatch,
+        {"question": "tell me a joke", "gate_failed": True,
+         "history": [{"role": "user", "content": "tell me about prime engine"}]},
+        hits=[hit],
+    )
+
+    assert judged == ["tell me a joke"], (
+        "the re-gate judged the raw rewrite instead of gate_form()'s output -- "
+        "the name would inflate the score and pass a joke request"
+    )
+
+
+def test_no_rewrite_happens_without_gate_failed(monkeypatch) -> None:
+    """A turn whose gate passed must cost nothing extra."""
+    mod = _load_backend()
+    called: list = []
+    monkeypatch.setattr(mod, "rewrite_question", lambda h, q: called.append(q) or (q, "rewritten"))
+    hit = {"chunk": {"id": "x", "url": "pages/skills.html", "anchor": "",
+                     "page_title": "S", "section_title": "S", "text": "t"}, "score": 0.4}
+    _drive_chat(mod, monkeypatch,
+                {"question": "what engines", "history": [{"role": "user", "content": "hi"}]},
+                hits=[hit])
+
+    assert called == []
+
+
+def test_no_rewrite_happens_with_gate_failed_but_empty_history(monkeypatch) -> None:
+    """There is nothing to resolve against. The widget should not have
+    escalated at all, but the server must not depend on that."""
+    mod = _load_backend()
+    called: list = []
+    monkeypatch.setattr(mod, "rewrite_question", lambda h, q: called.append(q) or (q, "rewritten"))
+    monkeypatch.setattr(mod, "gate_decision", lambda t: {"pass": False, "value": 0.1, "lang": "en"})
+    records, responses = _drive_chat(
+        mod, monkeypatch,
+        {"question": "write me a poem", "gate_failed": True, "history": []},
+        hits=[],
+    )
+
+    assert called == []
+    assert responses[0][1]["refused"] is True

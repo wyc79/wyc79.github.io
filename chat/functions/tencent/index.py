@@ -6,7 +6,8 @@ provider that exposes /v1/chat/completions). Listens on :9000 as SCF web
 functions require; scf_bootstrap starts it.
 
 Routes and guarantees:
-  POST /chat  {session, role, lang, question, history?, page?, embed_rid?, intent?}
+  POST /chat  {session, role, lang, question, history?, page?, embed_rid?, intent?,
+               gate_failed?}
               -> {answer, model, rid, sources[]}
   POST /embed {session?, text, gate_text?, gate_only?} -> {vector?, gate?, rid}
   POST /log   client-side event record -> 204
@@ -32,15 +33,26 @@ Routes and guarantees:
       far below where e5 cosines sit for this index -- measured, off-topic
       questions score ~0.80 -- so `not hits` was already close to
       unreachable before page-awareness relaxed the condition at all.
-    * The CALIBRATED OFF-TOPIC GATE IS NOT a server-side backstop. It lives on
-      /embed, it judges `gate_text` — a string the CLIENT computes and sends —
-      and /chat has no gate at all. Any client that skips /embed, ignores its
+    * The CALIBRATED OFF-TOPIC GATE IS NOT a general server-side backstop. It
+      lives primarily on /embed, where it judges `gate_text` — a string the
+      CLIENT computes and sends. Any client that skips /embed, ignores its
       verdict, or sends a benign gate_text still reaches the LLM as long as
-      something clears MIN_SCORE. The gate is a UX filter the server computes
-      on the client's behalf, not an access control, and the refusal rates the
-      golden harness measures for it are measurements of that filter.
-      Deliberate: for a portfolio site the practical exposure is LLM spend,
-      which rate_limited() covers.
+      something clears MIN_SCORE. There, the gate is a UX filter the server
+      computes on the client's behalf, not an access control, and the refusal
+      rates the golden harness measures for it are measurements of that
+      filter. /chat itself runs the gate too, but only on ONE path: when the
+      client reports `gate_failed: true` on a question with conversation
+      history behind it (follow-up resolution), _chat rewrites the question
+      (rewrite_question), applies gate_form() to the rewrite, and re-judges it
+      with gate_decision() itself. That verdict is SERVER-COMPUTED and
+      authoritative — a client cannot skip it, and `gate_failed` only ever
+      ADDS this check, it never substitutes for the /embed one. A client that
+      simply never sends `gate_failed: true` never reaches this path at all,
+      so it closes one specific gap (a genuine follow-up refused for having no
+      topic of its own in isolation) rather than turning the gate into a
+      backstop against a client that lies outright. Deliberate: for a
+      portfolio site the practical exposure is LLM spend, which
+      rate_limited() covers.
 - Role prompts come from the site's roles.json (client sends a role id only);
   a bundled roles.json copy is the fallback if github.io is unreachable from
   the function's region.
@@ -904,6 +916,15 @@ def validate_chat_body(body) -> str | None:
     intent = body.get("intent")
     if intent is not None and intent not in INTENTS:
         return "bad intent"
+    # Set by the widget when its own (client-computed, /embed) gate refused
+    # this question. Optional: an old cached widget omits it, and the field
+    # only ever ADDS the server-side re-gate below -- it can never skip one.
+    # isinstance(True, int) is True in Python, so bool must be checked before
+    # int would be, and explicitly rather than via a numeric check at all --
+    # this is why the integer 1 is rejected alongside the string "true".
+    gate_failed = body.get("gate_failed")
+    if gate_failed is not None and not isinstance(gate_failed, bool):
+        return "bad gate_failed"
     return None
 
 
@@ -1343,7 +1364,40 @@ class Handler(BaseHTTPRequestHandler):
         # than any attempt to detect that afterwards, and it makes sources: []
         # on this path mean something true: the answer came from the page the
         # visitor is on.
-        hits = [] if intent in ("summarize_page", "top_projects") else retrieve(body["question"])
+
+        # Follow-up resolution: the client's gate refused this question, but it
+        # has a conversation behind it, so the refusal may be an artifact of
+        # judging one string in isolation. Condense, then re-judge --
+        # server-side and authoritatively, so `gate_failed` only ever ADDS a
+        # check a client cannot skip. A declared intent bypasses the gate by
+        # design and must not take this path.
+        history = body.get("history") or []
+        query = body["question"]
+        rewrite_outcome = None
+        regate = None
+        if body.get("gate_failed") and history and intent is None:
+            query, rewrite_outcome = rewrite_question(history, body["question"])
+            regate = gate_decision(gate_form(query))
+            if regate is not None and not regate.get("pass"):
+                log({
+                    "type": "chat_refused",
+                    "rid": rid,
+                    "sid": sid,
+                    "embed_rid": embed_rid,
+                    "outcome": "refused_regate",
+                    "intent": intent,
+                    "role": body.get("role"),
+                    "question": clip(body["question"], LIMITS["log_msg_text"]),
+                    "rewrite": clip(query, LIMITS["log_msg_text"]),
+                    "rewrite_outcome": rewrite_outcome,
+                    "gate_verdict": gate_verdict(regate),
+                    "gate": regate,
+                    "page_url": (body.get("page") or {}).get("url"),
+                    "client_contexts_ignored": client_contexts_ignored,
+                })
+                return self._json(200, refusal_response(rid, "regate_failed"))
+
+        hits = [] if intent in ("summarize_page", "top_projects") else retrieve(query)
 
         page = body.get("page") if isinstance(body.get("page"), dict) else {}
         seen = {h["chunk"].get("id") for h in hits}
@@ -1378,6 +1432,8 @@ class Handler(BaseHTTPRequestHandler):
                 "question": clip(body["question"], LIMITS["log_msg_text"]),
                 "page_url": page.get("url"),
                 "client_contexts_ignored": client_contexts_ignored,
+                "rewrite": clip(query, LIMITS["log_msg_text"]) if rewrite_outcome else None,
+                "rewrite_outcome": rewrite_outcome,
             })
             return self._json(200, refusal_response(rid))
 
@@ -1466,6 +1522,8 @@ class Handler(BaseHTTPRequestHandler):
             "intent": intent,
             "role": body.get("role"),
             "client_contexts_ignored": client_contexts_ignored,
+            "rewrite": clip(query, LIMITS["log_msg_text"]) if rewrite_outcome else None,
+            "rewrite_outcome": rewrite_outcome,
             "in": {
                 "system_head": system_head,
                 "contexts": log_contexts(hits),
