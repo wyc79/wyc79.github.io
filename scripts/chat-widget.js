@@ -210,6 +210,8 @@
       send: 'Send',
       summarizePage: 'Summarize this page',
       summarizePageAria: 'Summarize the page you are reading',
+      topProjects: 'What should I look at?',
+      topProjectsAria: 'Recommend the projects most relevant to my role',
       loadingGeneric: 'Loading…',
       loadingModel: 'Loading the on-device search model (~23 MB, cached after the first visit)…',
       loadingModelPct: function (pct) { return 'Loading the on-device search model… ' + pct + '%'; },
@@ -259,6 +261,8 @@
       send: '发送',
       summarizePage: '总结一下这个页面',
       summarizePageAria: '总结你正在阅读的页面',
+      topProjects: '有哪些值得先看？',
+      topProjectsAria: '推荐最符合我身份的项目',
       loadingGeneric: '加载中…',
       loadingModel: '正在加载本地检索模型（约 23 MB，首次访问后会缓存）…',
       loadingModelPct: function (pct) { return '正在加载本地检索模型… ' + pct + '%'; },
@@ -897,14 +901,23 @@
   // used to return, now that retrieval happens server-side (Task 29).
   function resultsFromSources(sources) {
     return (sources || []).map(function (s) {
-      // Guard at the boundary where server-supplied data becomes the
-      // widget's internal {chunk, score} shape: every downstream reader
-      // (addSources' r.score.toFixed(2), the record.retrieved/sourcesForLog
-      // .toFixed(3) call sites) assumes a real number, the same guarantee
-      // scoreChunks' own numeric loop always provides for the client-side
-      // path. A backend that omits or malforms `score` must not throw deep
-      // inside rendering.
-      var score = typeof s.score === 'number' && isFinite(s.score) ? s.score : 0;
+      // Guard at the boundary where server-supplied data becomes the widget's
+      // internal {chunk, score} shape. Three states, not two, since /chat
+      // gained a path that ranks nothing:
+      //   a real number  -> a measured similarity, rendered
+      //   absent         -> nothing was ranked (the top_projects
+      //                     recommendation cards), so there is NO score to
+      //                     report and undefined is carried through rather
+      //                     than a fabricated 0.00
+      //   present but malformed -> 0, the original defensive case: a backend
+      //                     sending garbage must not throw inside rendering
+      // Readers of a server-supplied score must therefore test typeof before
+      // calling toFixed. There are exactly two (addSources, and send()'s
+      // record.retrieved) and both do; the client-side retrieval paths get
+      // their scores from scoreChunks' numeric loop and are unaffected.
+      var score = s.score === undefined || s.score === null
+        ? undefined
+        : (typeof s.score === 'number' && isFinite(s.score) ? s.score : 0);
       return {
         chunk: {
           id: s.id, url: s.url, anchor: s.anchor,
@@ -1010,7 +1023,11 @@
         ? (sec || r.chunk.page_title)
         : r.chunk.page_title + ' — ' + sec;
       var title = h('b', null, titleText);
-      var snippet = h('span', null, r.chunk.text.slice(0, 110) + '…  (' + r.score.toFixed(2) + ')');
+      // score is absent on a recommendation card: nothing was ranked, so
+      // there is no similarity to report and a fabricated 1.00 would make the
+      // number meaningless on the retrieval cards too.
+      var tail = typeof r.score === 'number' ? '…  (' + r.score.toFixed(2) + ')' : '…';
+      var snippet = h('span', null, r.chunk.text.slice(0, 110) + tail);
       a.appendChild(title);
       a.appendChild(snippet);
       wrap.appendChild(a);
@@ -1116,10 +1133,24 @@
     // page's own chunks without retrieving. Typing the same words still works
     // -- it just goes through ordinary retrieval like any other question, with
     // no guarantee the gate keeps admitting that phrasing.
-    var sum = h('button', 'ycchat-starter', t('summarizePage'));
+    // One slot, two behaviours. On a hub page "summarize this page" would
+    // disappoint -- index.html carries two chunks and projects.html three, so
+    // the summary is barely shorter than the page. There the useful question
+    // is which of the seventeen pages fits the role the visitor picked, which
+    // is what HUB_URLS already marks (it suppresses these two as source cards
+    // for the same reason: landing on them tells you nothing).
+    var onHub = !!HUB_URLS[currentPageUrl()];
+    var sum = h('button', 'ycchat-starter', t(onHub ? 'topProjects' : 'summarizePage'));
     sum.type = 'button';
-    sum.setAttribute('aria-label', t('summarizePageAria'));
-    sum.addEventListener('click', function () { send(t('summarizePage'), 'summarize_page'); });
+    sum.setAttribute('aria-label', t(onHub ? 'topProjectsAria' : 'summarizePageAria'));
+    // Both intents written as literals rather than through a variable: the two
+    // sides hold this closed set with no build step between them, and
+    // test_the_widget_only_ever_declares_intents_the_backend_accepts reads them
+    // straight out of this source to check they are ones index.py accepts.
+    sum.addEventListener('click', function () {
+      if (onHub) send(t('topProjects'), 'top_projects');
+      else send(t('summarizePage'), 'summarize_page');
+    });
     starters.appendChild(sum);
     (L(role, 'starters') || []).forEach(function (q) {
       var chip = h('button', 'ycchat-starter', q);
@@ -1271,7 +1302,12 @@
           return;
         }
         results = resultsFromSources(resp.sources);
-        record.retrieved = results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
+        record.retrieved = results.map(function (r) {
+          // score is absent on a recommendation card -- see resultsFromSources.
+          return typeof r.score === 'number'
+            ? { id: r.chunk.id, score: +r.score.toFixed(3) }
+            : { id: r.chunk.id };
+        });
         answer = normalizeAnswer(resp.answer);
         if (!answer) throw new Error('the model returned an empty answer');
         thinking.classList.remove('ycchat-dots');

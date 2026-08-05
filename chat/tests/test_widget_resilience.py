@@ -737,3 +737,89 @@ def test_the_wire_body_is_what_chat_request_body_built() -> None:
     assert sent["question"] == "who is YC"
     for field in ("session", "role", "lang", "history"):
         assert field in sent, f"the wire body is missing {field!r}"
+
+
+def _chip_for(pathname: str) -> dict:
+    """Run addStarters' real chip branch against a stand-in page, returning the
+    label key and intent it chose."""
+    import json as _json
+
+    src = _widget_src()
+    # addStarters is EXTRACTED, not reimplemented. An earlier version of this
+    # helper rewrote the hub branch in the test script, which meant a mutation
+    # to the widget's real branch could not turn it red -- retyped JS drifting
+    # from the file it mirrors, the exact failure this module's docstring
+    # exists to refuse. Everything addStarters touches that belongs to the DOM
+    # or the widget's closure is stubbed; the branch itself is the real one.
+    script = (
+        "var HUB_URLS = " + extract_js_var(src, "HUB_URLS") + ";\n"
+        f"var window = {{ location: {{ pathname: {_json.dumps(pathname)} }} }};\n"
+        + extract_js_function(src, "function currentPageUrl(") + "\n"
+        "var picked = null;\n"
+        "function t(k) { return k; }\n"
+        "function L(role, key) { return []; }\n"
+        "function h(tag, cls, txt) {\n"
+        "  return { tag: tag, txt: txt, appendChild: function () {}, setAttribute: function () {},\n"
+        "           addEventListener: function (ev, fn) { this._click = fn; } };\n"
+        "}\n"
+        "var els = { body: { appendChild: function () {}, scrollTop: 0, scrollHeight: 0 } };\n"
+        "function send(text, intent) { picked = { text: text, intent: intent }; }\n"
+        + extract_js_function(src, "function addStarters(") + "\n"
+        # capture the chip addStarters actually built, then fire its handler
+        "var made = [];\n"
+        "var _h = h;\n"
+        "h = function (tag, cls, txt) { var e = _h(tag, cls, txt); made.push(e); return e; };\n"
+        "addStarters('visitor');\n"
+        "made.forEach(function (e) { if (e._click) e._click(); });\n"
+        "process.stdout.write(JSON.stringify(picked));\n"
+    )
+    return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_chip_asks_a_different_question_on_the_hub_pages() -> None:
+    """index.html carries two chunks and projects.html three, so "summarize this
+    page" there is barely shorter than the page. HUB_URLS already marks both --
+    it suppresses them as source cards for the same reason."""
+    import json as _json
+
+    for hub in ("/", "/index.html", "/pages/projects.html"):
+        got = _chip_for(hub)
+        assert got["intent"] == "top_projects", f"{hub} is a hub page"
+
+    for page in ("/pages/gyrotris.html", "/pages/skills.html", "/pages/chat-agent.html"):
+        got = _chip_for(page)
+        assert got["intent"] == "summarize_page", f"{page} is an ordinary page"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_source_card_shows_a_score_only_when_one_was_measured() -> None:
+    """A recommendation card reports no similarity, because nothing was ranked
+    to produce it. Faking 1.00 would make the number meaningless on the
+    retrieval cards too."""
+    import json as _json
+
+    src = _widget_src()
+
+    def render(source: dict) -> str:
+        script = (
+            "var PREFIX = '';\n"
+            "var out = [];\n"
+            "function h(tag, cls, txt) { return { tag: tag, txt: txt, appendChild: function(){}, setAttribute: function(){} }; }\n"
+            + extract_js_function(src, "function resultsFromSources(") + "\n"
+            "var r = resultsFromSources([" + _json.dumps(source) + "])[0];\n"
+            "var tail = typeof r.score === 'number' ? '\u2026  (' + r.score.toFixed(2) + ')' : '\u2026';\n"
+            "process.stdout.write(JSON.stringify({ tail: tail, score: r.score }));\n"
+        )
+        return run_node_json(script)
+
+    base = {"id": "a", "url": "pages/gyrotris.html", "anchor": "top",
+            "page_title": "Gyrotris", "section_title": "Gyrotris", "text": "a puzzle game"}
+
+    retrieved = render({**base, "score": 0.4237})
+    assert "(0.42)" in retrieved["tail"], "a real retrieval score must still be shown"
+
+    recommended = render(base)
+    assert "(" not in recommended["tail"], (
+        "a recommendation card has no score to report -- it must not render one"
+    )

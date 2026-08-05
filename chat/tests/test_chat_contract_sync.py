@@ -875,3 +875,116 @@ def test_the_widget_only_ever_declares_intents_the_backend_accepts() -> None:
         f"widget sends {sorted(declared - set(mod.INTENTS))}, which index.py's "
         f"INTENTS {mod.INTENTS} would reject as a bad request"
     )
+
+
+def test_summary_chunks_is_one_per_page_in_the_answer_language() -> None:
+    """The whole context for top_projects: every page's own summary, once."""
+    mod = _load_backend()
+    index = _fixture_index()
+
+    got = mod.summary_chunks(index, "en")
+
+    assert {c["url"] for c in got} == {"pages/prime-engine.html", "pages/skills.html"}
+    assert len(got) == 2, "one summary per page, not one per language or per chunk"
+    assert all(c["anchor"] == "top" for c in got)
+    assert all(c["lang"] == "en" for c in got)
+    assert not any(c.get("curated") for c in got), (
+        "a curated section carries its link: target's url, so it would appear as "
+        "that page's summary"
+    )
+
+
+def test_sources_for_named_returns_only_pages_the_answer_mentions() -> None:
+    """Turns prose into clickable cards without asking the model for structured
+    output. Unmatched phrasing costs a card, never a parse error."""
+    mod = _load_backend()
+    cat = [
+        {"id": "a", "url": "pages/cemented-dreams.html", "anchor": "top",
+         "page_title": "Cemented Dreams", "section_title": "Cemented Dreams", "text": "x"},
+        {"id": "b", "url": "pages/gyrotris.html", "anchor": "top",
+         "page_title": "Gyrotris", "section_title": "Gyrotris", "text": "y"},
+        {"id": "c", "url": "pages/skills.html", "anchor": "top",
+         "page_title": "Skills", "section_title": "Skills", "text": "z"},
+    ]
+
+    got = mod.sources_for_named(cat, "Start with Cemented Dreams, then Gyrotris.")
+
+    assert [c["url"] for c in got] == ["pages/cemented-dreams.html", "pages/gyrotris.html"]
+    assert mod.sources_for_named(cat, "") == []
+    assert mod.sources_for_named(cat, None) == []
+    assert mod.sources_for_named(cat, "nothing here matches any page") == []
+
+
+def test_top_projects_uses_the_catalogue_and_does_not_retrieve(monkeypatch) -> None:
+    """The hub-page path. index.html has two chunks and projects.html three, so
+    summarizing them is close to reading them -- this answers the question the
+    visitor actually has there, from every page's summary plus their role."""
+    mod = _load_backend()
+    called: list = []
+    monkeypatch.setattr(mod, "retrieve", lambda q: called.append(q) or [])
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setattr(mod, "call_llm",
+                        lambda s, m: ("Look at Cemented Dreams first, then Prime Engine.",
+                                      "test-model", {}, "stop"))
+    monkeypatch.setattr(mod, "load_roles", lambda: {
+        "default_role": "visitor", "base_system_prompt": "base",
+        "roles": {"visitor": {"label": "Visitor", "system_prompt": "be helpful"}}})
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [
+        {"id": "1", "url": "pages/cemented-dreams.html", "anchor": "top", "lang": "en",
+         "page_title": "Cemented Dreams", "section_title": "Cemented Dreams", "text": "combat"},
+        {"id": "2", "url": "pages/prime-engine.html", "anchor": "top", "lang": "en",
+         "page_title": "Prime Engine", "section_title": "Prime Engine", "text": "engine"},
+        {"id": "3", "url": "pages/toolbox.html", "anchor": "top", "lang": "en",
+         "page_title": "Toolbox", "section_title": "Toolbox", "text": "tools"},
+    ])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    records: list = []
+    monkeypatch.setattr(mod, "log", lambda r: records.append(r))
+
+    handler = _StubHandler(json.dumps({
+        "question": "What should I look at?", "history": [], "lang": "en",
+        "page": {"url": "index.html"}, "intent": "top_projects"}).encode("utf-8"))
+    mod.Handler._chat(handler)
+
+    assert called == [], "top_projects must not retrieve"
+    status, payload = handler.responses[0]
+    assert status == 200
+    assert [s["url"] for s in payload["sources"]] == [
+        "pages/cemented-dreams.html", "pages/prime-engine.html"], (
+        "cards must be exactly the pages the answer named -- Toolbox was not mentioned")
+    assert all("score" not in s for s in payload["sources"]), (
+        "nothing was ranked, so no similarity may be reported")
+    chat = [r for r in records if r.get("type") == "chat"][0]
+    head = chat["in"]["system_head"]
+    assert "currently viewing the page" not in head, (
+        "the page-awareness wording would name whichever page sorts first, which "
+        "is not where the visitor is")
+    assert "most worth their time" in head
+
+
+def test_top_projects_recommends_nothing_it_cannot_link(monkeypatch) -> None:
+    """Complement: if the answer names no page, the card strip is empty rather
+    than falling back to the whole catalogue."""
+    mod = _load_backend()
+    monkeypatch.setattr(mod, "retrieve", lambda q: [])
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setattr(mod, "call_llm", lambda s, m: ("I have nothing to suggest.", "m", {}, "stop"))
+    monkeypatch.setattr(mod, "load_roles", lambda: {
+        "default_role": "visitor", "base_system_prompt": "base",
+        "roles": {"visitor": {"label": "Visitor", "system_prompt": "x"}}})
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [
+        {"id": "1", "url": "pages/gyrotris.html", "anchor": "top", "lang": "en",
+         "page_title": "Gyrotris", "section_title": "Gyrotris", "text": "g"}])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setattr(mod, "log", lambda r: None)
+
+    handler = _StubHandler(json.dumps({
+        "question": "What should I look at?", "history": [], "lang": "en",
+        "intent": "top_projects"}).encode("utf-8"))
+    mod.Handler._chat(handler)
+
+    assert handler.responses[0][1]["sources"] == []

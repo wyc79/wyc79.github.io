@@ -502,7 +502,7 @@ PAGE_CONTEXT_MAX = 6
 # 0.85), so no score threshold can separate "found nothing" from "found
 # something". Rather than infer the intent, take it from the one party that
 # already knows.
-INTENTS = ("summarize_page",)
+INTENTS = ("summarize_page", "top_projects")
 
 
 def page_chunks(chunks: list, page_url, lang: str | None) -> list:
@@ -553,6 +553,57 @@ def page_chunks(chunks: list, page_url, lang: str | None) -> list:
     summary = [c for c in on_page if c.get("anchor") == "top"]
     rest = [c for c in on_page if c.get("anchor") != "top"]
     return (summary + rest)[:PAGE_CONTEXT_MAX]
+
+
+def summary_chunks(chunks: list, lang: str | None) -> list:
+    """One summary chunk per page -- the <meta name="description"> chunk each
+    page carries, in the answering language.
+
+    This is the whole context for the "top_projects" intent, and it is small:
+    17 pages at ~130 characters each, about 550 tokens for the full set. The
+    visitor's role prompt is already in the system prompt, so the model has
+    both halves of "which of these fits this visitor" without retrieval --
+    which could not answer it anyway, since the question is a judgment over
+    the whole catalogue rather than a search for a passage.
+
+    Curated chunks are excluded for the same reason page_chunks excludes them:
+    a knowledge section carries the url of its `link:` target, so by url it is
+    indistinguishable from a page's own summary. Whether a page is a *project*
+    is left to the model rather than encoded here -- the alternative is a
+    hardcoded list that goes stale the next time a page is added.
+    """
+    out, seen = [], set()
+    for c in chunks:
+        if c.get("anchor") != "top" or c.get("curated"):
+            continue
+        if lang in ("en", "zh") and c.get("lang") not in (lang, None):
+            continue
+        if c.get("url") in seen:
+            continue
+        seen.add(c.get("url"))
+        out.append(c)
+    return out
+
+
+def sources_for_named(chunks: list, answer: str) -> list:
+    """The subset of `chunks` whose page_title the answer actually names.
+
+    The model writes prose recommending three or four projects; this turns
+    that into clickable cards without asking it for structured output. Matching
+    on the title is why authored titles matter -- "Portfolio Chat Agent: Role"
+    would never have matched anything the model wrote. Degrades to no cards
+    rather than to a parse error if the phrasing is unexpected, which is the
+    property that makes it safe to depend on a model for.
+
+    Longest title first, so "Cemented Dreams" is not shadowed by a shorter
+    title that happens to be a substring of it.
+    """
+    if not isinstance(answer, str) or not answer:
+        return []
+    return [
+        c for c in sorted(chunks, key=lambda c: -len(c.get("page_title") or ""))
+        if (c.get("page_title") or "") and c["page_title"] in answer
+    ]
 
 
 def build_context_block(hits: list, page_ctx: list) -> str:
@@ -1091,14 +1142,22 @@ class Handler(BaseHTTPRequestHandler):
         # than any attempt to detect that afterwards, and it makes sources: []
         # on this path mean something true: the answer came from the page the
         # visitor is on.
-        hits = [] if intent == "summarize_page" else retrieve(body["question"])
+        hits = [] if intent in ("summarize_page", "top_projects") else retrieve(body["question"])
 
         page = body.get("page") if isinstance(body.get("page"), dict) else {}
         seen = {h["chunk"].get("id") for h in hits}
-        page_ctx = [
-            c for c in page_chunks(_index["chunks"], page.get("url"), answer_lang)
-            if c.get("id") not in seen
-        ]
+        if intent == "top_projects":
+            # The catalogue, not the current page: this intent fires on the two
+            # hub pages, whose own content is a name and a nav (index.html has
+            # two chunks, projects.html three). Summarizing those is close to
+            # reading them; what the visitor wants is which of the seventeen
+            # pages is worth their time given the role they picked.
+            page_ctx = summary_chunks(_index["chunks"], answer_lang)
+        else:
+            page_ctx = [
+                c for c in page_chunks(_index["chunks"], page.get("url"), answer_lang)
+                if c.get("id") not in seen
+            ]
 
         # Refuse only when BOTH are empty. Retrieval alone returning nothing is
         # the normal outcome for a deictic question, and refusing on it is what
@@ -1131,7 +1190,21 @@ class Handler(BaseHTTPRequestHandler):
             f"{roles_data['base_system_prompt']}\n\n"
             f"Visitor role: {role['label']}. {role['system_prompt']}"
         )
-        if page_ctx:
+        if intent == "top_projects":
+            # NOT the page-awareness wording: page_ctx here is the whole
+            # catalogue, so saying "the visitor is currently viewing" and naming
+            # page_ctx[0] would assert whichever page happens to sort first.
+            # The role prompt is already in system_head above; this only has to
+            # say what to do with the catalogue.
+            system_head += (
+                "\n\nThe context chunks are one short summary of every page on this "
+                "site. The visitor asked which are most worth their time. Recommend "
+                "the three or four that best fit the visitor role described above, "
+                "name each one exactly as its page= attribute spells it, and say in "
+                "one line why each fits. Recommend only project and work pages, not "
+                "index or listing pages. Do not mention pages you are not recommending."
+            )
+        elif page_ctx:
             # The title comes off OUR OWN chunk records, never off the request.
             # The client sends a url and nothing else, so no client-supplied
             # string can reach the prompt through this feature.
@@ -1208,7 +1281,23 @@ class Handler(BaseHTTPRequestHandler):
                 "usage": usage,
             },
         })
-        self._json(200, {"answer": answer, "model": model, "rid": rid, "sources": sources_from_hits(hits)})
+        # On top_projects there are no hits to build cards from, but the answer
+        # names pages -- turn those into cards so the recommendation is
+        # clickable. score is omitted rather than faked: there is no similarity
+        # being reported here, and a fabricated 1.00 next to a real 0.42
+        # elsewhere would make the number meaningless in both places. The widget
+        # renders the score only when present.
+        if intent == "top_projects":
+            named = sources_for_named(page_ctx, answer)
+            sources = [
+                {"id": c.get("id"), "url": c.get("url"), "anchor": c.get("anchor"),
+                 "page_title": c.get("page_title"), "section_title": c.get("section_title"),
+                 "text": c.get("text")}
+                for c in named
+            ]
+        else:
+            sources = sources_from_hits(hits)
+        self._json(200, {"answer": answer, "model": model, "rid": rid, "sources": sources})
 
     def _log(self):
         raw = self._read_body(LIMITS["log_bytes"] + 1)
