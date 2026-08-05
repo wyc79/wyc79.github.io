@@ -613,13 +613,35 @@ general-assistant task request, off-topic by any reading — measured
 own, with no conversation needed at all. The case was retuned to a phrasing
 that does fail (`帮我写封邮件`, "help me write an email," measured 0.3825) so
 `neg-post-zh-02` itself is not compromised, but the underlying gap is not
-fixed. It is not an isolated surprise: `gate_calibration.OFF_TOPIC_ZH`'s own
-calibration set already contains two near-identical task requests that pass
-this same gate — `帮我写作业` (0.4338) and `帮我写一段Python代码` (0.5169) —
-so roughly 1 in 8 of the zh gate's own fit-on off-topic set reads as on-topic
-by its own threshold (the zero-false-refusal policy, see
-`gate_calibration.py`'s module docstring, only ever promises to catch a
-*subset*).
+fixed. It is not an isolated surprise: swept the **full** 16-entry
+`gate_calibration.OFF_TOPIC_ZH` set against the live zh gate (not just the
+two task-request examples first noticed) and found **8 of 16 — 1 in 2 —
+pass (leak) this same gate on their own**, not the "roughly 1 in 8" an
+earlier draft of this entry estimated from those two alone (correction:
+task 9 review caught this undercount by a factor of 4 and it was
+re-verified directly):
+
+```
+给我讲个笑话 0.4433 · 帮我写作业 0.4338 · 帮我写一段Python代码 0.5169
+把这句话翻译成英文 0.4901 · 谁赢了世界杯 0.4297 · 人民币兑美元今天的汇率是多少 0.4181
+推荐一部好看的科幻电影 0.4289 · 新手健身应该怎么练 0.4542
+```
+
+(the other 8 — weather, poem, restaurants, tallest mountain, cooking,
+Spanish "thank you," time zone, boiling an egg — do refuse, 0.3262-0.3853,
+all comfortably under the 0.3979 threshold; the zero-false-refusal policy,
+see `gate_calibration.py`'s module docstring, only ever promises to catch a
+*subset*, and here it catches almost exactly half of its own fit-on
+off-topic set).
+
+**Contrast, for scale: the equivalent sweep of the full 16-entry
+`gate_calibration.OFF_TOPIC` (English) set against the live en gate (also
+threshold-relative, 0.2029) catches all 16 — 0 leak.** This is direct
+evidence for this finding's "strictly weaker separation than the English
+gate" claim below, not just an assertion: the same zero-false-refusal
+calibration policy, run over comparably-sized fit-on sets in each language,
+leaves the zh gate's own calibration corpus half-uncaught while the en
+gate's is fully caught.
 
 **A second, broader symptom surfaced empirically while retuning Task 9's zh
 follow-up positives**, worth recording alongside this one because it's the

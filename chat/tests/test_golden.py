@@ -687,6 +687,43 @@ def test_followup_positives_do_not_contaminate_single_turn_metrics() -> None:
     assert with_multi["n_followup"] == 1 and with_multi["followup_rescued"] == 1
 
 
+def test_an_unrescued_followup_does_not_inflate_followup_rescued() -> None:
+    """The mirror of test_a_post_context_negative_that_passes_is_counted_as_a_
+    failure_to_refuse, on the positive side: every existing followup_rescued
+    assertion in this file used rescued=True, so nothing pinned the counter
+    to 0 when a follow-up was NOT rescued. Mutating aggregate() to
+    `cell["followup_rescued"] += 1` unconditionally (dropping the
+    `int(bool(r.rescued))` guard, i.e. crediting every follow-up as rescued
+    regardless of CaseResult.rescued) left the whole suite green before this
+    test existed -- caught by task-9 review, not by any test.
+
+    Covers both ways a follow-up can be UNrescued: rescued=None (no rewrite
+    was ever attempted -- no fixture entry, or the raw question already
+    passed the gate) and rescued=False (a rewrite WAS attempted and replayed
+    but still failed to clear the gate/land the page). Both must count
+    toward n_followup (the case was still a follow-up) but neither toward
+    followup_rescued."""
+    from portfolio_rag.evaluation import CaseResult, GoldenCase, aggregate
+
+    never_attempted = GoldenCase(id="a", role="visitor", lang="en", type="positive", q="q",
+                                 history=(("user", "u"), ("assistant", "a")),
+                                 expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+    attempted_and_failed = GoldenCase(id="b", role="visitor", lang="en", type="positive", q="q",
+                                      history=(("user", "u"), ("assistant", "a")),
+                                      expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+    results = [
+        CaseResult(case=never_attempted, gate_passed=False, gate_value=0.1, gate_available=True,
+                   hit=None, top_urls=(), top_scores=(), rescued=None),
+        CaseResult(case=attempted_and_failed, gate_passed=False, gate_value=0.3, gate_available=True,
+                   hit=False, top_urls=(), top_scores=(), rewrite_used="a rewrite", rescued=False),
+    ]
+
+    cell = aggregate(results)["visitor/en"]
+
+    assert cell["n_followup"] == 2, "both cases are still follow-ups"
+    assert cell["followup_rescued"] == 0, "neither case was actually rescued"
+
+
 def test_a_post_context_negative_gets_its_own_bucket() -> None:
     """Bucketed by whether it has history, NOT by adjacency: adjacency measures
     how close the QUESTION is to the domain, which is orthogonal to whether the
