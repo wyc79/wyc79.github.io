@@ -965,6 +965,12 @@
       '.ycchat-head b{font-size:.95rem;}',
       '.ycchat-rolechip{margin-left:auto;font-size:.72rem;color:var(--muted,#666);border:1px solid var(--border,#ccc);',
       ' border-radius:999px;padding:.15rem .55rem;cursor:pointer;background:var(--bg,#fff);}',
+      '.ycchat-actions{display:flex;align-items:center;gap:.5rem;padding:.45rem .9rem;',
+      ' border-bottom:1px solid var(--border,#ccc);background:var(--card,#f7f7f8);}',
+      '.ycchat-actionchip{margin-left:auto;font-size:.72rem;color:var(--fg,#131313);',
+      ' border:1px solid var(--border,#ccc);border-radius:999px;padding:.15rem .6rem;',
+      ' cursor:pointer;background:var(--bg,#fff);}',
+      '.ycchat-actionchip:hover{border-color:var(--link,#0b57d0);}',
       '.ycchat-clearchip{font-size:.72rem;color:var(--muted,#666);border:1px solid var(--border,#ccc);',
       ' border-radius:999px;padding:.15rem .55rem;cursor:pointer;background:var(--bg,#fff);}',
       '.ycchat-clearchip:hover{border-color:var(--link,#0b57d0);}',
@@ -1120,8 +1126,30 @@
     els.input.focus();
   }
 
+  // What the action chip does depends on where the visitor is standing, and
+  // three callers need to agree on it: the row that builds the chip, applyLang
+  // which relabels it on the 中/EN toggle, and its click handler. On a hub page
+  // "summarize this page" would disappoint -- index.html carries two chunks and
+  // projects.html three, so the summary is barely shorter than the page. There
+  // the useful question is which of the seventeen pages fits the role the
+  // visitor picked. HUB_URLS already marks exactly those two: it suppresses
+  // them as source cards for the same reason, that landing on them tells a
+  // visitor nothing.
+  //
+  // Both intent strings are literals here rather than built from a variable --
+  // the two sides hold this closed set with no build step between them, and
+  // test_the_widget_only_ever_declares_intents_the_backend_accepts reads them
+  // straight out of this function's source to check index.py would accept them.
+  function pageAction() {
+    return HUB_URLS[currentPageUrl()]
+      ? { key: 'topProjects', intent: 'top_projects' }
+      : { key: 'summarizePage', intent: 'summarize_page' };
+  }
+
   function updateClearVisibility() {
-    if (els.clearBtn) els.clearBtn.style.display = state.role ? '' : 'none';
+    // The row goes as a unit: before a role is picked the panel is showing the
+    // role picker, and neither Clear nor the action chip has anything to act on.
+    if (els.actions) els.actions.style.display = state.role ? '' : 'none';
   }
 
   function addStarters(role) {
@@ -1133,25 +1161,6 @@
     // page's own chunks without retrieving. Typing the same words still works
     // -- it just goes through ordinary retrieval like any other question, with
     // no guarantee the gate keeps admitting that phrasing.
-    // One slot, two behaviours. On a hub page "summarize this page" would
-    // disappoint -- index.html carries two chunks and projects.html three, so
-    // the summary is barely shorter than the page. There the useful question
-    // is which of the seventeen pages fits the role the visitor picked, which
-    // is what HUB_URLS already marks (it suppresses these two as source cards
-    // for the same reason: landing on them tells you nothing).
-    var onHub = !!HUB_URLS[currentPageUrl()];
-    var sum = h('button', 'ycchat-starter', t(onHub ? 'topProjects' : 'summarizePage'));
-    sum.type = 'button';
-    sum.setAttribute('aria-label', t(onHub ? 'topProjectsAria' : 'summarizePageAria'));
-    // Both intents written as literals rather than through a variable: the two
-    // sides hold this closed set with no build step between them, and
-    // test_the_widget_only_ever_declares_intents_the_backend_accepts reads them
-    // straight out of this source to check they are ones index.py accepts.
-    sum.addEventListener('click', function () {
-      if (onHub) send(t('topProjects'), 'top_projects');
-      else send(t('summarizePage'), 'summarize_page');
-    });
-    starters.appendChild(sum);
     (L(role, 'starters') || []).forEach(function (q) {
       var chip = h('button', 'ycchat-starter', q);
       chip.type = 'button';
@@ -1351,18 +1360,33 @@
     els.roleChip.title = t('roleChipTitle');
     els.roleChip.addEventListener('click', function () { if (state.roles) showRolePicker(); });
     head.appendChild(els.roleChip);
-    els.clearBtn = h('button', 'ycchat-clearchip', t('clearLabel')); // TODO#3
-    els.clearBtn.type = 'button';
-    els.clearBtn.title = t('clearTitle');
-    els.clearBtn.style.display = state.role ? '' : 'none';
-    els.clearBtn.addEventListener('click', function () { if (state.role) clearChat(); });
-    head.appendChild(els.clearBtn);
     var x = h('button', 'ycchat-x', '✕');
     els.closeBtn = x;
     x.type = 'button';
     x.setAttribute('aria-label', t('closeAria'));
     x.addEventListener('click', toggle);
     head.appendChild(x);
+
+    // Second row: the actions. Kept OUT of the starters row on purpose --
+    // starters are example questions a visitor could have typed, and a button
+    // that performs something is a different kind of thing. Sitting one row
+    // under the header also balances the panel: the role label is the longest
+    // element up there ("Client dev recruiter"), so pairing Clear with the
+    // action chip below it evens the two rows out.
+    els.actions = h('div', 'ycchat-actions');
+    els.clearBtn = h('button', 'ycchat-clearchip', t('clearLabel')); // TODO#3
+    els.clearBtn.type = 'button';
+    els.clearBtn.title = t('clearTitle');
+    els.clearBtn.addEventListener('click', function () { if (state.role) clearChat(); });
+    els.actions.appendChild(els.clearBtn);
+    els.pageActionBtn = h('button', 'ycchat-actionchip', t(pageAction().key));
+    els.pageActionBtn.type = 'button';
+    els.pageActionBtn.setAttribute('aria-label', t(pageAction().key + 'Aria'));
+    els.pageActionBtn.addEventListener('click', function () {
+      var a = pageAction();
+      if (state.role) send(t(a.key), a.intent);
+    });
+    els.actions.appendChild(els.pageActionBtn);
 
     els.body = h('div', 'ycchat-body');
     els.body.setAttribute('aria-live', 'polite');
@@ -1380,6 +1404,7 @@
     foot.appendChild(els.send);
 
     els.panel.appendChild(head);
+    els.panel.appendChild(els.actions);
     els.panel.appendChild(els.body);
     els.panel.appendChild(foot);
 
@@ -1466,6 +1491,10 @@
       ? L(state.roles.roles[state.role], 'label')
       : t('chooseRole');
     if (els.clearBtn) { els.clearBtn.textContent = t('clearLabel'); els.clearBtn.title = t('clearTitle'); }
+    if (els.pageActionBtn) {
+      els.pageActionBtn.textContent = t(pageAction().key);
+      els.pageActionBtn.setAttribute('aria-label', t(pageAction().key + 'Aria'));
+    }
     updateClearVisibility();
     if (els.closeBtn) els.closeBtn.setAttribute('aria-label', t('closeAria'));
     els.input.placeholder = t('placeholder');

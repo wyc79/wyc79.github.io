@@ -866,11 +866,14 @@ def test_the_widget_only_ever_declares_intents_the_backend_accepts() -> None:
 
     mod = _load_backend()
     src = WIDGET_PATH.read_text(encoding="utf-8")
-    # The first argument is itself a call -- send(t('summarizePage'), '...') --
-    # so the pattern must tolerate nested parens, bounded to one statement.
-    declared = set(re.findall(r"\bsend\([^;\n]*?,\s*'([a-z_]+)'\s*\)", src))
+    # pageAction() is the single place the widget names an intent, so read the
+    # literals out of that function rather than pattern-matching call sites --
+    # the call site passes a variable now, which a call-site pattern silently
+    # finds nothing in.
+    fn = extract_js_function(src, "function pageAction(")
+    declared = set(re.findall(r"intent:\s*'([a-z_]+)'", fn))
 
-    assert declared, "expected the widget to declare at least one intent via send(text, intent)"
+    assert declared, "expected pageAction() to name at least one intent"
     assert declared <= set(mod.INTENTS), (
         f"widget sends {sorted(declared - set(mod.INTENTS))}, which index.py's "
         f"INTENTS {mod.INTENTS} would reject as a bad request"
