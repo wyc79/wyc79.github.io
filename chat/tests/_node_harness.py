@@ -54,12 +54,15 @@ def extract_js_var(src: str, name: str) -> str:
     return src[start:end]
 
 
-def extract_js_function(src: str, fn_marker: str) -> str:
-    """Verbatim function-body extraction: find fn_marker (e.g.
-    'function scoreChunks(' or 'async function askWorker('), then match
-    braces from the first '{' after it to its corresponding close."""
-    fn_start = src.index(fn_marker)
-    brace_start = src.index("{", fn_start)
+def _matching_brace(src: str, at_or_after: int) -> int:
+    """Index of the '}' closing the first '{' at or after `at_or_after`.
+
+    Counts braces without tracking string literals, which is sound only because
+    every construct this module extracts happens to contain no braces inside
+    its own strings or comments. That has always been true of the functions
+    extracted here; it is worth rechecking before pointing this at something
+    new."""
+    brace_start = src.index("{", at_or_after)
     depth, i = 0, brace_start
     while True:
         if src[i] == "{":
@@ -67,6 +70,24 @@ def extract_js_function(src: str, fn_marker: str) -> str:
         elif src[i] == "}":
             depth -= 1
             if depth == 0:
-                break
+                return i
         i += 1
-    return src[fn_start : i + 1]
+
+
+def extract_js_object(src: str, name: str) -> str:
+    """Pull a multi-line `var {name} = {...};` object literal out verbatim, by
+    brace matching rather than by scanning for the terminating ';'. Needed for
+    literals whose own values contain a ';' (a function body, say) -- STR, the
+    widget's i18n table, is the case this exists for; extract_js_var's
+    first-semicolon rule truncates it mid-table."""
+    marker = f"var {name} = "
+    start = src.index(marker) + len(marker)
+    return src[start : _matching_brace(src, start) + 1]
+
+
+def extract_js_function(src: str, fn_marker: str) -> str:
+    """Verbatim function-body extraction: find fn_marker (e.g.
+    'function scoreChunks(' or 'async function askWorker('), then match
+    braces from the first '{' after it to its corresponding close."""
+    fn_start = src.index(fn_marker)
+    return src[fn_start : _matching_brace(src, fn_start) + 1]

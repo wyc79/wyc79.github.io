@@ -769,6 +769,13 @@
       ).stats;
       var gateScore = statValue(gateStats, gate.gate_stat || 'top');
       thinking.classList.remove('ycchat-dots');
+      // No declared-intent bypass here, unlike send()'s gate, and that is not
+      // an oversight: the bypass exists because the backend HONORS the intent
+      // (answering from page chunks or the catalogue instead of retrieving),
+      // and there is no backend here. Letting a chip label through would rank
+      // "What should I look at?" against the local corpus and show four
+      // unrelated cards. Refusing is the worse message but the better answer,
+      // and it still offers starters as a way forward.
       if (gateScore < (gate.gate_threshold || OFFTOPIC_GATE)) {
         thinking.textContent = t('refused');
         addStarters(state.roles.roles[state.role]);
@@ -1154,13 +1161,15 @@
 
   function addStarters(role) {
     var starters = h('div', 'ycchat-starters');
-    // The page-summary chip leads, because it is the one suggestion whose
-    // answer depends on where the visitor is standing rather than on who they
-    // said they were. Clicking it declares the intent outright: the request
-    // carries intent='summarize_page' and the backend answers from the current
-    // page's own chunks without retrieving. Typing the same words still works
-    // -- it just goes through ordinary retrieval like any other question, with
-    // no guarantee the gate keeps admitting that phrasing.
+    // Starters are gated like anything else a visitor could have typed, and
+    // deliberately so: they ARE questions about YC, so one of them failing the
+    // gate is a calibration bug worth seeing rather than papering over
+    // (test_every_role_starter_passes_the_gate holds that contract). This is
+    // the opposite call from the action chip, whose label is not a question at
+    // all -- see send()'s `if (intent)` branch. That asymmetry is also why
+    // clicking the chip and typing its label are no longer the same turn:
+    // typing "What should I look at?" goes through the gate like any other
+    // input, and the English gate refuses it.
     (L(role, 'starters') || []).forEach(function (q) {
       var chip = h('button', 'ycchat-starter', q);
       chip.type = 'button';
@@ -1224,13 +1233,29 @@
         record.retrieved = localRetrieval.results.map(function (r) { return { id: r.chunk.id, score: +r.score.toFixed(3) }; });
       }
 
-      // Off-topic gate: refuse before any retrieval/LLM call. Three cases:
-      // the backend judged it (server-side gate_only /embed call), the index
-      // expects a remote gate that wasn't available (fail open — the LLM
-      // prompt still refuses), or the classic local gate on this browser's
-      // own in-memory index.
+      // Off-topic gate: refuse before any retrieval/LLM call. Four cases: the
+      // widget wrote the question itself (a declared intent), the backend
+      // judged it (server-side gate_only /embed call), the index expects a
+      // remote gate that wasn't available (fail open — the LLM prompt still
+      // refuses), or the classic local gate on this browser's own in-memory
+      // index.
       var refused = false;
-      if (emb.gate) {
+      if (intent) {
+        // A declared intent means this text came from the widget, not from a
+        // visitor: the action chip sends its own i18n label as the question
+        // (see the click handler that calls send(t(a.key), a.intent)), so a
+        // gate whose job is judging what a visitor typed has nothing to judge.
+        // Not merely unnecessary — actively wrong: t('topProjects') is "What
+        // should I look at?", which carries no topical content BY DESIGN, so
+        // the English gate refuses it, while 有哪些值得先看？ clears the zh gate
+        // on corpus luck rather than on correctness. Gating a string we
+        // authored made the same button work in one language and not the
+        // other. index.py already treats a declared intent as the
+        // no-retrieval path for the same underlying reason (a deictic label
+        // is not a query), and INTENTS there is a closed set validated on both
+        // sides, so this cannot widen into a general gate-off switch.
+        record.gate = { bypassed: intent };
+      } else if (emb.gate) {
         refused = !emb.gate.pass;
         record.gate = { remote: true, value: emb.gate.value, reason: emb.gate.reason, stripped: stripped || undefined };
       } else if (state.meta.gate_remote) {

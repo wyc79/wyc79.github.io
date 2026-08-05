@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 960" width="1120" height="960" role="img" aria-labelledby="ttl desc">
   <title id="ttl">Portfolio Chat Agent: information flow</title>
-  <desc id="desc">At build time three sources (every site page in English and Chinese, about_en.md, and about_zh.md) are embedded by three encoders, which together write four static files: the e5 encoder embeds all three sources into the retrieval corpus (chunks_e5.json); the MiniLM encoder embeds the English page text and about_en into the English gate (gate_en_minilm.json), and separately re-embeds the retrieval corpus's own English chunks into an offline fallback corpus (chunks_en_minilm.json) for degraded mode; the bge-small-zh encoder embeds about_zh only, into the Chinese gate (gate_zh_bge.json). Only gate_en_minilm.json, chunks_en_minilm.json, and a small meta.json are served to the browser; chunks_e5.json and gate_zh_bge.json are bundled into the serverless function only. Per turn: the browser sends the name-normalized query to the serverless /embed endpoint, which runs the relevance gate (MiniLM for English, bge-small-zh for Chinese) and returns a pass/fail verdict; off-topic queries stop here, before any retrieval or LLM call. On a pass, the browser calls /chat with just the question; the function embeds it with e5, runs cosine similarity over its own bundled chunks_e5.json to get the top-k passages, injects them into the role prompt, and calls the LLM, returning the answer plus the source chunks that become the source cards. If the function is unavailable, a consent-gated in-browser MiniLM model handles retrieval locally over chunks_en_minilm.json, English only.</desc>
+  <desc id="desc">At build time three sources (every site page in English and Chinese, about_en.md, and about_zh.md) are embedded by three encoders, which together write four static files: the e5 encoder embeds all three sources into the retrieval corpus (chunks_e5.json); the MiniLM encoder embeds about_en only into the English gate (gate_en_minilm.json), and separately re-embeds the retrieval corpus's own English chunks into an offline fallback corpus (chunks_en_minilm.json) for degraded mode; the bge-small-zh encoder embeds about_zh only, into the Chinese gate (gate_zh_bge.json). Both gates therefore judge against a small curated corpus rather than the whole site: page text feeds retrieval only. Only gate_en_minilm.json, chunks_en_minilm.json, and a small meta.json are served to the browser; chunks_e5.json and gate_zh_bge.json are bundled into the serverless function only. Per turn: the browser sends the name-normalized query to the serverless /embed endpoint, which runs the relevance gate (MiniLM for English, bge-small-zh for Chinese) and returns a pass/fail verdict; off-topic queries stop here, before any retrieval or LLM call. On a pass, the browser calls /chat with just the question; the function embeds it with e5, runs cosine similarity over its own bundled chunks_e5.json to get the top-k passages, injects them into the role prompt, and calls the LLM, returning the answer plus the source chunks that become the source cards. If the function is unavailable, a consent-gated in-browser MiniLM model handles retrieval locally over chunks_en_minilm.json, English only.</desc>
   <style>
     text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
     .bg{fill:#ffffff;}
@@ -70,13 +70,13 @@
 
   <rect class="node" x="330" y="112" width="182" height="48" rx="10"/>
   <text class="t-node" x="421" y="132">MiniLM</text>
-  <text class="t-sub"  x="421" y="149">English gate</text>
+  <text class="t-sub"  x="421" y="149">English gate · about_en only</text>
   <rect class="node" x="330" y="172" width="182" height="48" rx="10"/>
   <text class="t-node" x="421" y="192">e5 encoder</text>
   <text class="t-sub"  x="421" y="209">retrieval · all sources</text>
   <rect class="node" x="330" y="232" width="182" height="48" rx="10"/>
   <text class="t-node" x="421" y="252">bge-small-zh</text>
-  <text class="t-sub"  x="421" y="269">Chinese gate</text>
+  <text class="t-sub"  x="421" y="269">Chinese gate · about_zh only</text>
 
   <rect class="node" x="592" y="112" width="214" height="48" rx="10"/>
   <text class="t-node" x="699" y="132">gate vectors · EN</text>
@@ -96,8 +96,7 @@
   <text class="t-subL"  x="862" y="224">Bundled in function:</text>
   <text class="t-subL"  x="862" y="242">chunks_e5.json + both gates</text>
 
-  <path class="flow" marker-end="url(#arrow)" d="M250,130 C292,130 292,132 328,132"/>
-  <path class="flow" marker-end="url(#arrow)" d="M250,140 C296,140 296,190 328,190"/>
+  <path class="flow" marker-end="url(#arrow)" d="M250,136 C296,136 296,190 328,190"/>
   <path class="flow" marker-end="url(#arrow)" d="M250,190 C296,190 296,140 328,140"/>
   <path class="flow" marker-end="url(#arrow)" d="M250,200 C292,200 292,196 328,196"/>
   <path class="flow" marker-end="url(#arrow)" d="M250,250 C296,250 296,202 328,202"/>
