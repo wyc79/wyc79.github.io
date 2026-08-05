@@ -1322,10 +1322,13 @@
         // refusal below does, in the visitor's own language.
         if (resp.refused) {
           record.mode = 'off_topic_refused';
-          // Distinguishes this from the client-side gate refusal, which
-          // never reaches the backend at all. The server logged its own
-          // chat_refused line under the same rid.
-          record.refused_by = 'server_retrieval_empty';
+          // Two unrelated server-side causes produce `refused: true`:
+          // retrieval came back empty, or the authoritative re-gate rejected a
+          // rewrite on the escalated follow-up path. They look identical to the
+          // visitor and need different fixes, so the server names which one.
+          // An old deployed function omits `reason` -- fall back to the literal
+          // this branch used before the field existed.
+          record.refused_by = resp.reason || 'server_retrieval_empty';
           thinking.classList.remove('ycchat-dots');
           thinking.textContent = t('refused');
           addStarters(state.roles.roles[state.role]);

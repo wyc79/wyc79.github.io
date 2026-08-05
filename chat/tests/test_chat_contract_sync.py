@@ -176,6 +176,39 @@ def test_a_normal_answer_is_not_treated_as_a_refusal() -> None:
     assert got["calls"] == []
 
 
+def test_refusal_response_carries_a_reason_and_defaults_to_retrieval_empty() -> None:
+    mod = _load_backend()
+
+    assert mod.refusal_response("r1")["reason"] == "retrieval_empty"
+    assert mod.refusal_response("r1", "regate_failed")["reason"] == "regate_failed"
+    # The shape the widget's refusal branch already depends on must not move.
+    assert mod.refusal_response("r1")["refused"] is True
+    assert mod.refusal_response("r1")["sources"] == []
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_widget_records_the_servers_refusal_reason() -> None:
+    """Two unrelated causes now produce `refused: true`. Reporting both as
+    'server_retrieval_empty' would misattribute every re-gate refusal in GA and
+    in the transcript."""
+    mod = _load_backend()
+
+    got = _run_widget_refusal_branch(mod.refusal_response("r1", "regate_failed"), page_lang="en")
+
+    assert got["record"]["refused_by"] == "regate_failed"
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_refusal_with_no_reason_keeps_the_old_label() -> None:
+    """An old deployed function omits the field. The widget must not record
+    undefined -- it degrades to the literal it used before this existed."""
+    got = _run_widget_refusal_branch(
+        {"answer": "no", "refused": True, "rid": "r1", "sources": []}, page_lang="en"
+    )
+
+    assert got["record"]["refused_by"] == "server_retrieval_empty"
+
+
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_the_refusal_payloads_sources_survive_resultsfromsources() -> None:
     """The refusal carries `sources: []`; resultsFromSources must yield [] and
