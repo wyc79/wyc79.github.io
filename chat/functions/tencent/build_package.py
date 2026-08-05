@@ -181,7 +181,45 @@ def download_wheels(py_version: str, wheel_dir: Path) -> list[Path]:
         ["coloredlogs", "flatbuffers", "packaging", "protobuf", "sympy", "humanfriendly", "mpmath"],
         required=False,
     )
-    return sorted(wheel_dir.glob("*.whl"))
+    return _newest_per_distribution(sorted(wheel_dir.glob("*.whl")))
+
+
+def _wheel_version(path: Path) -> tuple:
+    """Sort key from a wheel filename's version segment.
+
+    Wheel names are {distribution}-{version}(-{build})?-{py}-{abi}-{platform},
+    so the version is always the second dash-separated field. Numeric segments
+    compare as ints and anything else falls back to its string, which orders
+    a plain "1.2.3" correctly and never raises on a prerelease suffix.
+    """
+    parts = path.name.split("-")
+    version = parts[1] if len(parts) > 1 else ""
+    return tuple(int(p) if p.isdigit() else p for p in version.split("."))
+
+
+def _newest_per_distribution(wheels: list[Path]) -> list[Path]:
+    """One wheel per distribution, highest version.
+
+    _wheels/ is a download cache pip only ever ADDS to -- it prints "File was
+    already downloaded" for a hit and never prunes the version it replaced. A
+    plain glob therefore packs every version it has ever resolved. That is not
+    theoretical: a build shipped packaging 26.2 and 26.3 together, and the zip
+    carried 21 duplicated entries whose contents genuinely differed
+    (packaging/__init__.py at two different CRCs). Which one an extractor keeps
+    is its own business, so the deployed function had 21 ambiguous files.
+
+    zipfile warns about each duplicate, but a 163 MB build prints enough that
+    twenty warnings scroll past -- which is how this shipped unnoticed.
+    """
+    newest: dict[str, Path] = {}
+    for w in wheels:
+        dist = w.name.split("-")[0]
+        if dist not in newest or _wheel_version(w) > _wheel_version(newest[dist]):
+            newest[dist] = w
+    dropped = sorted(set(wheels) - set(newest.values()))
+    for w in dropped:
+        print(f"  superseded, not packaged: {w.name}")
+    return sorted(newest.values())
 
 
 def build_zip(preset: dict, preset_name: str, model_src: Path, wheels: list[Path], out_zip: Path,
