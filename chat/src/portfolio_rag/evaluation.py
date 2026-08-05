@@ -26,6 +26,23 @@ GOLDEN_PATH = settings.chat_root / "eval" / "golden.jsonl"
 # Defined here so the CLI and the test share one definition.
 BASELINE_PATH = settings.resolve_path("data/eval_baseline.json")
 
+# Recorded rewrites, keyed by case id. Written ONLY by
+# scripts/refresh_rewrites.py, which is the only thing in this repo that calls
+# a real LLM for a rewrite; read here and replayed offline so run_eval.py and
+# pytest stay deterministic and network-free. Regenerating is a deliberate,
+# reviewed step when the rewrite prompt changes -- the same shape as
+# --update-baseline.
+REWRITES_PATH = settings.chat_root / "eval" / "rewrites.json"
+
+
+def load_rewrites(path: Path = REWRITES_PATH) -> dict[str, str]:
+    """case id -> recorded standalone question. Empty when the file is absent,
+    which scores every multi-turn case as still-refused rather than inventing a
+    rewrite -- an absent measurement is never a favourable one."""
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
 
 def format_margin(margin: float | None) -> str:
     """Render a gate calibration margin for display.
@@ -256,6 +273,15 @@ class CaseResult:
     # defect on the branch; the fix is to thread the real value, not to pick
     # a better stand-in.
     gate_reason: str | None = None
+    # The recorded rewrite that was actually replayed, or None when this case
+    # had no history, cleared the gate on its own, or had no fixture entry.
+    rewrite_used: str | None = None
+    # Positives with a REPLAYED rewrite only (rewrite_used is not None): did
+    # the rewrite turn a gate refusal into a pass AND land the expected page?
+    # None whenever no rewrite was actually replayed -- no history, the raw
+    # question already passed the gate, or the fixture had no entry -- so a
+    # follow-up that was never broken can never register as a rescue.
+    rescued: bool | None = None
 
     @property
     def ok(self) -> bool:
@@ -265,11 +291,23 @@ class CaseResult:
         return not self.gate_passed
 
 
-def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
+def score_case(rt: Runtime, case: GoldenCase, rewrites: dict[str, str] | None = None) -> CaseResult:
     # Retrieval runs for every case type, and hit/keywords are computed WITHOUT
     # consulting the gate: a gate failure must never mask retrieval quality.
     retrieval = rt.retrieve(case.q, k=TOP_K)
     decision = rt.gate(case.q)
+    rewrite_used = None
+    rescued = None
+    # The escalated path, replayed: the raw question is judged first, and only a
+    # REFUSAL with a conversation behind it consults the fixture. This mirrors
+    # the runtime's laziness exactly -- a follow-up that stands on its own never
+    # reaches the rewriter in production either.
+    if case.history and not decision.passed:
+        rewrite = (rewrites or {}).get(case.id)
+        if rewrite:
+            rewrite_used = rewrite
+            decision = rt.gate(rewrite)
+            retrieval = rt.retrieve(rewrite, k=TOP_K)
     urls = tuple(h.url for h in retrieval.hits)
     hit = None
     hit_page_only = None
@@ -282,13 +320,24 @@ def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
         # candidate pool BEFORE top-k is taken (see Runtime.retrieve's
         # exclude_ids), not a post-hoc filter of the already-computed `hits`
         # above -- a page chunk ranked 5th overall but 4th once the curated
-        # corpus is out of the running still deserves credit here.
-        page_retrieval = rt.retrieve(case.q, k=TOP_K, exclude_ids=rt.knowledge_chunk_ids)
+        # corpus is out of the running still deserves credit here. Ranks
+        # whatever was actually queried (the rewrite when one was replayed,
+        # case.q otherwise) so this diagnostic never silently measures a
+        # different query than the main path did.
+        page_retrieval = rt.retrieve(rewrite_used or case.q, k=TOP_K, exclude_ids=rt.knowledge_chunk_ids)
         hit_page_only = bool(set(h.url for h in page_retrieval.hits) & set(case.expected_urls))
         # Matched against the concatenated post-floor top-4 — exactly the text
         # that becomes `contexts`. This is "was the fact available to the model?"
         blob = " ".join(rt.chunk_text(h.chunk_id) for h in retrieval.hits)
         found, missing = keyword_matches(blob, case.expected_keywords)
+        # Gated on rewrite_used, NOT bare case.history: a follow-up that
+        # cleared the gate on its own never consulted the fixture (see above),
+        # so there was no rewrite for it to be "rescued" by -- scoring it here
+        # would inflate the rescue-rate metric with cases that were never
+        # broken. rescued only answers "did a REPLAYED rewrite turn a refusal
+        # into a pass," which requires a rewrite to have actually run.
+        if rewrite_used is not None:
+            rescued = bool(decision.passed and hit)
     return CaseResult(
         case=case,
         gate_passed=decision.passed,
@@ -303,11 +352,13 @@ def score_case(rt: Runtime, case: GoldenCase) -> CaseResult:
         retrieved_langs=dict(Counter(h.lang for h in retrieval.hits)),
         dropped_by_floor=retrieval.dropped_by_floor,
         hit_page_only=hit_page_only,
+        rewrite_used=rewrite_used,
+        rescued=rescued,
     )
 
 
-def run_cases(rt: Runtime, cases: list[GoldenCase]) -> list[CaseResult]:
-    return [score_case(rt, c) for c in cases]
+def run_cases(rt: Runtime, cases: list[GoldenCase], rewrites: dict[str, str] | None = None) -> list[CaseResult]:
+    return [score_case(rt, c, rewrites) for c in cases]
 
 
 def aggregate(results: list[CaseResult]) -> dict[str, dict]:

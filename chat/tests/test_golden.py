@@ -508,3 +508,63 @@ def test_history_rejects_a_bad_role(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="role"):
         load_cases(path)
+
+
+# --- Task 8: the recorded-rewrite fixture ------------------------------------
+
+
+def test_score_case_is_untouched_for_a_single_turn_case(rt) -> None:
+    """The overwhelming majority of the set. A case with no history must score
+    exactly as it did before rewrites existed."""
+    from portfolio_rag.evaluation import GoldenCase, score_case
+
+    case = GoldenCase(id="x", role="visitor", lang="en", type="positive",
+                      q="what game engines has he used",
+                      expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+
+    with_fixture = score_case(rt, case, rewrites={"x": "should be ignored"})
+    without = score_case(rt, case)
+
+    assert with_fixture.gate_passed == without.gate_passed
+    assert with_fixture.top_urls == without.top_urls
+    assert with_fixture.rewrite_used is None
+    assert with_fixture.rescued is None
+
+
+def test_a_followup_that_already_passes_the_gate_is_not_rewritten(rt) -> None:
+    """The rewrite is LAZY: it only runs when the raw question fails. A
+    follow-up that stands on its own must not pay for it, and must not be
+    scored as a rescue."""
+    from portfolio_rag.evaluation import GoldenCase, score_case
+
+    case = GoldenCase(id="x", role="visitor", lang="en", type="positive",
+                      q="what game engines has he used",
+                      history=(("user", "tell me about prime engine"), ("assistant", "...")),
+                      expected_urls=("pages/skills.html",), expected_keywords=("UE5",))
+
+    result = score_case(rt, case, rewrites={"x": "a rewrite that should never be used"})
+
+    assert result.rewrite_used is None
+    assert result.rescued is None
+
+
+def test_a_missing_fixture_entry_leaves_the_case_refused_rather_than_inventing_one(rt) -> None:
+    """A case added to golden.jsonl without re-running refresh_rewrites.py must
+    score as "still refused", never as a silent pass. An absent measurement is
+    never a favourable one."""
+    from portfolio_rag.evaluation import GoldenCase, score_case
+
+    case = GoldenCase(id="missing", role="visitor", lang="en", type="off_topic",
+                      adjacency="easy", q="write me a poem",
+                      history=(("user", "tell me about prime engine"), ("assistant", "...")))
+
+    result = score_case(rt, case, rewrites={})
+
+    assert result.rewrite_used is None
+    assert result.gate_passed is False
+
+
+def test_load_rewrites_of_an_absent_file_is_empty(tmp_path) -> None:
+    from portfolio_rag.evaluation import load_rewrites
+
+    assert load_rewrites(tmp_path / "nope.json") == {}
