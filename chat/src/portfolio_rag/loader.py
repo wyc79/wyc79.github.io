@@ -110,7 +110,35 @@ def _clean_text(node) -> str:
     return " ".join(node.get_text(separator=" ").split())
 
 
-def _page_title(soup: BeautifulSoup) -> str:
+def _page_title(soup: BeautifulSoup, lang: str | None = None) -> str:
+    """The page's display title, authored where the page declares one.
+
+    `<meta name="page-title" content="..." data-zh="...">` is authoritative and
+    is read first. Everything else falls back to splitting <title>, which works
+    only by convention and demonstrably not always: across this site's 17 pages
+    the <title> element uses five different shapes -- "X - Author",
+    "X - Subtitle - Author", "X: Y-Aware Z | Author", one page with no
+    data-en/data-zh at all, and one whose text content disagrees with its own
+    data-en. The split on "-" gets 16 of them right and mangles
+    pages/chat-agent.html in both languages: English cut mid-word to "Portfolio
+    Chat Agent: Role" (the hyphen inside "Role-Aware"), and Chinese not cut at
+    all, keeping " | 王元辰" because that title has no hyphen to split on.
+
+    This is not cosmetic metadata. page_title is what source cards show, what
+    /chat's page-awareness line names to the model, and what any
+    recommendation list renders -- so a mangled value is user-visible in three
+    places, and the model was being told the visitor was reading a page called
+    "作品集聊天助手：角色感知 RAG | 王元辰".
+
+    The tab title is deliberately NOT this string: <title> carries the author
+    name because a browser tab should, and this should not. They are different
+    strings and each gets its own home.
+    """
+    meta = soup.find("meta", attrs={"name": "page-title"})
+    if meta:
+        authored = (meta.get("data-zh") if lang == "zh" else meta.get("content")) or ""
+        if authored.strip():
+            return authored.strip()
     raw = soup.title.get_text() if soup.title else ""
     return raw.split("—")[0].split("-")[0].strip() or "Untitled"
 
@@ -119,7 +147,7 @@ def load_page(path: Path, url: str, lang: str | None = None) -> list[Section]:
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "lxml")
     if lang:
         _select_language(soup, lang)
-    page_title = _page_title(soup)
+    page_title = _page_title(soup, lang)
 
     sections: list[Section] = []
 

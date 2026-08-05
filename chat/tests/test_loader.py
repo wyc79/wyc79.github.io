@@ -254,3 +254,86 @@ def test_every_site_page_produces_a_summary_chunk_in_both_languages() -> None:
                 missing[lang].append(url)
 
     assert missing == {"en": [], "zh": []}, f"pages with no summary chunk: {missing}"
+
+
+def test_an_authored_page_title_beats_the_title_tag_heuristic(tmp_path) -> None:
+    """<meta name="page-title"> is authoritative. The <title> below it is the
+    shape that breaks the heuristic in both directions: a hyphen inside a word
+    for English, and no hyphen at all for Chinese."""
+    from portfolio_rag.loader import load_page
+
+    page = tmp_path / "demo.html"
+    page.write_text(
+        '<html><head>'
+        '<title data-en="Portfolio Chat Agent: Role-Aware RAG | YC"'
+        ' data-zh="作品集聊天助手：角色感知 RAG | 王元辰">Portfolio Chat Agent: Role-Aware RAG | YC</title>'
+        '<meta name="description" content="A description comfortably past the length floor."'
+        ' data-zh="一句足够长的中文描述，用来越过长度下限，确保这一段真的会被索引进去。">'
+        '<meta name="page-title" content="Portfolio Chat Agent" data-zh="作品集聊天助手">'
+        "</head><body><main></main></body></html>",
+        encoding="utf-8",
+    )
+
+    en = [s for s in load_page(page, "pages/demo.html", "en") if s.anchor == "top"][0]
+    zh = [s for s in load_page(page, "pages/demo.html", "zh") if s.anchor == "top"][0]
+
+    assert en.page_title == "Portfolio Chat Agent", "the heuristic would cut this at 'Role'"
+    assert zh.page_title == "作品集聊天助手", "the heuristic would keep ' | 王元辰'"
+
+
+def test_a_page_with_no_authored_title_still_falls_back(tmp_path) -> None:
+    """The tag is optional and can be added per page. Without it, behaviour is
+    exactly what it was before the tag existed."""
+    from portfolio_rag.loader import load_page
+
+    page = tmp_path / "demo.html"
+    page.write_text(
+        '<html><head><title>Gyrotris - Solo Puzzle Game - YC</title>'
+        '<meta name="description" content="A description comfortably past the length floor.">'
+        "</head><body><main></main></body></html>",
+        encoding="utf-8",
+    )
+
+    en = [s for s in load_page(page, "pages/demo.html", "en") if s.anchor == "top"][0]
+    assert en.page_title == "Gyrotris"
+
+
+def test_no_page_title_leaks_the_author_name_or_a_separator() -> None:
+    """page_title is user-visible in three places -- source cards, /chat's
+    page-awareness line, and any recommendation list -- so a title carrying
+    "Yuanchen Wang" or a leftover "|" is a defect a visitor sees. index.html is
+    exempt: its page genuinely is the author."""
+    from portfolio_rag.config import settings
+    from portfolio_rag.loader import load_page
+
+    site_root = settings.site_root
+    pages = [(p, f"pages/{p.name}") for p in sorted((site_root / "pages").glob("*.html"))]
+
+    bad = []
+    for path, url in pages:
+        for lang in ("en", "zh"):
+            for s in load_page(path, url, lang):
+                if s.anchor != "top":
+                    continue
+                if "Yuanchen Wang" in s.page_title or "王元辰" in s.page_title or "|" in s.page_title:
+                    bad.append(f"{url} [{lang}] {s.page_title!r}")
+
+    assert bad == [], f"page titles carrying an author name or separator: {bad}"
+
+
+def test_no_page_title_meta_carries_data_en() -> None:
+    """Same void-element rule as the description tag: i18n.js selects
+    [data-en][data-zh] and assigns textContent, which does nothing useful on a
+    <meta>. English lives in content=."""
+    import re
+
+    from portfolio_rag.config import settings
+
+    site_root = settings.site_root
+    offenders = []
+    for path in [site_root / "index.html"] + sorted((site_root / "pages").glob("*.html")):
+        for tag in re.findall(r"<meta[^>]*name=\"page-title\"[^>]*>", path.read_text(encoding="utf-8")):
+            if "data-en=" in tag:
+                offenders.append(path.name)
+
+    assert offenders == [], f"data-en on a <meta> tag is swapped by i18n.js: {offenders}"
