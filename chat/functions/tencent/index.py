@@ -891,7 +891,7 @@ def llm_payload(system: str, messages: list) -> dict:
         log({"type": "llm_max_tokens_invalid", "value": raw, "fallback": LLM_MAX_TOKENS_DEFAULT})
         max_tokens = int(LLM_MAX_TOKENS_DEFAULT)
     payload = {
-        "model": env("LLM_MODEL", "deepseek-chat"),
+        "model": env("LLM_MODEL", "deepseek-v4-flash"),
         "max_tokens": max_tokens,
         "messages": [{"role": "system", "content": system}] + messages,
     }

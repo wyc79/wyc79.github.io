@@ -341,6 +341,18 @@ def test_llm_payload_puts_system_first_then_messages_and_carries_the_model(monke
     assert payload["model"] == "deepseek-v4-flash"
 
 
+def test_llm_payload_default_model_is_not_the_deprecated_deepseek_chat(monkeypatch) -> None:
+    """`deepseek-chat` is on a deprecation path. A default that names it is a
+    latent outage: the day it is withdrawn, every /chat turn 4xxs on a
+    deployment whose console never set LLM_MODEL explicitly."""
+    mod = _load_backend()
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    payload = mod.llm_payload("system prompt", [])
+
+    assert payload["model"] == "deepseek-v4-flash"
+
+
 def test_llm_payload_falls_back_to_the_default_on_a_malformed_max_tokens(monkeypatch) -> None:
     """A typo'd console value (e.g. "abc") must not raise out of a request --
     that would take /chat down entirely instead of just serving one turn with
