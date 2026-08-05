@@ -1029,6 +1029,31 @@ def test_rewrite_payload_uses_greedy_decoding(monkeypatch) -> None:
     assert payload["temperature"] == 0
 
 
+def test_rewrite_payload_default_model_is_not_the_deprecated_deepseek_chat(monkeypatch) -> None:
+    """Same reasoning as llm_payload's: a default that names the deprecated
+    model is a latent outage on this path too, and the rewrite call must not
+    drift from llm_payload's default just because it pins its other three
+    parameters independently."""
+    mod = _load_backend()
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert payload["model"] == "deepseek-v4-flash"
+
+
+def test_rewrite_payload_honors_llm_model_override(monkeypatch) -> None:
+    """Unlike temperature/thinking/max_tokens, model is NOT one of the pinned
+    parameters -- a deployment pointing LLM_MODEL elsewhere must have the
+    rewrite call follow it, the same as llm_payload does."""
+    mod = _load_backend()
+    monkeypatch.setenv("LLM_MODEL", "some-other-model")
+
+    payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+    assert payload["model"] == "some-other-model"
+
+
 def test_rewrite_payload_disables_thinking_regardless_of_llm_thinking(monkeypatch) -> None:
     """LLM_THINKING's "" escape hatch omits the field entirely, which is a safe
     neutral only for a non-reasoning model. The default model reasons, so an
