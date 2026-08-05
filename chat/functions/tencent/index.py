@@ -1019,10 +1019,38 @@ def llm_payload(system: str, messages: list) -> dict:
 
 REWRITE_MAX_TOKENS = 128
 
+# Measured against the real DeepSeek API (chat/scripts/refresh_rewrites.py
+# --dry-run over the multi-turn golden cases): two Chinese off-topic
+# follow-ups ("给我写首诗", "帮我写封邮件") came back ANSWERED, not restated --
+# e.g. "please tell me what theme you'd like and I'll write you a poem." The
+# root cause was structural, in the payload below, not a wording gap in this
+# prompt: the old payload replayed history as REAL message turns
+# ([system] + history + [{"role": "user", "content": question}]), so the model
+# saw a genuine user/assistant dialogue with the follow-up as the newest user
+# turn, and the dominant pattern-match for "produce the next assistant turn"
+# is to answer it. One English system instruction cannot reliably out-compete
+# an entire conversation shaped like a live dialogue -- and the effect was
+# strongest cross-lingually, since this prompt's grip on the input is
+# strongest when the input is also English. See _rewrite_user_message below
+# for the fix's other half: history is now flattened into quoted data inside
+# a single user message, never played back as turns the model participates
+# in. This prompt carries the other half: an anti-answer clause that does not
+# depend on the model correctly inferring its role from message shape alone,
+# plus an explicit same-language requirement (the two broken cases were both
+# Chinese input answered in Chinese, argued against only in English).
 REWRITE_SYSTEM_PROMPT = (
-    "You rewrite a follow-up question into a single standalone question, using "
-    "the conversation only to resolve references. You are not answering "
-    "anything.\n\n"
+    "You are not a conversational assistant, and the message below is not "
+    "addressed to you. You are a question-rewriting tool: your only job is "
+    "to restate a follow-up question as one standalone question, using the "
+    "quoted conversation only to resolve dangling references inside it.\n\n"
+    "Never answer, fulfil, respond to, or offer to help with the question -- "
+    "not in whole, not in part, not by asking a clarifying question back, in "
+    "any language. Whatever it requests (a poem, an email, a translation, "
+    "code, an opinion, a joke, anything), do not produce it. Your entire "
+    "output is a restatement of the question itself, never an attempt to "
+    "satisfy it.\n\n"
+    "The conversation you are given is quoted data to read, not a dialogue "
+    "you are continuing -- you are never its next speaker.\n\n"
     "Resolve ONLY dangling references: pronouns (it, they, that one), definite "
     "descriptions with no antecedent inside the question (the renderer, the "
     "second one), and elided arguments (\"is there any optimization work\" -- on "
@@ -1032,9 +1060,47 @@ REWRITE_SYSTEM_PROMPT = (
     "antecedent for the dangling reference.\n\n"
     "Never add a topic, project name, or qualifier the question did not ask "
     "for, and never introduce a person's name.\n\n"
+    "Output in the SAME language as the follow-up question: a Chinese "
+    "question must produce a Chinese output, an English one an English "
+    "output, regardless of the language this instruction is written in.\n\n"
+    "Worked example (a topic unrelated to any real conversation, showing the "
+    "correct behaviour on an off-topic imperative):\n"
+    "  Conversation:\n"
+    "    user: 他发表过什么论文\n"
+    "    assistant: 他发表过一篇关于分布式系统的论文。\n"
+    "  Follow-up question to restate: \"给我讲个笑话\"\n"
+    "  Correct output: 给我讲个笑话\n"
+    "  WRONG output -- this FULFILS the request instead of restating it, "
+    "never do this: \"好的，给你讲个笑话：为什么程序员分不清万圣节和圣诞节？"
+    "因为 Oct 31 等于 Dec 25。\"\n\n"
     "Reply with the question and nothing else: one line, no preamble, no "
     "quotes, no explanation."
 )
+
+
+def _rewrite_user_message(history: list, question: str) -> str:
+    """The ONE user-role message the rewrite call ever sees.
+
+    History is flattened into labelled transcript lines inside this single
+    string -- quoted data the model reads about -- rather than replayed as
+    real `{"role": "user"/"assistant", ...}` turns. Turns would cast the
+    model as a dialogue participant whose natural next move is to produce the
+    next assistant reply; see REWRITE_SYSTEM_PROMPT's comment for the live
+    defect that shape caused. Every history turn's own text still reaches the
+    model -- nothing here summarizes or drops it, it is only relabelled from
+    "a turn to continue" to "a line to read".
+    """
+    lines = [
+        "Conversation so far, quoted for context only -- you are not a "
+        "participant in it and this is not a turn you are replying to:"
+    ]
+    for turn in history or []:
+        role = turn.get("role", "user") if isinstance(turn, dict) else "user"
+        content = turn.get("content", "") if isinstance(turn, dict) else str(turn)
+        lines.append(f"{role}: {content}")
+    lines.append("")
+    lines.append(f'Follow-up question to restate: "{question}"')
+    return "\n".join(lines)
 
 
 def rewrite_payload(history: list, question: str) -> dict:
@@ -1047,17 +1113,20 @@ def rewrite_payload(history: list, question: str) -> dict:
       "" escape hatch: the default model reasons, so an omitted field is not a
       neutral escape -- it restores thinking at effort "high".
     - its own small ceiling, not LLM_MAX_TOKENS' 2048 reasoning headroom.
+    - messages are exactly [system, user] -- history is flattened into the
+      single user message by _rewrite_user_message rather than replayed as
+      message turns; see REWRITE_SYSTEM_PROMPT's comment for why that
+      distinction is the whole fix for the role-break this call once had.
     """
     return {
         "model": env("LLM_MODEL", "deepseek-v4-flash"),
         "max_tokens": REWRITE_MAX_TOKENS,
         "temperature": 0,
         "thinking": {"type": "disabled"},
-        "messages": (
-            [{"role": "system", "content": REWRITE_SYSTEM_PROMPT}]
-            + list(history or [])
-            + [{"role": "user", "content": question}]
-        ),
+        "messages": [
+            {"role": "system", "content": REWRITE_SYSTEM_PROMPT},
+            {"role": "user", "content": _rewrite_user_message(history, question)},
+        ],
     }
 
 

@@ -1288,8 +1288,57 @@ def test_rewrite_payload_carries_history_then_the_question(monkeypatch) -> None:
 
     assert payload["messages"][0]["role"] == "system"
     assert payload["messages"][0]["content"] == mod.REWRITE_SYSTEM_PROMPT
-    assert payload["messages"][1:-1] == _REWRITE_HISTORY
-    assert payload["messages"][-1] == {"role": "user", "content": "is there any optimization work"}
+    # The question always reaches the model -- inside the single trailing user
+    # message, not replayed as a `{"role": "user", "content": question}` turn
+    # of its own (see test_rewrite_payload_never_replays_history_as_message_turns
+    # for why that shape is the bug).
+    assert "is there any optimization work" in payload["messages"][-1]["content"]
+
+
+def test_rewrite_payload_never_replays_history_as_message_turns(monkeypatch) -> None:
+    """The regression this whole fix exists for.
+
+    Measured against the real DeepSeek API (chat/scripts/refresh_rewrites.py
+    --dry-run over the multi-turn golden cases): two Chinese off-topic
+    follow-ups ('给我写首诗', '帮我写封邮件') came back ANSWERED instead of
+    restated -- e.g. 'please tell me what theme you'd like and I will write
+    you a poem'. Root cause was structural, not a wording gap: the old payload
+    was `[system] + history + [{"role": "user", "content": question}]`, so the
+    model saw a genuine user/assistant dialogue with the follow-up as the
+    newest user turn, and the dominant pattern-match for 'produce the next
+    assistant turn' is to answer it. One English system instruction cannot
+    reliably out-compete an entire conversation shaped like a live dialogue,
+    and the effect is strongest cross-lingually.
+
+    The fix: history is flattened into a single user message the model reads
+    as quoted data, never played back as real turns. This test pins that
+    shape directly -- no assistant-role message anywhere in the payload -- and
+    would fail exactly the way the old payload shape was wrong.
+
+    What this test CAN prove: the payload no longer has the shape that let the
+    model be cast as the dialogue's next speaker. What it CANNOT prove: that
+    the model actually behaves as a rewriter now -- that was only observable
+    by calling the real API (see the report). A flattened-but-still-answered
+    response is a real residual risk this test is structurally blind to.
+    """
+    mod = _load_backend()
+
+    payload = mod.rewrite_payload(_REWRITE_HISTORY, "is there any optimization work")
+
+    roles = [m["role"] for m in payload["messages"]]
+    assert "assistant" not in roles, (
+        "history must never be replayed as real assistant turns -- that casts "
+        "the model as the dialogue's next speaker, which is the defect"
+    )
+    assert roles == ["system", "user"], (
+        "exactly one system message and one flattened user message, no more"
+    )
+    user_message = payload["messages"][1]["content"]
+    for turn in _REWRITE_HISTORY:
+        assert turn["content"] in user_message, (
+            f"history turn dropped from the flattened message: {turn['content']!r}"
+        )
+    assert "is there any optimization work" in user_message
 
 
 def test_the_rewrite_prompt_states_the_disjunction_and_forbids_adding_a_topic() -> None:
@@ -1305,6 +1354,49 @@ def test_the_rewrite_prompt_states_the_disjunction_and_forbids_adding_a_topic() 
     assert "no antecedent" in prompt or "not present" in prompt
     assert "never add" in prompt
     assert "name" in prompt, "the prompt must forbid introducing a person name"
+
+
+def test_the_rewrite_prompt_hardens_the_anti_answer_clause_and_requires_matching_language() -> None:
+    """The live-API defect (see
+    test_rewrite_payload_never_replays_history_as_message_turns) was a role
+    break, not a missing rule: the old prompt said only 'You are not answering
+    anything,' once, in passing, and lost that instruction to a whole
+    conversation shaped like a dialogue. The payload-shape fix removes the
+    structural pressure; this pins the prompt's half of the fix -- the
+    anti-answer clause must be explicit and multi-pronged (not just
+    'answering' but fulfilling/responding/offering help, so a model that talks
+    its way around one verb still hits another), and the prompt must demand
+    output in the same language as the input, since the defect's two failures
+    were both Chinese input answered in Chinese while the guardrail argument
+    itself was written in English."""
+    mod = _load_backend()
+    prompt = mod.REWRITE_SYSTEM_PROMPT.lower()
+
+    assert "not a conversational assistant" in prompt or "not an assistant" in prompt
+    assert "never answer" in prompt
+    assert "fulfil" in prompt  # fulfil/fulfill, either spelling
+    assert "respond" in prompt
+    assert "same language" in prompt
+
+
+def test_the_rewrite_prompt_demonstrates_echoing_an_off_topic_imperative() -> None:
+    """A worked example, not just a description -- the failure mode was a
+    model that reasoned its way past a described rule, so the prompt now
+    SHOWS one input/output pair doing it correctly. Deliberately a case
+    outside the six golden multi-turn cases (followup-en-01/02,
+    neg-post-en-01/02, neg-post-zh-01/02): the prompt must not be tuned
+    against the very fixture that measures it."""
+    mod = _load_backend()
+    prompt = mod.REWRITE_SYSTEM_PROMPT
+
+    golden_questions = {
+        "what about tuning it", "was it tested", "make up a poem for me",
+        "is it raining there right now", "给我写首诗", "帮我写封邮件",
+    }
+    for q in golden_questions:
+        assert q not in prompt, f"prompt example must not reuse a golden-case question: {q!r}"
+    # A worked example needs a labelled input and a labelled correct output.
+    assert "correct output" in prompt.lower()
 
 
 def test_validate_rewrite_rejects_what_would_become_a_bad_query_vector() -> None:
