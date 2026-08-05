@@ -190,24 +190,34 @@ def _run_widget_gate_branch(gate: dict, history: list, intent_js: str = "null") 
     Measured: with only that call, this helper returns `record: {}` no matter
     what `gate` says, and every assertion on `record["gate"]` blows up with a
     KeyError instead of a real pass/fail -- exactly the "passes while testing
-    almost nothing" trap. Fixed by extracting each self-contained branch
-    verbatim with its own marker and concatenating them back into the same
-    if/else-if/else chain, in source order -- nothing here is retyped, only
-    reassembled. The trailing branch's own marker text is the tail of the
-    PRECEDING branch (the literal `else {` is not unique file-wide), so its
-    extraction is trimmed back to where `else {` actually starts.
+    almost nothing" trap.
+
+    Fixed by taking the CONTIGUOUS source slice from the head of the chain
+    (`if (intent) {`) through the end of its last branch, rather than
+    extracting each branch by name and reassembling them: a per-branch
+    reassembly hardcodes which branches exist and in what order, so a fifth
+    branch inserted into the chain (verified with a mutant copy of
+    chat-widget.js: `else if (emb.hardBlock) { refused = true; ... }` ahead of
+    `else if (emb.gate)`) would silently never be included, and every test
+    below would go on passing against a chain that no longer matches the
+    file. A contiguous slice has no such list to fall out of sync -- it picks
+    up an inserted branch automatically and carries no assumption about how
+    many branches there are or what order they're in. `local_gate_branch`
+    is still extracted by name -- not to include in the chain directly, but
+    because it is the FINAL branch, so its own end is the end of the slice.
+    Its own marker text is the tail of the PRECEDING branch (the literal
+    `else {` is not unique file-wide), so its extraction is trimmed back to
+    where `else {` actually starts.
+
     `escalated` is declared here because node treats a script containing
     `await` (the local-gate branch's `await localEmbed(...)`) as an ES
     module and runs it in strict mode -- an undeclared bare assignment that
     was a harmless implicit global in sloppy mode throws a ReferenceError
     there, whether or not that branch ends up executing."""
     src = WIDGET_PATH.read_text(encoding="utf-8")
-    intent_branch = extract_js_function(src, "if (intent) {")
-    remote_gate_branch = extract_js_function(src, "else if (emb.gate) {")
-    gate_unavailable_branch = extract_js_function(src, "else if (state.meta.gate_remote) {")
     local_gate_branch_raw = extract_js_function(src, "unavailable: true };\n      } else {")
     local_gate_branch = local_gate_branch_raw[local_gate_branch_raw.index("else {"):]
-    chain = " ".join([intent_branch, remote_gate_branch, gate_unavailable_branch, local_gate_branch])
+    chain = src[src.index("if (intent) {") : src.index(local_gate_branch) + len(local_gate_branch)]
     script = (
         "var state = { history: " + json.dumps(history) + " };\n"
         "var record = {};\n"
@@ -853,6 +863,26 @@ def test_ask_worker_builds_its_body_with_chat_request_body() -> None:
     )
     assert "JSON.stringify(chatRequestBody(" in " ".join(fn.split()), (
         "askWorker must serialise chatRequestBody's output directly"
+    )
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_send_passes_its_own_escalated_flag_to_ask_worker() -> None:
+    """M8: send()'s call site dropping `escalated`
+    (`askWorker(question, emb.rid, intent)`, no 4th argument) left the whole
+    suite green -- _run_widget_gate_branch's tests pin that send() COMPUTES
+    `escalated` correctly, and test_askworker_forwards_gate_failed_to_the_wire_body
+    (test_widget_resilience.py) pins that askWorker FORWARDS a 4th argument
+    when given one, but nothing previously read what send() itself hands
+    askWorker at its own call site, so a call site that silently stopped
+    passing the flag it just computed left both of those green. Structural
+    claim in the style of test_ask_worker_builds_its_body_with_chat_request_body
+    above -- a wiring assertion, not a behavioural one."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    fn = extract_js_function(src, "async function send(")
+
+    assert "askWorker(question, emb.rid, intent, escalated)" in " ".join(fn.split()), (
+        "send() must pass its own `escalated` flag as askWorker's 4th argument"
     )
 
 

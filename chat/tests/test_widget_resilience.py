@@ -358,13 +358,16 @@ def test_degraded_sources_message_is_gated_on_the_displayable_count() -> None:
 # fragile `indexOf('rate limited')` string check.
 
 
-def _run_ask_worker(status: int, body_js: str) -> dict:
+def _run_ask_worker(status: int, body_js: str, ask_worker_call: str = "askWorker('who is YC')") -> dict:
     """Execute the REAL askWorker, together with its REAL fetchWithTimeout,
     in node against a mocked global.fetch -- so the 502-body-sniffing logic
     runs for real rather than being redescribed in Python. `body_js` is a JS
     statement body for the mocked response's `.json()` (e.g.
     "return Promise.resolve({...});", or a rejection for a non-JSON gateway
-    502 body)."""
+    502 body). `ask_worker_call` is the literal call expression -- overridden
+    by test_askworker_forwards_gate_failed_to_the_wire_body below, which needs
+    askWorker's 4th argument, everything else here only ever needs the
+    question."""
     src = _widget_src()
     script = (
         "var WORKER_URL = 'http://example.invalid';\n"
@@ -392,7 +395,7 @@ def _run_ask_worker(status: int, body_js: str) -> dict:
         "    json: function () { " + body_js + " },\n"
         "  });\n"
         "};\n"
-        "askWorker('who is YC').then(function (r) {\n"
+        + ask_worker_call + ".then(function (r) {\n"
         "  process.stdout.write(JSON.stringify({ threw: false, result: r, sentBody: sentBody }));\n"
         "}).catch(function (e) {\n"
         "  process.stdout.write(JSON.stringify({\n"
@@ -402,6 +405,27 @@ def _run_ask_worker(status: int, body_js: str) -> dict:
         "});\n"
     )
     return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_askworker_forwards_gate_failed_to_the_wire_body() -> None:
+    """M7: askWorker dropping its 4th argument on the way to chatRequestBody
+    (`chatRequestBody(question, embedRid, intent)`, no `gateFailed`) left the
+    whole suite green -- every OTHER request-shape test either calls
+    chatRequestBody() standalone (which cannot see askWorker drop an
+    argument) or calls askWorker with no 4th argument at all
+    (test_the_wire_body_is_what_chat_request_body_built below). This is the
+    one place that drives askWorker with a truthy gate_failed and reads it
+    back off the real bytes handed to fetch()."""
+    import json as _json
+
+    got = _run_ask_worker(
+        200, "return Promise.resolve({ answer: 'x', sources: [] });",
+        ask_worker_call="askWorker('who is YC', undefined, undefined, true)",
+    )
+
+    sent = _json.loads(got["sentBody"])
+    assert sent["gate_failed"] is True, "askWorker must forward its 4th argument through to the wire"
 
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
