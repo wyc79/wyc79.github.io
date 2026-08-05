@@ -138,3 +138,74 @@ def test_update_baseline_still_refuses_a_filtered_run(
 
     assert mod.main() == 2
     assert not baseline.exists()
+
+
+# --- Important 1, final whole-branch review: two fabricated numbers --------
+
+
+def test_missing_rewrite_fixture_renders_n_a_not_a_fabricated_number(
+    monkeypatch, capsys
+) -> None:
+    """Drives the real main() end to end (not print_shared_table or the
+    follow-up block in isolation) so a future edit that drops the n/a
+    substitution -- or resurrects the deleted prose NOTE this replaces --
+    shows up here instead of nowhere. This file's own docstring names
+    exactly this gap: `_StubCase.history = ()` makes every other test in
+    this module blind to the multi-turn path entirely.
+
+    Two real GoldenCase/CaseResult pairs, both with history and NO recorded
+    rewrite (load_rewrites stubbed to {}, mirroring this environment's real
+    state -- chat/eval/rewrites.json does not exist here). aggregate() runs
+    for REAL (only load_runtime/load_cases/load_rewrites/run_cases are
+    stubbed) so the rendering logic under test sees the same cell shape a
+    real run would produce:
+
+      - a positive follow-up case -> followup_rescued must print "n/a", not
+        "rescued 0/1", which reads as "attempted and failed" rather than
+        "never attempted."
+      - a post-context negative -> the shared table's post_context column
+        must print "n/a", not "0/0", which reads as a clean pass despite
+        never having replayed a rewrite (the whole point of the bucket).
+    """
+    from portfolio_rag.evaluation import CaseResult, GoldenCase
+
+    mod = _load_run_eval()
+
+    followup_case = GoldenCase(
+        id="followup-x", role="combat_design_recruiter", lang="en", type="positive",
+        q="what about tuning it",
+        history=(("user", "u"), ("assistant", "a")),
+        expected_urls=("pages/skills.html",), expected_keywords=("UE5",),
+    )
+    post_context_case = GoldenCase(
+        id="neg-post-x", role="shared", lang="en", type="off_topic", adjacency="easy",
+        q="make up a poem for me",
+        history=(("user", "u"), ("assistant", "a")),
+    )
+    results = [
+        CaseResult(case=followup_case, gate_passed=False, gate_value=0.1,
+                   gate_available=True, hit=None, top_urls=(), top_scores=(), rescued=None),
+        CaseResult(case=post_context_case, gate_passed=False, gate_value=0.1,
+                   gate_available=True, hit=None, top_urls=(), top_scores=()),
+    ]
+
+    monkeypatch.setattr(mod, "load_runtime", lambda: _StubRuntime(stale=set()))
+    monkeypatch.setattr(mod, "load_cases", lambda path: [followup_case, post_context_case])
+    monkeypatch.setattr(mod, "load_rewrites", lambda: {})  # this environment's real state
+    monkeypatch.setattr(mod, "run_cases", lambda rt, cases, rewrites=None: results)
+    monkeypatch.setattr("sys.argv", ["run_eval.py"])
+
+    rc = mod.main()
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    followup_line = next(l for l in out.splitlines() if "rescued" in l)
+    assert followup_line.split()[-1] == "n/a", (
+        f"expected the fabricated 'rescued 0/1' replaced with n/a, got: {followup_line!r}"
+    )
+    shared_line = next(l for l in out.splitlines() if l.strip().startswith("en "))
+    assert shared_line.split()[-1] == "n/a", (
+        f"expected post_context's structurally-guaranteed pass replaced with n/a, "
+        f"got: {shared_line!r}"
+    )
+    assert "NOTE:" not in out, "the removed prose NOTE must not silently come back"

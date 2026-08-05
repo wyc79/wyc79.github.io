@@ -143,10 +143,13 @@ def test_fetch_with_timeout_aborts_a_response_whose_body_never_settles() -> None
 
 @pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
 def test_the_chat_deadline_outlives_the_functions_own_llm_timeout() -> None:
-    """index.py's call_llm uses urlopen(timeout=N). A client deadline shorter
-    than that would abandon requests the server is still going to answer --
-    N is parsed from index.py's own source, not hardcoded, so raising the
-    server timeout can't leave this guard silently green."""
+    """index.py's call_llm shares its transport with the follow-up rewrite
+    call via a private _post_llm helper, which is where the urlopen(timeout=N)
+    literal now lives (see _index_call_llm_timeout's own docstring). A client
+    deadline shorter than that would abandon requests the server is still
+    going to answer -- N is parsed from index.py's own source, not
+    hardcoded, so raising the server timeout can't leave this guard silently
+    green."""
     src = _widget_src()
     chat_ms = int(extract_js_var(src, "CHAT_TIMEOUT_MS"))
     embed_ms = int(extract_js_var(src, "EMBED_TIMEOUT_MS"))

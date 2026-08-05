@@ -93,7 +93,38 @@ def print_positive_table(cells: dict) -> None:
               "(see n/a rows)")
 
 
-def print_shared_table(cells: dict) -> None:
+def _fixture_coverage(cases: list, rewrites: dict) -> dict[str, bool]:
+    """cell -> whether EVERY multi-turn case belonging to it has a recorded
+    rewrite in `rewrites`. A cell with incomplete coverage never actually
+    replayed a rewrite for at least one of its history-bearing cases, so its
+    multi-turn metric carries no information about what the rewriter does --
+    only about what the raw question does, which is a different, narrower
+    measurement (see score_case: the fixture is consulted only when the raw
+    question fails the gate; a missing entry just leaves it at that raw
+    result). Cells with no multi-turn cases at all are simply absent from
+    the returned dict, and every caller looks them up with `.get(cell,
+    True)`, treating "nothing to measure" as fully covered rather than as
+    unmeasured.
+
+    Used by print_shared_table (post_context) and main()'s follow-up block
+    (followup_rescued) to decide when to render "n/a" instead of a count --
+    see Important 1, final whole-branch review: without this, post_context
+    was scored purely off rt.gate(case.q) on the raw question and was
+    structurally guaranteed to read as a pass no matter what a real
+    rewriter would do, while a cell with no fixture at all read "rescued
+    0/1" -- indistinguishable from "attempted and failed." An absent
+    measurement must render as unavailable, never as a number that could be
+    mistaken for a real one in either direction.
+    """
+    have: dict[str, list[bool]] = {}
+    for c in cases:
+        if not c.history:
+            continue
+        have.setdefault(c.cell, []).append(c.id in rewrites)
+    return {cell: all(flags) for cell, flags in have.items()}
+
+
+def print_shared_table(cells: dict, post_context_fixture_available: dict) -> None:
     """shared/lang cells: refusal broken out by bucket. Never blended with the
     positive table above, and the four buckets are never blended with each
     other -- a gate that refuses easy off-topic but not adjacent off-topic is
@@ -101,7 +132,16 @@ def print_shared_table(cells: dict) -> None:
     post-context refusal failure (task 9) means the REWRITER is smuggling
     conversational context into a question that should still be refused,
     which is a different failure again from the raw gate missing an easy or
-    adjacent probe."""
+    adjacent probe.
+
+    post_context_fixture_available (see _fixture_coverage): a cell's
+    post_context column renders "n/a", not a fraction, whenever at least one
+    of that cell's post-context cases had no recorded rewrite -- otherwise
+    the column is pure rt.gate(case.q) on the raw question, which every
+    current post-context negative is independently documented (golden.jsonl)
+    to fail standalone, making the fraction structurally guaranteed to read
+    as a full pass regardless of what a real rewrite would do.
+    """
     print(f"\n{'shared negatives':<16} {'off_topic/easy':>16} {'off_topic/adjacent':>20} "
           f"{'injection':>12} {'post_context':>14}")
     print("-" * 83)
@@ -111,7 +151,11 @@ def print_shared_table(cells: dict) -> None:
             easy = f"{c['refusal_easy']}/{c['n_easy']}"
             adjacent = f"{c['refusal_adjacent']}/{c['n_adjacent']}"
             injection = f"{c['refusal_injection']}/{c['n_injection']}"
-            post_context = f"{c['refusal_post_context']}/{c['n_post_context']}"
+            post_context = (
+                f"{c['refusal_post_context']}/{c['n_post_context']}"
+                if post_context_fixture_available.get(name, True)
+                else "n/a"
+            )
         else:
             easy = adjacent = injection = post_context = "n/a"
         print(f"{c['lang']:<16} {easy:>16} {adjacent:>20} {injection:>12} {post_context:>14}")
@@ -203,6 +247,7 @@ def main() -> int:
     cells = aggregate(results)
     positive_cells = {k: v for k, v in cells.items() if v["role"] != SHARED_ROLE}
     shared_cells = {k: v for k, v in cells.items() if v["role"] == SHARED_ROLE}
+    fixture_coverage = _fixture_coverage(selected, rewrites)
 
     if args.verbose:
         print_verbose(results)
@@ -212,7 +257,7 @@ def main() -> int:
         if positive_cells:
             print_positive_table(positive_cells)
         if shared_cells:
-            print_shared_table(shared_cells)
+            print_shared_table(shared_cells, fixture_coverage)
         print_gate_summary(rt.gate_meta)
         print("\nMetrics are reported side by side on purpose -- a blended score cannot")
         print("distinguish a gate problem from a retrieval problem, and hit@4 passing")
@@ -228,18 +273,23 @@ def main() -> int:
         # toward n_followup/followup_rescued, never n_positive -- see its
         # comment) and reported here instead, so a cell's single-turn numbers
         # never move just because a follow-up case was added to it.
+        # Important 1, final whole-branch review: rescued renders "n/a", not a
+        # fabricated 0/N, whenever this cell's follow-up case(s) never
+        # actually replayed a rewrite (see _fixture_coverage) -- "rescued
+        # 0/1" reads as "attempted and failed," which is not what an absent
+        # fixture measured. This replaces the old prose NOTE below the
+        # tables (deleted -- nothing tested it, and the n/a inline is the
+        # same information at the point it's actually misleading).
         followup_cells = {k: c for k, c in cells.items() if c.get("n_followup")}
         if followup_cells:
             print("follow-up resolution (multi-turn positives)")
             for name, c in sorted(followup_cells.items()):
-                print(f"  {name:<28} rescued {c['followup_rescued']}/{c['n_followup']}")
-        missing = [c.id for c in selected if c.history and c.id not in rewrites]
-        if missing:
-            print(
-                f"\n  NOTE: {len(missing)} multi-turn case(s) have no recorded rewrite "
-                f"and scored as still-refused: {missing}\n"
-                "  Run scripts/refresh_rewrites.py to record them."
-            )
+                rescued = (
+                    f"{c['followup_rescued']}/{c['n_followup']}"
+                    if fixture_coverage.get(name, True)
+                    else "n/a"
+                )
+                print(f"  {name:<28} rescued {rescued}")
 
     if args.update_baseline:
         if args.role or args.lang:

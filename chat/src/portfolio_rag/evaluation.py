@@ -460,6 +460,17 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             # `rescued`, which requires landing the expected page -- see
             # CaseResult.rescued's docstring -- so nothing is lost by excluding
             # it here, only double-counted.
+            #
+            # gate_available (below, past this if/else) is the deliberate
+            # EIGHTH exception to "excluded here": it is set unconditionally
+            # from every CaseResult, multi-turn included. That is correct, not
+            # an oversight -- gate_available describes whether THE GATE itself
+            # produced a real measurement (vs. a cjk_bypass decision) for
+            # whatever text it was asked to judge, which is a property of the
+            # gate call a follow-up case makes exactly like a single-turn one
+            # does, not a property of the case's own retrieval/rescue outcome
+            # the way n_positive/hit_at_4/keywords_* are. Excluding it here
+            # too would silently hide a cjk_bypass a follow-up's re-gate hit.
             if c.history:
                 cell["n_followup"] += 1
                 cell["followup_rescued"] += int(bool(r.rescued))

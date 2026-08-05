@@ -18,6 +18,7 @@ from portfolio_rag.evaluation import (
     GOLDEN_PATH,
     NEGATIVES_PER_LANG,
     POSITIVES_PER_CELL,
+    REWRITES_PATH,
     SHARED_ROLE,
     aggregate,
     load_cases,
@@ -478,6 +479,48 @@ def test_a_metric_at_the_floor_genuinely_cannot_fire() -> None:
     # ...and the control: the one shared metric NOT at the floor does fire.
     worse = {"shared/zh": {**current_cells["shared/zh"], "refusal_easy": 2}}
     assert _find_regressions(baseline_cells, worse) == ["shared/zh.refusal_easy: 3 -> 2"]
+
+
+def test_followup_metrics_are_excluded_from_the_regression_gate_only_while_no_fixture_exists() -> None:
+    """followup_rescued and refusal_post_context (evaluation.aggregate) are
+    deliberately absent from _REGRESSION_METRICS -- correct today, because
+    chat/eval/rewrites.json does not exist (no LLM_API_KEY in this
+    environment, so scripts/refresh_rewrites.py has never run) and every
+    multi-turn case therefore scores off the raw question alone, never a
+    replayed rewrite (see evaluation.load_rewrites's docstring and
+    scripts/run_eval.py's _fixture_coverage). Wiring either metric into the
+    gate today would protect a number that measures nothing.
+
+    Same shape as test_hit_at_4_page_only_is_not_a_regression_metric above:
+    an exclusion that is correct only conditionally must be tied to the
+    condition that makes it correct, pinned by an assertion, not left as an
+    omission indistinguishable from an oversight. The moment REWRITES_PATH
+    exists, this test fails and forces a decision instead of the exclusion
+    silently continuing to hold past the point it stopped being justified.
+
+    THE TRAP for whoever wires this in once a fixture lands: adding these
+    two names to _REGRESSION_METRICS is not sufficient by itself for
+    refusal_post_context. It is gate-derived exactly like refusal_easy/
+    refusal_adjacent/refusal_injection (all come from rt.gate()), so it must
+    ALSO join _GATE_METRICS (line 246) -- otherwise a fresh clone, where
+    data/gate_zh_bge.json is gitignored and so has no zh gate, will compare
+    it STRICTLY on zh cells and report a false regression every time. This
+    is exactly the bug test_gate_metric_skipped_unless_available_on_both_sides
+    exists to prevent, and _find_regressions cannot warn about it on its own
+    -- only a human wiring in the metric can remember. followup_rescued is
+    NOT gate-derived the same way (it also requires a successful retrieval
+    hit, see CaseResult.rescued), so it needs its own judgment call about
+    gate-availability skipping, not a copy-paste of this rule.
+    """
+    assert "followup_rescued" not in _REGRESSION_METRICS
+    assert "refusal_post_context" not in _REGRESSION_METRICS
+    assert not REWRITES_PATH.exists(), (
+        "chat/eval/rewrites.json now exists in this environment -- "
+        "followup_rescued and refusal_post_context must be deliberately "
+        "wired into the regression gate (see this test's docstring for the "
+        "refusal_post_context/_GATE_METRICS trap), not left excluded by an "
+        "assumption (no fixture, so nothing to protect) that no longer holds"
+    )
 
 
 def test_history_defaults_to_empty_and_round_trips(tmp_path) -> None:

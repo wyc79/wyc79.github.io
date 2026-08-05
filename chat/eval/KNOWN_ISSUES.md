@@ -703,6 +703,39 @@ a defect to fix, rather than the zero-false-refusal policy working as
 designed) means recalibrating or reconsidering the gate statistic, out of
 this task's scope.
 
+**Measurement caveat (final whole-branch review, fix wave): only one of the
+two EN follow-up positives is a strong test of retrieval, not just the gate.**
+Recorded here, alongside the rest of this finding's evidence about what the
+follow-up-resolution feature does and does not measure, so it is on the
+record before `followup_rescued` is ever quoted as a result on its own.
+
+Verified directly with `rt.retrieve()` against the current index, raw
+question only (no rewrite, no history):
+
+```
+followup-en-01 "what about tuning it"
+  -> pages/automatic-differentiation.html, pages/chat-agent.html,
+     pages/aegis-sword.html, pages/game-design-workshop.html
+  wants pages/prime-engine.html -- ABSENT from the top-4 entirely.
+
+followup-en-02 "was it tested"
+  -> pages/chat-agent.html, pages/chat-agent.html, pages/gyrotris.html,
+     pages/nothing-can-go-wrong.html
+  wants pages/chat-agent.html -- ALREADY present, ranks 1 and 2.
+```
+
+`followup-en-01` is the genuinely strong case: the raw question's retrieval
+misses the expected page completely, so a measured rescue there is evidence
+the rewrite both cleared the gate AND fixed retrieval. `followup-en-02`'s
+raw retrieval already lands the expected page in the top-4 -- its `rescued`
+outcome rides almost entirely on the gate flip (refused standalone at 0.1498
+vs. threshold 0.2029, per its golden.jsonl note), not on the rewrite
+repairing a retrieval miss, because there is no retrieval miss to repair.
+Both cases are legitimate follow-up-resolution positives (the raw question
+genuinely fails the gate standalone, which is the feature's actual
+precondition), but a reader treating `followup_rescued` as "N cases where
+the rewrite fixed a broken retrieval" would overcount by this one case.
+
 ### Right-page/wrong-chunk: full catalog, this run
 
 Every positive case, classified by the `hit@4` x `keywords` quadrant defined

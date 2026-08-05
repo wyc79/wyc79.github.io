@@ -35,15 +35,21 @@ shared probe list and asserts they agree, piece by piece:
      most, because it is exactly what reaches the gate. This is the layer
      the "scored the raw question" wiring bug lived in.
 
-Scope note -- this is two implementations, not three, for items 1-3 and 5:
-functions/tencent/index.py receives `gate_text` as a parameter (the widget
-computes gateForm() and sends the result over the wire) -- it never strips a
-name itself. So NAME_RE/BIO_STUB_RE/gate_form comparisons stay two-way
-(runtime.py vs chat-widget.js); only CJK_RE (used there purely to ROUTE an
-already-computed gate_text, not to strip anything) gets the three-way
+Scope note -- this is a three-way comparison for all five items, not just
+CJK_RE. It used to be two-way (runtime.py vs chat-widget.js) for items 1-3
+and 5, because functions/tencent/index.py received `gate_text` as a
+parameter (the widget computed gateForm() and sent the result over the wire)
+and never stripped a name itself -- only CJK_RE (used there purely to ROUTE
+an already-computed gate_text, not to strip anything) needed the three-way
 treatment, via the same lazy-compile-forcing technique
 test_retrieval_sync.py's precedent (the reverted Task 28
-test_task_request_re_sync.py) used for TASK_REQUEST_RE.
+test_task_request_re_sync.py) used for TASK_REQUEST_RE. Follow-up resolution
+changed that: the escalated /chat path now runs an authoritative, server-side
+re-gate on a rewrite index.py produces itself, with no client involved, so
+index.py computes gate_form() -- and therefore strip_name(), NAME_RE, and
+BIO_STUB_RE -- on its own. All five items are live code on a real request
+path in all three places now; see the three-way block at the bottom of this
+file (items 1-3 and 5, widened) for the tests this added.
 
 The node subprocess plumbing (run a `node -e SCRIPT`, skip -- not fail --
 when node is unavailable, extract a `var NAME = ...;` literal or a whole

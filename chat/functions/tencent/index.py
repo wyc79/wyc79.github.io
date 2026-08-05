@@ -1353,18 +1353,6 @@ class Handler(BaseHTTPRequestHandler):
         # here rather than further down because page_chunks needs it.
         answer_lang = body.get("lang") if body.get("lang") in ("en", "zh") else None
 
-        # The declared-intent path does NOT retrieve, and that is the point.
-        # Ranking a deictic question against the whole index returns four
-        # chunks about other pages -- measured on the live index, "summarize
-        # this page" asked from pages/gyrotris.html retrieved two index.html
-        # chunks and two chat-agent.html ones, none of them about Gyrotris.
-        # They would then be injected under "Context retrieved from the site
-        # for this question" and, worse, rendered as source cards, since
-        # `sources` is built from hits. Skipping retrieval outright is cheaper
-        # than any attempt to detect that afterwards, and it makes sources: []
-        # on this path mean something true: the answer came from the page the
-        # visitor is on.
-
         # Follow-up resolution: the client's gate refused this question, but it
         # has a conversation behind it, so the refusal may be an artifact of
         # judging one string in isolation. Condense, then re-judge --
@@ -1397,6 +1385,17 @@ class Handler(BaseHTTPRequestHandler):
                 })
                 return self._json(200, refusal_response(rid, "regate_failed"))
 
+        # The declared-intent path does NOT retrieve, and that is the point.
+        # Ranking a deictic question against the whole index returns four
+        # chunks about other pages -- measured on the live index, "summarize
+        # this page" asked from pages/gyrotris.html retrieved two index.html
+        # chunks and two chat-agent.html ones, none of them about Gyrotris.
+        # They would then be injected under "Context retrieved from the site
+        # for this question" and, worse, rendered as source cards, since
+        # `sources` is built from hits. Skipping retrieval outright is cheaper
+        # than any attempt to detect that afterwards, and it makes sources: []
+        # on this path mean something true: the answer came from the page the
+        # visitor is on.
         hits = [] if intent in ("summarize_page", "top_projects") else retrieve(query)
 
         page = body.get("page") if isinstance(body.get("page"), dict) else {}
