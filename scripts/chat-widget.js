@@ -839,7 +839,7 @@
   // `page` carries a url and nothing else, deliberately: the page title the
   // system prompt mentions is read off the server's own chunk records, so no
   // client-supplied string reaches the prompt through page-awareness.
-  function chatRequestBody(question, embedRid, intent) {
+  function chatRequestBody(question, embedRid, intent, gateFailed) {
     return {
       session: state.session,
       role: state.role,
@@ -851,15 +851,21 @@
       // own list and ignores anything else, so this adds no surface a typed
       // question does not already have. Absent for an ordinary question.
       intent: intent || undefined,
+      // Set only when the local gate refused a question that has a
+      // conversation behind it. The server re-gates the rewrite it derives, so
+      // this can only ever ADD a check -- a client that lies gains nothing and
+      // pays for a rewrite call. Absent otherwise, so the server's own
+      // `body.get("gate_failed")` test means what it says.
+      gate_failed: gateFailed || undefined,
       history: state.history.slice(-6),
     };
   }
 
-  async function askWorker(question, embedRid, intent) {
+  async function askWorker(question, embedRid, intent, gateFailed) {
     var r = await fetchWithTimeout(WORKER_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(chatRequestBody(question, embedRid, intent)),
+      body: JSON.stringify(chatRequestBody(question, embedRid, intent, gateFailed)),
     }, CHAT_TIMEOUT_MS);
     try {
       var res = r.res;
@@ -1240,6 +1246,7 @@
       // refuses), or the classic local gate on this browser's own in-memory
       // index.
       var refused = false;
+      var escalated = false;
       if (intent) {
         // A declared intent means this text came from the widget, not from a
         // visitor: the action chip sends its own i18n label as the question
@@ -1258,6 +1265,20 @@
       } else if (emb.gate) {
         refused = !emb.gate.pass;
         record.gate = { remote: true, value: emb.gate.value, reason: emb.gate.reason, stripped: stripped || undefined };
+        // A failed gate stops being terminal when there is a conversation
+        // behind it: the gate judges one string in isolation, so "is there any
+        // optimization work" asked right after a Prime Engine turn refuses on
+        // an artifact of that isolation rather than on being off-topic. Hand it
+        // to /chat, which condenses the history into a standalone question and
+        // re-judges THAT, server-side. Empty history means there is nothing to
+        // resolve against, so the free client-side fast-reject stands. A
+        // declared intent already bypassed the gate above and never reaches
+        // here.
+        if (refused && state.history.length) {
+          refused = false;
+          escalated = true;
+          record.gate.escalated = true;
+        }
       } else if (state.meta.gate_remote) {
         record.gate = { remote: true, unavailable: true };
       } else {
@@ -1288,7 +1309,7 @@
         record.mode = 'llm';
         var resp;
         try {
-          resp = await askWorker(question, emb.rid, intent);
+          resp = await askWorker(question, emb.rid, intent, escalated);
         } catch (chatErr) {
           // askWorker marks an error `passThrough` for a rate limit or an
           // empty-but-successful LLM answer (see askWorker above) -- the

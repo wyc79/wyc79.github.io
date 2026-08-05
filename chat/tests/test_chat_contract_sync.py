@@ -176,6 +176,85 @@ def test_a_normal_answer_is_not_treated_as_a_refusal() -> None:
     assert got["calls"] == []
 
 
+def _run_widget_gate_branch(gate: dict, history: list, intent_js: str = "null") -> dict:
+    """Execute send()'s REAL remote-gate branch -- extracted verbatim including
+    its condition -- against a gate verdict, and report whether it refused or
+    escalated.
+
+    extract_js_function brace-matches from the first '{' after its marker to
+    that brace's OWN partner -- sound for a single block, but an if/else-if/
+    else chain has no brace enclosing the whole thing (each `{...}` is a
+    self-contained sibling), so `extract_js_function(src, "if (intent) {")`
+    alone yields only the `if (intent)` block and silently stops before ever
+    reaching `else if (emb.gate)`, where the escalation logic actually lives.
+    Measured: with only that call, this helper returns `record: {}` no matter
+    what `gate` says, and every assertion on `record["gate"]` blows up with a
+    KeyError instead of a real pass/fail -- exactly the "passes while testing
+    almost nothing" trap. Fixed by extracting each self-contained branch
+    verbatim with its own marker and concatenating them back into the same
+    if/else-if/else chain, in source order -- nothing here is retyped, only
+    reassembled. The trailing branch's own marker text is the tail of the
+    PRECEDING branch (the literal `else {` is not unique file-wide), so its
+    extraction is trimmed back to where `else {` actually starts.
+    `escalated` is declared here because node treats a script containing
+    `await` (the local-gate branch's `await localEmbed(...)`) as an ES
+    module and runs it in strict mode -- an undeclared bare assignment that
+    was a harmless implicit global in sloppy mode throws a ReferenceError
+    there, whether or not that branch ends up executing."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+    intent_branch = extract_js_function(src, "if (intent) {")
+    remote_gate_branch = extract_js_function(src, "else if (emb.gate) {")
+    gate_unavailable_branch = extract_js_function(src, "else if (state.meta.gate_remote) {")
+    local_gate_branch_raw = extract_js_function(src, "unavailable: true };\n      } else {")
+    local_gate_branch = local_gate_branch_raw[local_gate_branch_raw.index("else {"):]
+    chain = " ".join([intent_branch, remote_gate_branch, gate_unavailable_branch, local_gate_branch])
+    script = (
+        "var state = { history: " + json.dumps(history) + " };\n"
+        "var record = {};\n"
+        "var emb = { gate: " + json.dumps(gate) + " };\n"
+        "var stripped = null;\n"
+        "var intent = " + intent_js + ";\n"
+        "var refused = false;\n"
+        "var escalated = false;\n"
+        + chain + "\n"
+        "process.stdout.write(JSON.stringify({ refused: refused, record: record }));\n"
+    )
+    return run_node_json(script)
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_failed_gate_with_history_escalates_instead_of_refusing() -> None:
+    got = _run_widget_gate_branch(
+        {"pass": False, "value": 0.12, "lang": "en"},
+        history=[{"role": "user", "content": "tell me about prime engine"},
+                 {"role": "assistant", "content": "..."}],
+    )
+
+    assert got["refused"] is False, "a follow-up must reach /chat, not the canned refusal"
+    assert got["record"]["gate"]["escalated"] is True
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_failed_gate_with_no_history_still_refuses_locally() -> None:
+    """The free fast-reject. A first-turn off-topic question must not cost a
+    /chat round trip or an LLM call."""
+    got = _run_widget_gate_branch({"pass": False, "value": 0.12, "lang": "en"}, history=[])
+
+    assert got["refused"] is True
+    assert not got["record"]["gate"].get("escalated")
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_a_passing_gate_never_escalates() -> None:
+    got = _run_widget_gate_branch(
+        {"pass": True, "value": 0.44, "lang": "en"},
+        history=[{"role": "user", "content": "tell me about prime engine"}],
+    )
+
+    assert got["refused"] is False
+    assert not got["record"]["gate"].get("escalated")
+
+
 def test_refusal_response_carries_a_reason_and_defaults_to_retrieval_empty() -> None:
     mod = _load_backend()
 
@@ -945,6 +1024,42 @@ def test_the_widget_only_ever_declares_intents_the_backend_accepts() -> None:
         f"widget sends {sorted(declared - set(mod.INTENTS))}, which index.py's "
         f"INTENTS {mod.INTENTS} would reject as a bad request"
     )
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_gate_failed_reaches_the_request_body_and_is_absent_otherwise() -> None:
+    """Absent on an ordinary turn so the server's `body.get("gate_failed")`
+    check means what it says -- the same closed-field discipline `intent`
+    follows."""
+    src = WIDGET_PATH.read_text(encoding="utf-8")
+
+    def body(gate_failed_js: str) -> dict:
+        script = (
+            "const state = { session: 's', role: 'visitor', history: "
+            "[{role:'user',content:'tell me about prime engine'}] };\n"
+            "function lang() { return 'en'; }\n"
+            "const window = { location: { pathname: '/pages/prime-engine.html' } };\n"
+            + extract_js_function(src, "function currentPageUrl(") + "\n"
+            + extract_js_function(src, "function chatRequestBody(") + "\n"
+            "process.stdout.write(JSON.stringify(chatRequestBody('q', 'rid', undefined, "
+            + gate_failed_js + ")));\n"
+        )
+        return run_node_json(script)
+
+    assert body("true")["gate_failed"] is True
+    assert "gate_failed" not in body("false"), "an ordinary turn must omit the field entirely"
+    assert "gate_failed" not in body("undefined")
+
+
+@pytest.mark.skipif(not node_available(), reason="node not on PATH -- cannot execute the JS copy")
+def test_the_escalating_request_body_still_validates() -> None:
+    """The escalated body is the one that changed -- it must still pass the
+    real validate_chat_body."""
+    mod = _load_backend()
+    body = _widget_chat_request_body("is there any optimization work")
+    body["gate_failed"] = True
+
+    assert mod.validate_chat_body(body) is None
 
 
 def test_summary_chunks_is_one_per_page_in_the_answer_language() -> None:
