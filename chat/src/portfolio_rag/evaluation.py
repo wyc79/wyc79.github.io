@@ -36,30 +36,47 @@ POSITIVES_PER_CELL = 12
 # the same "declared, not silently unprotected" contract NEGATIVES_PER_LANG's
 # post_context entry below follows.
 #
-# Per-language, not a scalar applied to both, because the two languages are
-# NOT symmetric here -- this is a measured finding, not an authoring gap.
-# Task 9 tried ~90 candidate zh follow-up phrasings (elided arguments,
-# dangling pronouns, "那...呢" topic shifts, generic continuations, even
-# topic-agnostic "他/这个 + interrogative" forms with no referent to resolve
-# at all) against the live, calibrated zh gate (threshold 0.3979) and found
-# essentially all of them score 0.42-0.56 REGARDLESS of topic or whether they
-# actually reference the prior turn -- e.g. "那这个是谁做的" ("who made this")
-# scores 0.51 with zero conversation behind it. Meanwhile the zh POST-CONTEXT
-# NEGATIVES for this same task refuse correctly on their own (e.g.
-# "帮我写封邮件" at 0.3825) -- so the zh gate does separate clearly-off-topic
-# from on-topic, it just admits essentially any domain-adjacent-sounding
-# question standalone. The conclusion this supports: at current calibration,
-# follow-up refusal (the raw question failing the gate, which is the whole
-# precondition for the rewrite-and-rescue path to ever fire) is an EN
-# phenomenon -- a zh visitor's follow-up is never refused standing alone, so
-# there is no rescue for a zh case to measure. See KNOWN_ISSUES.md Finding Q
-# for the full evidence. REVISIT IF THE ZH GATE IS EVER RECALIBRATED TIGHTER
-# -- this is not hypothetical: zh calibration moves with about_zh.md's
-# content (see eval/README.md's Known Limits), and the currently DEPLOYED zh
-# gate already sits at threshold 0.4919, well above this repo's local 0.3979.
-# A tighter zh gate would make zh follow-ups start failing standalone, at
-# which point zh coverage becomes both possible and necessary again.
-FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 0}
+# Per-language, not a scalar applied to both, because the two languages were
+# NOT symmetric here for a long time -- this constant's history is a measured
+# finding, not an authoring gap. Task 9 tried ~90 candidate zh follow-up
+# phrasings (elided arguments, dangling pronouns, "那...呢" topic shifts,
+# generic continuations, even topic-agnostic "他/这个 + interrogative" forms
+# with no referent to resolve at all) against the live, calibrated zh gate
+# (threshold 0.3979) and found essentially all of them score 0.42-0.56
+# REGARDLESS of topic or whether they actually reference the prior turn --
+# e.g. "那这个是谁做的" ("who made this") scores 0.51 with zero conversation
+# behind it. Meanwhile the zh POST-CONTEXT NEGATIVES for this same task
+# refuse correctly on their own (e.g. "帮我写封邮件" at 0.3825) -- so the zh
+# gate does separate clearly-off-topic from on-topic, it just admits
+# essentially any domain-adjacent-sounding question standalone.
+#
+# A later task re-swept the same question with the shape of the EN winner
+# (followup-en-01, "what about tuning it") specifically in mind: an elided
+# argument plus a dangling pronoun, near-zero content words. ~50 further
+# candidates were tried -- direct structural analogues of that shape (那优化呢,
+# 那这部分呢, 那性能呢, 那这个呢, and further deictic/task-request variants)
+# ALL still leaked at 0.42-0.53, reproducing Task 9's finding exactly for
+# that shape. But widening to plain narrative-continuation fillers ("and then
+# what?") found several that clear the bar with a real margin: 那再后来
+# (0.3645, margin 0.0334), 再后来 (0.3768, margin 0.0211), 那后来 (0.3857,
+# margin 0.0122), 再往下 (0.3877, margin 0.0102) -- a distinct, narrower
+# phenomenon from the elided-argument shape that dominates the EN side. The
+# two with the cleanest margin and the most natural phrasing became
+# followup-zh-01 ("再后来") and followup-zh-02 ("那后来"); the full
+# candidate record (including everything that still leaks) lives in
+# KNOWN_ISSUES.md Finding Q, which this constant's prior all-zero state also
+# used to point to.
+#
+# REVISIT IF THE ZH GATE IS EVER RECALIBRATED -- this is not hypothetical:
+# zh calibration moves with about_zh.md's content (see eval/README.md's Known
+# Limits), and the currently DEPLOYED zh gate sits at threshold 0.4919, well
+# above this repo's local 0.3979 -- both of these zh cases' resolved forms
+# clear 0.4919 too (0.5355 and 0.5481) with margin to spare, but the raw
+# forms' 0.01-0.02 margins under the LOCAL threshold are thin enough that a
+# future about_zh.md edit could flip them back to passing standalone, at
+# which point they stop measuring the rescue path and must be re-swept or
+# retired, not left silently measuring nothing.
+FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 2}
 NEGATIVES_PER_LANG = {
     "off_topic_easy": 4, "off_topic_adjacent": 4, "injection": 4,
     # A post-context negative (a negative case WITH history) is bucketed

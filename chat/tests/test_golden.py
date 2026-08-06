@@ -158,12 +158,17 @@ def test_followup_positive_pool_has_the_right_composition(cases) -> None:
     could grow without bound and no test would notice.
 
     FOLLOWUP_POSITIVES_PER_LANG is a per-language MAPPING, not a scalar,
-    because the languages are not symmetric here: zh is declared 0 by
-    measured finding, not omitted by oversight (see the constant's own
-    comment and KNOWN_ISSUES.md Finding Q). Asserting the full mapping,
-    including its zero, means a zh follow-up positive added later must
-    also update this constant to justify itself -- the zero is enforced,
-    not merely documented."""
+    because the languages are not symmetric here: for a long time zh was
+    declared 0 by measured finding (essentially every natural zh follow-up
+    phrasing cleared the gate standalone, so there was no rescue phenomenon
+    to measure), then later moved to 2 once a narrower phrasing shape
+    (narrative-continuation fillers, not the elided-argument shape that
+    dominates the EN side) was found to clear the bar with a real margin --
+    see the constant's own comment and KNOWN_ISSUES.md Finding Q for the
+    full record of both. Asserting the full mapping means either value
+    change -- zh moving off 0, or any count changing at all -- must update
+    this constant to justify itself, not just add a case and hope; it is
+    enforced, not merely documented."""
     by_lang = Counter(c.lang for c in cases if c.type == "positive" and c.history)
     got = {lang: by_lang.get(lang, 0) for lang in FOLLOWUP_POSITIVES_PER_LANG}
     assert got == FOLLOWUP_POSITIVES_PER_LANG, (
