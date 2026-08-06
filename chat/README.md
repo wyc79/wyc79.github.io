@@ -262,6 +262,11 @@ the widget fetches on every load instead of the full chunks file; see "Why it's 
 this way" above). `data/gate_zh_bge.json` is gitignored and never committed. Chunk ids
 are deterministic (`{url}#{anchor}:{i}`), so diffs stay readable.
 
+A rebuild recalibrates the off-topic threshold, which can silently invalidate the golden
+set's multi-turn cases — see `eval/README.md`'s "Multi-turn cases" section for the
+re-verification rule to run before trusting `refusal_post_context`/`followup_rescued`
+after one.
+
 If you ran `python build.py --function`, upload and redeploy the zip **before** committing
 and publishing the site — see "Deploying a backend" below for why the order matters and the
 exact steps; it is the reverse of the order you'd guess.

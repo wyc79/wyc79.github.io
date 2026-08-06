@@ -180,6 +180,73 @@ file, for the same reason every other measured number in this doc carries
 that instruction: both move whenever the fixture, the golden set, or the
 index does.
 
+**Rebuilding the index is the other thing that can silently invalidate this
+whole set, and it needs the same discipline as a `REWRITE_SYSTEM_PROMPT`
+edit above — re-verify, don't assume.** The off-topic threshold is not
+configured; `scripts/build_index.py` *derives* it per embedding model by
+recalibrating against `gate_calibration.py`'s canonical on-/off-topic sets
+and the current `../knowledge/about_<lang>.md` corpus (`../README.md`
+already notes that zh calibration quality moves with `about_zh.md`'s
+content — the same recalibration mechanism moves the en threshold too, on
+every rebuild, not only zh ones). Every rebuild is a chance to move the line
+every multi-turn case in this file sits next to.
+
+That dependency is real only for cases with `history`, and only through the
+precondition spelled out above: `score_case` consults `rewrites.json` — the
+escalated path — only `if case.history and not decision.passed`. A raw
+question that drifts to the other side of a moved threshold stops testing
+the mechanism, silently: a follow-up positive can no longer be rescued
+(nothing refused it standalone, so there is nothing to rescue), and a
+post-context negative reports a refusal earned for free by the raw gate
+rather than one earned by the rewriter echoing and the re-gate rejecting —
+exactly the "structurally guaranteed number" failure this eval harness was
+built to eliminate. Single-turn cases have no such dependency: gate-pass,
+`hit@4`, and keyword coverage score the same regardless of which side of the
+threshold the raw question lands on.
+
+**After any rebuild, re-verify every multi-turn case's raw question still
+fails its language's gate** — `rt.gate(case.q).passed is False`, the same
+offline check "A good multi-turn positive"/"A good post-context negative"
+below prescribe at authoring time. Read the current threshold from
+`data/gate_en_minilm.json`/`data/gate_zh_bge.json`'s own `gate_threshold`
+(or the build log's `gate calibration` line), not from a number quoted here.
+The margins below are worth quoting anyway, because the finding is their
+size, not their exact value — how much headroom each case has before a
+routine rebuild flips it (measured against thresholds en `0.2029`, zh
+`0.3979` at time of writing):
+
+```
+neg-post-en-02   0.1173   margin 0.0856
+neg-post-en-01   0.1277   margin 0.0752
+followup-en-01   0.1466   margin 0.0563
+followup-en-02   0.1498   margin 0.0531
+neg-post-zh-01   0.3818   margin 0.0161   <- thin
+neg-post-zh-02   0.3825   margin 0.0154   <- thin
+```
+
+The English cases have comfortable room — an en rebuild would need to move
+the threshold by several hundredths to touch any of them. The two Chinese
+post-context negatives sit ~0.016 below the line, thin enough that a modest
+zh recalibration (a few more `about_zh.md` sections, a reworded one) flips
+both — which is exactly the failure this note exists to name before it
+happens quietly instead of after.
+
+If a case has drifted above threshold: re-tune the question, re-verify with
+`rt.gate(case.q).passed is False` against the new threshold, re-record
+`rewrites.json` (`refresh_rewrites.py`), and update the case's `note` — each
+note records its own measured value, so a stale note after a re-tune is a
+false claim in a file that advertises being measured.
+
+**A `refusal_post_context` or `followup_rescued` regression right after a
+rebuild is more likely case drift than a code defect.** Both metrics are in
+`tests/test_golden.py::_REGRESSION_METRICS`, so a case going inert this way
+does fail `test_no_metric_regressed` rather than sliding by unnoticed — that
+part of the safety net works as designed. But the failure presents as "a
+metric regressed," not as "your multi-turn cases stopped testing the
+mechanism," and the fix is not a code hunt: check the margins above (or
+their current equivalents) before assuming the rewriter or the gate itself
+broke.
+
 **A good multi-turn positive is a question that genuinely cannot stand
 alone.** The raw `q`, judged with no conversation behind it, must fail the
 gate — if it passes on its own, `history` is decorative and the case is
