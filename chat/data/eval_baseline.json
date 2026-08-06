@@ -1,7 +1,7 @@
 {
   "k": 4,
-  "generated_at": "2026-08-05T04:15:01+00:00",
-  "index_built_at": "2026-08-05T04:13:12+00:00",
+  "generated_at": "2026-08-06T00:25:01+00:00",
+  "index_built_at": "2026-08-05T05:20:06+00:00",
   "gate": {
     "en": {
       "stat": "top",
@@ -28,7 +28,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "en": 48
-      }
+      },
+      "n_followup": 0,
+      "followup_rescued": 0
     },
     "combat_design_recruiter/zh": {
       "role": "combat_design_recruiter",
@@ -43,7 +45,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "zh": 48
-      }
+      },
+      "n_followup": 0,
+      "followup_rescued": 0
     },
     "client_dev_recruiter/en": {
       "role": "client_dev_recruiter",
@@ -58,7 +62,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "en": 48
-      }
+      },
+      "n_followup": 1,
+      "followup_rescued": 1
     },
     "client_dev_recruiter/zh": {
       "role": "client_dev_recruiter",
@@ -73,7 +79,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "zh": 48
-      }
+      },
+      "n_followup": 0,
+      "followup_rescued": 0
     },
     "ai_agent_recruiter/en": {
       "role": "ai_agent_recruiter",
@@ -88,7 +96,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "en": 48
-      }
+      },
+      "n_followup": 1,
+      "followup_rescued": 1
     },
     "ai_agent_recruiter/zh": {
       "role": "ai_agent_recruiter",
@@ -103,7 +113,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "zh": 48
-      }
+      },
+      "n_followup": 0,
+      "followup_rescued": 0
     },
     "visitor/en": {
       "role": "visitor",
@@ -118,7 +130,9 @@
       "gate_available": true,
       "retrieved_langs": {
         "en": 48
-      }
+      },
+      "n_followup": 0,
+      "followup_rescued": 0
     },
     "visitor/zh": {
       "role": "visitor",
@@ -133,32 +147,38 @@
       "gate_available": true,
       "retrieved_langs": {
         "zh": 48
-      }
+      },
+      "n_followup": 0,
+      "followup_rescued": 0
     },
     "shared/en": {
       "role": "shared",
       "lang": "en",
       "n_positive": 0,
-      "n_negative": 12,
+      "n_negative": 14,
       "refusal_easy": 4,
       "n_easy": 4,
       "refusal_adjacent": 1,
       "n_adjacent": 4,
       "refusal_injection": 1,
       "n_injection": 4,
+      "refusal_post_context": 2,
+      "n_post_context": 2,
       "gate_available": true
     },
     "shared/zh": {
       "role": "shared",
       "lang": "zh",
       "n_positive": 0,
-      "n_negative": 12,
+      "n_negative": 14,
       "refusal_easy": 3,
       "n_easy": 4,
       "refusal_adjacent": 0,
       "n_adjacent": 4,
       "refusal_injection": 0,
       "n_injection": 4,
+      "refusal_post_context": 2,
+      "n_post_context": 2,
       "gate_available": true
     }
   }

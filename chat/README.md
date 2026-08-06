@@ -321,22 +321,28 @@ follow-up rewrite — `run_eval.py` and `pytest` never do; they replay whatever
 network-free. Re-run it, and read the diff before committing, whenever
 `REWRITE_SYSTEM_PROMPT` (`functions/tencent/index.py`) changes or a multi-turn case is
 added or edited — a stale fixture reports numbers that describe neither the old prompt nor
-the new one. A case with no recorded rewrite doesn't error; it silently scores as
-still-refused (`run_eval.py` prints a `NOTE` naming every such case), which is why
-`followup_rescued` and the `post_context` bucket are deliberately **not** in
-`tests/test_golden.py::_REGRESSION_METRICS` and `data/eval_baseline.json` was deliberately
-not updated for them — this project's own rule is that an absent measurement renders as
-`n/a`, never a fabricated `0`, and gating on either now would bake in exactly that
-fabrication.
+the new one, and now that these metrics are gated (below), a stale fixture can silently
+invalidate the regression gate itself rather than just mis-describing it. A case with no
+recorded rewrite doesn't error; it silently scores as still-refused (an absent measurement,
+never a fabricated pass — see `load_rewrites`'s docstring), which is why `run_eval.py`
+renders that cell's `rescued`/`post_context` column as `n/a` rather than a count (see
+`_fixture_coverage`).
 
-`eval/rewrites.json` does not exist in this repo yet — no `LLM_API_KEY` has been available
-in any environment this branch was built in, so the script has never run, and every
-multi-turn case currently scores as "still refused" for lack of a fixture, not because a
-rewrite was attempted and failed. Recording it is the pending step:
+`eval/rewrites.json` is recorded, against the live DeepSeek API — both multi-turn positives
+resolved and all four post-context negatives echoed verbatim (see the file itself for the
+exact rewrites). `followup_rescued` and `refusal_post_context` are consequently **wired
+into** `tests/test_golden.py::_REGRESSION_METRICS` (and, for the reasons detailed at that
+constant's declaration, `_GATE_METRICS` too), and `data/eval_baseline.json` carries their
+real measured values. Do not trust the numbers quoted in any prose here, in this file or
+`eval/README.md` — read them straight from `data/eval_baseline.json` (`n_followup`/
+`followup_rescued` per positive cell, `n_post_context`/`refusal_post_context` per shared
+cell) or from `run_eval.py`'s own `follow-up resolution` block and `post_context` column,
+since both move the moment the fixture or the golden set changes and a stale quote here
+would not.
 
 ```bash
 python scripts/refresh_rewrites.py --dry-run   # review before writing
-python scripts/refresh_rewrites.py             # record eval/rewrites.json
+python scripts/refresh_rewrites.py             # re-record eval/rewrites.json
 ```
 
 `--update-baseline` refuses to write from a run that cannot represent the

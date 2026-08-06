@@ -22,6 +22,7 @@ from portfolio_rag.evaluation import (
     SHARED_ROLE,
     aggregate,
     load_cases,
+    load_rewrites,
     run_cases,
 )
 from portfolio_rag.gate_calibration import OFF_TOPIC, OFF_TOPIC_ZH, ON_TOPIC, ON_TOPIC_ZH
@@ -244,9 +245,25 @@ def test_off_topic_adjacency_is_valid(cases) -> None:
 # SCHEMA change, not a regression, so it is skipped rather than compared; a
 # metric present on BOTH sides (gate_pass/hit_at_4 on a positive cell whose
 # role/lang key hasn't moved) is still compared strictly.
-_GATE_METRICS = {"gate_pass", "refusal_easy", "refusal_adjacent", "refusal_injection"}
+#
+# refusal_post_context and followup_rescued (task 9's multi-turn metrics,
+# evaluation.aggregate) joined both sets once chat/eval/rewrites.json existed
+# to score them for real -- see
+# test_followup_and_post_context_metrics_are_governed_not_silently_unprotected
+# below for the full reasoning on why EACH needed _GATE_METRICS membership,
+# not just _REGRESSION_METRICS: refusal_post_context is gate-derived exactly
+# like refusal_easy/adjacent/injection (all come from rt.gate());
+# followup_rescued is a compound metric (decision.passed AND hit, see
+# CaseResult.rescued) that inherits the same gate-availability exposure
+# through its gate half, currently a no-op in this repo (no zh follow-ups,
+# and the en gate is always committed) but declared for the day that changes.
+_GATE_METRICS = {
+    "gate_pass", "refusal_easy", "refusal_adjacent", "refusal_injection",
+    "refusal_post_context", "followup_rescued",
+}
 _REGRESSION_METRICS = (
     "gate_pass", "hit_at_4", "refusal_easy", "refusal_adjacent", "refusal_injection",
+    "refusal_post_context", "followup_rescued",
 )
 
 # Metrics whose BASELINE value is 0, i.e. already at the floor. _find_regressions
@@ -268,9 +285,33 @@ _REGRESSION_METRICS = (
 # must be removed from here). Same precedent as
 # test_hit_at_4_page_only_is_not_a_regression_metric below: state the exclusion
 # behaviourally instead of leaving it silent.
+#
+# Wiring followup_rescued into _REGRESSION_METRICS surfaced a SECOND, distinct
+# reason a cell can land at this floor: six of the eight positive (role, lang)
+# cells carry no follow-up positive case at all (only ai_agent_recruiter/en
+# and client_dev_recruiter/en do -- FOLLOWUP_POSITIVES_PER_LANG's zh:0, and
+# only 2 of 3 en roles got one). n_followup is 0 for those six, so
+# followup_rescued is trivially 0/0, not a real "rescue attempted, none
+# landed" measurement -- unlike shared/zh's two entries above, where 4 real
+# adjacent/injection probes exist and genuinely 0 of them are refused. Both
+# kinds read identically to the mechanical check below (want.get(metric) ==
+# 0), so both must be declared here for the same reason: nothing in
+# chat/tests/ would fail if a rewrite silently broke the ONE cell that could
+# regress un-noticed by these six sitting at floor for an unrelated,
+# structural reason. Adding a follow-up positive to a currently-empty cell is
+# exactly the "metric LEAVES the floor, now genuinely protected" case the
+# docstring above describes, at which point its entry here must be removed.
 _UNPROTECTED_AT_THE_BASELINE_FLOOR = frozenset({
     "shared/zh.refusal_adjacent",   # 0/4 -- the zh gate refuses no adjacent off-topic probe
     "shared/zh.refusal_injection",  # 0/4 -- nor any injection probe
+    # 0/0 each -- no follow-up positive case exists in this cell yet (see the
+    # comment above), not a rescue that was attempted and failed.
+    "ai_agent_recruiter/zh.followup_rescued",
+    "client_dev_recruiter/zh.followup_rescued",
+    "combat_design_recruiter/en.followup_rescued",
+    "combat_design_recruiter/zh.followup_rescued",
+    "visitor/en.followup_rescued",
+    "visitor/zh.followup_rescued",
 })
 
 
@@ -313,10 +354,20 @@ def _find_regressions(baseline_cells: dict, current_cells: dict) -> list[str]:
 
 
 def test_no_metric_regressed(cases, rt) -> None:
+    """Replays the recorded rewrite fixture, same as scripts/run_eval.py
+    (which is what produced data/eval_baseline.json) -- run_cases(rt, cases)
+    with no third argument defaults rewrites to {} (see load_rewrites's
+    docstring: an absent/empty fixture scores every multi-turn case as
+    still-refused), which cannot reproduce a baseline that measured a real
+    rescue. Discovered wiring followup_rescued into _REGRESSION_METRICS: it
+    reported client_dev_recruiter/en and ai_agent_recruiter/en regressing
+    1 -> 0 on every run, unconditionally, before this fixture load was added
+    -- not a real regression, this test simply never replayed the same
+    rewrites the baseline was built from."""
     if not BASELINE_PATH.exists():
         pytest.skip("no baseline yet — run scripts/run_eval.py --update-baseline")
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
-    current = aggregate(run_cases(rt, cases))
+    current = aggregate(run_cases(rt, cases, load_rewrites()))
 
     if baseline.get("index_built_at") != rt.index_built_at:
         print(f"\nNOTE: baseline measured against index built "
@@ -423,9 +474,14 @@ def test_metrics_at_their_baseline_floor_are_declared_not_silently_unprotected()
     """Which of the regression gate's comparisons are structurally incapable
     of failing must be a stated fact, checked against the real baseline.
 
-    Measured on the current baseline: 22 live comparisons, 28 schema-skips
-    (structurally correct -- positive cells carry no refusal_*, shared cells
-    carry no gate_pass/hit_at_4), and exactly the two below at the floor.
+    Measured on the current baseline (after wiring in followup_rescued and
+    refusal_post_context): 24 live comparisons, 38 schema-skips (structurally
+    correct -- positive cells carry no refusal_*, shared cells carry no
+    gate_pass/hit_at_4/followup_rescued), and exactly the eight below at the
+    floor -- two real-measurement floors (shared/zh) and six followup_rescued
+    cells with no follow-up positive case to measure at all (see
+    _UNPROTECTED_AT_THE_BASELINE_FLOOR's own comment for why both kinds land
+    here identically).
 
     Fails in BOTH directions, which is what makes it a guard rather than a
     comment: a metric that newly drops to 0 has regressed in a way
@@ -481,45 +537,79 @@ def test_a_metric_at_the_floor_genuinely_cannot_fire() -> None:
     assert _find_regressions(baseline_cells, worse) == ["shared/zh.refusal_easy: 3 -> 2"]
 
 
-def test_followup_metrics_are_excluded_from_the_regression_gate_only_while_no_fixture_exists() -> None:
-    """followup_rescued and refusal_post_context (evaluation.aggregate) are
-    deliberately absent from _REGRESSION_METRICS -- correct today, because
-    chat/eval/rewrites.json does not exist (no LLM_API_KEY in this
-    environment, so scripts/refresh_rewrites.py has never run) and every
-    multi-turn case therefore scores off the raw question alone, never a
-    replayed rewrite (see evaluation.load_rewrites's docstring and
-    scripts/run_eval.py's _fixture_coverage). Wiring either metric into the
-    gate today would protect a number that measures nothing.
+# followup_rescued and refusal_post_context are gate-touching by two
+# different routes (see the _GATE_METRICS comment above), but both need the
+# same membership. Declared together so the guard below can check both by
+# one equality instead of two independent `in` assertions that could drift
+# apart silently.
+_FOLLOWUP_METRICS = frozenset({"followup_rescued", "refusal_post_context"})
 
-    Same shape as test_hit_at_4_page_only_is_not_a_regression_metric above:
-    an exclusion that is correct only conditionally must be tied to the
-    condition that makes it correct, pinned by an assertion, not left as an
-    omission indistinguishable from an oversight. The moment REWRITES_PATH
-    exists, this test fails and forces a decision instead of the exclusion
-    silently continuing to hold past the point it stopped being justified.
 
-    THE TRAP for whoever wires this in once a fixture lands: adding these
-    two names to _REGRESSION_METRICS is not sufficient by itself for
-    refusal_post_context. It is gate-derived exactly like refusal_easy/
-    refusal_adjacent/refusal_injection (all come from rt.gate()), so it must
-    ALSO join _GATE_METRICS (line 246) -- otherwise a fresh clone, where
-    data/gate_zh_bge.json is gitignored and so has no zh gate, will compare
-    it STRICTLY on zh cells and report a false regression every time. This
-    is exactly the bug test_gate_metric_skipped_unless_available_on_both_sides
-    exists to prevent, and _find_regressions cannot warn about it on its own
-    -- only a human wiring in the metric can remember. followup_rescued is
-    NOT gate-derived the same way (it also requires a successful retrieval
-    hit, see CaseResult.rescued), so it needs its own judgment call about
-    gate-availability skipping, not a copy-paste of this rule.
+def test_followup_and_post_context_metrics_are_governed_not_silently_unprotected() -> None:
+    """Replaces test_followup_metrics_are_excluded_from_the_regression_gate_
+    only_while_no_fixture_exists (see git history for the original), whose
+    entire premise -- chat/eval/rewrites.json does not exist -- is now false:
+    the fixture was recorded against the live DeepSeek API (see
+    eval/README.md's "Multi-turn cases" section) and REWRITES_PATH exists on
+    disk. That test's job was to force this decision, not to keep failing
+    forever, so it is gone; the property it protected -- these two metrics
+    are DELIBERATELY governed, not accidentally ungoverned -- still needs a
+    guard, which is this test.
+
+    The replaced test's own docstring named the trap for whoever did the
+    wiring: adding followup_rescued/refusal_post_context to
+    _REGRESSION_METRICS is not enough by itself for refusal_post_context,
+    which is gate-derived exactly like refusal_easy/adjacent/injection (all
+    come from rt.gate()) and needs _GATE_METRICS membership too, or a fresh
+    clone (data/gate_zh_bge.json gitignored, so zh always cjk_bypasses)
+    reports a false regression on every zh post_context cell -- precisely
+    what test_gate_metric_skipped_unless_available_on_both_sides exists to
+    prevent.
+
+    followup_rescued got _GATE_METRICS membership here too, by a related but
+    distinct argument, because it is NOT gate-derived the same way -- it is a
+    COMPOUND metric (decision.passed AND hit, see CaseResult.rescued) that
+    also requires a retrieval hit. But the gate half of that compound still
+    carries the same exposure: a cjk_bypass forces decision.passed=True
+    unconditionally, which for a future zh follow-up positive
+    (FOLLOWUP_POSITIVES_PER_LANG's zh quota is 0 today by measured finding,
+    not forever -- see that constant's own REVISIT note) would make the raw
+    question read as "passed standalone" and the case would never even reach
+    n_followup/followup_rescued on a bypass machine (see aggregate()'s
+    refused_standalone), while a real, tightly-calibrated zh gate might
+    genuinely refuse it and later rescue it. Comparing those two measurements
+    against each other across a gate-availability boundary, with no skip,
+    reaches the identical false-regression bug through the compound metric
+    instead of directly. It is currently a no-op either way -- the en gate is
+    always committed (Runtime.gate's "no_en_gate" path is unreachable) and no
+    zh follow-up positive exists yet -- but declared ahead of that day rather
+    than left for a future editor to rediscover, the same way
+    _UNPROTECTED_AT_THE_BASELINE_FLOOR above is declared ahead of a metric's
+    measured state actually changing.
+
+    Checked as one set comparison, not two independent `in` assertions, so
+    this fails in BOTH directions like
+    test_metrics_at_their_baseline_floor_are_declared_not_silently_unprotected
+    above: dropping either metric's _GATE_METRICS membership (the
+    false-regression exposure described above returns silently) fails it,
+    and so does this file's own _FOLLOWUP_METRICS declaration drifting from
+    what _GATE_METRICS actually contains.
     """
-    assert "followup_rescued" not in _REGRESSION_METRICS
-    assert "refusal_post_context" not in _REGRESSION_METRICS
-    assert not REWRITES_PATH.exists(), (
-        "chat/eval/rewrites.json now exists in this environment -- "
-        "followup_rescued and refusal_post_context must be deliberately "
-        "wired into the regression gate (see this test's docstring for the "
-        "refusal_post_context/_GATE_METRICS trap), not left excluded by an "
-        "assumption (no fixture, so nothing to protect) that no longer holds"
+    assert REWRITES_PATH.exists(), (
+        "chat/eval/rewrites.json is gone -- followup_rescued and "
+        "refusal_post_context would be measuring nothing again. See git "
+        "history for the tripwire this test replaced and reconsider this "
+        "wiring rather than editing this assertion away."
+    )
+    assert _FOLLOWUP_METRICS <= set(_REGRESSION_METRICS), (
+        f"{_FOLLOWUP_METRICS - set(_REGRESSION_METRICS)} dropped out of "
+        "_REGRESSION_METRICS -- reverting to accidentally ungoverned"
+    )
+    assert _FOLLOWUP_METRICS & _GATE_METRICS == _FOLLOWUP_METRICS, (
+        f"{_FOLLOWUP_METRICS - _GATE_METRICS} missing from _GATE_METRICS -- "
+        "a gate-unavailable cell (e.g. zh with no gate_zh_bge.json) will "
+        "compare this metric strictly and report a false regression, see "
+        "this test's docstring"
     )
 
 

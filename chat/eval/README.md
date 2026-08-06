@@ -156,9 +156,26 @@ off-topic follow-up is exactly the regression the post-context negatives
 below exist to catch, and it shows up in that diff first, in plain text. A
 case added without a matching `rewrites.json` entry does not error — it
 silently scores as still-refused (an absent measurement, never a fabricated
-pass; see `load_rewrites`'s docstring) — so `run_eval.py` prints a `NOTE`
-naming every multi-turn case with no recorded rewrite, on every run where
-one exists.
+pass; see `load_rewrites`'s docstring) — `run_eval.py` renders that cell's
+`post_context`/`rescued` column as `n/a` instead of a count whenever any of
+its multi-turn cases lacks a recorded entry (see `_fixture_coverage`), so a
+gap is visible in the table itself rather than requiring a separate note.
+
+`chat/eval/rewrites.json` is recorded, against the live DeepSeek API — both
+multi-turn positives resolved and all four post-context negatives echoed
+verbatim. `followup_rescued` and `refusal_post_context` are consequently real
+measurements, not placeholders, and are wired into
+`tests/test_golden.py::_REGRESSION_METRICS` (`_GATE_METRICS` too — see that
+constant's declaration for why each metric needed it). This makes the re-run
+rule above matter more than it used to: a `REWRITE_SYSTEM_PROMPT` edit with
+no matching `refresh_rewrites.py` re-run no longer just prints a stale
+number, it silently invalidates the regression gate — `data/eval_baseline.json`
+would keep comparing against rewrites the deployed prompt no longer produces.
+Read the current fixture's effect on the numbers from `data/eval_baseline.json`
+or `run_eval.py`'s own output rather than trusting any count quoted in this
+file, for the same reason every other measured number in this doc carries
+that instruction: both move whenever the fixture, the golden set, or the
+index does.
 
 **A good multi-turn positive is a question that genuinely cannot stand
 alone.** The raw `q`, judged with no conversation behind it, must fail the
@@ -230,9 +247,10 @@ retrieved languages — single-turn cases only, see "Multi-turn cases" above),
 a shared-negatives block with one row per language showing `off_topic/easy`,
 `off_topic/adjacent`, `injection`, and `post_context` refusal counts side by
 side, and — only when the golden set holds multi-turn positives — a
-follow-up-resolution block (`rescued N/M` per cell) plus a `NOTE` naming any
-multi-turn case with no recorded `rewrites.json` entry (see "Multi-turn
-cases" above).
+follow-up-resolution block (`rescued N/M` per cell). Either block renders
+`n/a` instead of a count for any cell whose multi-turn case(s) lack a
+recorded `rewrites.json` entry, rather than a separate note naming the case
+(see "Multi-turn cases" above).
 
 `--role` filters the positive table only — negatives belong to no role, so
 the shared-negatives block always covers the full pool for whichever
@@ -251,12 +269,20 @@ baseline was generated) is treated as new, not a regression, and skipped;
 anything present on both sides is still compared strictly.
 
 Gate-derived metrics (`gate_pass`, `refusal_easy`, `refusal_adjacent`,
-`refusal_injection`) are additionally skipped whenever **either** the
-baseline or the current run reports `gate_available: false` for that cell —
-comparing a real refusal count against the 0 a bypassed gate always produces
-would report a regression that never happened. `hit_at_4` and
-`keyword_coverage` have no such exception; retrieval is gate-free, so they
-are always compared strictly.
+`refusal_injection`, `refusal_post_context`, `followup_rescued`) are
+additionally skipped whenever **either** the baseline or the current run
+reports `gate_available: false` for that cell — comparing a real refusal
+count against the 0 a bypassed gate always produces would report a
+regression that never happened. `refusal_post_context` is gate-derived the
+same way `refusal_easy`/`adjacent`/`injection` are; `followup_rescued` is a
+compound metric (a rescue needs both a gate pass and a retrieval hit — see
+`CaseResult.rescued`) that carries the same exposure through its gate half,
+currently a no-op in this repo (the en gate is always committed and no zh
+follow-up positive exists — see `tests/test_golden.py`'s
+`_GATE_METRICS`/`_FOLLOWUP_METRICS` comments for the full reasoning) but
+declared for when that changes. `hit_at_4` and `keyword_coverage` have no
+such exception; retrieval is gate-free, so they are always compared
+strictly.
 
 ## Known limits
 
