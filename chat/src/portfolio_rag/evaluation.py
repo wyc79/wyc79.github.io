@@ -461,7 +461,7 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             # CaseResult.rescued's docstring -- so nothing is lost by excluding
             # it here, only double-counted.
             #
-            # gate_available (below, past this if/else) is the deliberate
+            # gate_available (below, past this if/elif) is the deliberate
             # EIGHTH exception to "excluded here": it is set unconditionally
             # from every CaseResult, multi-turn included. That is correct, not
             # an oversight -- gate_available describes whether THE GATE itself
@@ -471,10 +471,44 @@ def aggregate(results: list[CaseResult]) -> dict[str, dict]:
             # does, not a property of the case's own retrieval/rescue outcome
             # the way n_positive/hit_at_4/keywords_* are. Excluding it here
             # too would silently hide a cjk_bypass a follow-up's re-gate hit.
-            if c.history:
+            #
+            # n_followup counts cases that were actually REFUSED standalone --
+            # the metric's own definition (KNOWN_ISSUES.md Finding Q /
+            # eval/README.md): "of the context-dependent follow-ups -- those
+            # that fail the gate standing alone -- what fraction clear the
+            # gate after rewrite." case.history alone is the wrong signal: it
+            # is also true of a follow-up whose raw question already PASSES
+            # the gate on its own, which never reaches score_case's `if
+            # case.history and not decision.passed:` guard and so can never
+            # be rescued -- counting it here would grow the denominator with
+            # a case structurally incapable of ever incrementing the
+            # numerator, permanently depressing the rate for a case where
+            # rescue was never attempted.
+            #
+            # "Refused standalone" is reconstructed from the two fields
+            # score_case actually leaves behind, rather than added as a new
+            # one, because the two together already say it unambiguously:
+            #   - rewrite_used is not None  => the raw question failed the
+            #     gate AND a fixture entry existed, so the fixture was
+            #     replayed (score_case only ever sets this inside `if
+            #     case.history and not decision.passed:`). True regardless of
+            #     what the REPLAYED gate call then decided.
+            #   - rewrite_used is None and not gate_passed => the raw
+            #     question failed the gate but no fixture entry existed, so
+            #     score_case left decision at that original refusal
+            #     untouched. This case IS a real context-dependent follow-up
+            #     -- it is exactly the "still refused for lack of a fixture"
+            #     state _fixture_coverage (scripts/run_eval.py) renders as
+            #     "n/a" rather than a fabricated number, not a case to drop
+            #     from the denominator.
+            #   - rewrite_used is None and gate_passed => the raw question
+            #     passed on its own; score_case never touched the fixture.
+            #     The only combination NOT counted below.
+            refused_standalone = r.rewrite_used is not None or not r.gate_passed
+            if c.history and refused_standalone:
                 cell["n_followup"] += 1
                 cell["followup_rescued"] += int(bool(r.rescued))
-            else:
+            elif not c.history:
                 cell["n_positive"] += 1
                 cell["gate_pass"] += int(r.gate_passed)
                 cell["hit_at_4"] += int(bool(r.hit))

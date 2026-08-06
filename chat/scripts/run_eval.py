@@ -93,18 +93,32 @@ def print_positive_table(cells: dict) -> None:
               "(see n/a rows)")
 
 
-def _fixture_coverage(cases: list, rewrites: dict) -> dict[str, bool]:
-    """cell -> whether EVERY multi-turn case belonging to it has a recorded
-    rewrite in `rewrites`. A cell with incomplete coverage never actually
-    replayed a rewrite for at least one of its history-bearing cases, so its
-    multi-turn metric carries no information about what the rewriter does --
-    only about what the raw question does, which is a different, narrower
-    measurement (see score_case: the fixture is consulted only when the raw
-    question fails the gate; a missing entry just leaves it at that raw
-    result). Cells with no multi-turn cases at all are simply absent from
-    the returned dict, and every caller looks them up with `.get(cell,
-    True)`, treating "nothing to measure" as fully covered rather than as
-    unmeasured.
+def _fixture_coverage(results: list, rewrites: dict) -> dict[str, bool]:
+    """cell -> whether EVERY multi-turn case belonging to it that could have
+    consulted the fixture actually has a recorded rewrite in `rewrites`. A
+    cell with incomplete coverage never actually replayed a rewrite for at
+    least one of its history-bearing cases, so its multi-turn metric carries
+    no information about what the rewriter does -- only about what the raw
+    question does, which is a different, narrower measurement (see
+    score_case: the fixture is consulted only when the raw question fails
+    the gate; a missing entry just leaves it at that raw result). Cells with
+    no multi-turn cases at all are simply absent from the returned dict, and
+    every caller looks them up with `.get(cell, True)`, treating "nothing to
+    measure" as fully covered rather than as unmeasured.
+
+    Takes CaseResult`s, not raw GoldenCase`s, so the positive-side filter
+    below can mirror evaluation.aggregate()'s n_followup denominator exactly
+    (see that function's refused_standalone comment): a positive follow-up
+    whose raw question already passed the gate standalone never reaches
+    score_case's `if case.history and not decision.passed:` guard, so it
+    never looks the fixture up at all. Requiring one for it here would be
+    checking coverage of a lookup that was never attempted -- exactly the
+    "cell that isn't actually a follow-up rescue" case n_followup itself now
+    excludes, not a gap in coverage. Negative (post_context) cases are not
+    filtered this way: aggregate() counts every history-bearing negative
+    into n_post_context regardless of whether it was refused standalone
+    (there is no equivalent denominator question on that side), so this
+    keeps checking every one of them, unchanged.
 
     Used by print_shared_table (post_context) and main()'s follow-up block
     (followup_rescued) to decide when to render "n/a" instead of a count --
@@ -117,9 +131,12 @@ def _fixture_coverage(cases: list, rewrites: dict) -> dict[str, bool]:
     mistaken for a real one in either direction.
     """
     have: dict[str, list[bool]] = {}
-    for c in cases:
+    for r in results:
+        c = r.case
         if not c.history:
             continue
+        if c.type == "positive" and not (r.rewrite_used is not None or not r.gate_passed):
+            continue  # passed the gate standalone -- never consulted the fixture
         have.setdefault(c.cell, []).append(c.id in rewrites)
     return {cell: all(flags) for cell, flags in have.items()}
 
@@ -247,7 +264,7 @@ def main() -> int:
     cells = aggregate(results)
     positive_cells = {k: v for k, v in cells.items() if v["role"] != SHARED_ROLE}
     shared_cells = {k: v for k, v in cells.items() if v["role"] == SHARED_ROLE}
-    fixture_coverage = _fixture_coverage(selected, rewrites)
+    fixture_coverage = _fixture_coverage(results, rewrites)
 
     if args.verbose:
         print_verbose(results)

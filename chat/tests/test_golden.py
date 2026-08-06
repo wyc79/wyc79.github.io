@@ -682,8 +682,15 @@ def test_followup_rescue_is_counted_only_for_multi_turn_positives() -> None:
     results = [
         CaseResult(case=single, gate_passed=True, gate_value=0.4, gate_available=True,
                    hit=True, top_urls=(), top_scores=()),
+        # rewrite_used set: a real rescue is only ever reachable through a
+        # REPLAYED rewrite (score_case only sets rescued once rewrite_used is
+        # not None), and n_followup now keys off exactly that signal -- see
+        # aggregate()'s refused_standalone comment. Omitting it here would
+        # describe a state score_case can never actually produce (rescued=True
+        # with no rewrite ever replayed) and, post-fix, would no longer count
+        # toward n_followup at all.
         CaseResult(case=multi, gate_passed=True, gate_value=0.4, gate_available=True,
-                   hit=True, top_urls=(), top_scores=(), rescued=True),
+                   hit=True, top_urls=(), top_scores=(), rewrite_used="a rewrite", rescued=True),
     ]
 
     cell = aggregate(results)["visitor/en"]
@@ -715,9 +722,13 @@ def test_followup_positives_do_not_contaminate_single_turn_metrics() -> None:
         CaseResult(case=single, gate_passed=True, gate_value=0.4, gate_available=True,
                    hit=True, top_urls=("pages/skills.html",), top_scores=(0.9,),
                    keywords_found=("UE5",), retrieved_langs={"en": 1}),
+        # rewrite_used set for the same reason as the sibling test above: a
+        # rescue is only reachable through a replayed rewrite, and n_followup
+        # now keys off that signal rather than bare case.history.
         CaseResult(case=multi, gate_passed=True, gate_value=0.4, gate_available=True,
                    hit=True, top_urls=("pages/skills.html",), top_scores=(0.9,),
-                   keywords_found=("UE5", "Godot"), retrieved_langs={"en": 1}, rescued=True),
+                   keywords_found=("UE5", "Godot"), retrieved_langs={"en": 1},
+                   rewrite_used="a rewrite", rescued=True),
     ])["visitor/en"]
 
     for metric in ("gate_pass", "hit_at_4", "hit_at_4_page_only",
@@ -765,6 +776,46 @@ def test_an_unrescued_followup_does_not_inflate_followup_rescued() -> None:
 
     assert cell["n_followup"] == 2, "both cases are still follow-ups"
     assert cell["followup_rescued"] == 0, "neither case was actually rescued"
+
+
+def test_a_followup_that_passes_the_gate_standalone_does_not_inflate_n_followup() -> None:
+    """n_followup must count cases that were actually REFUSED standalone, not
+    every case carrying history. The metric is defined (KNOWN_ISSUES.md
+    Finding Q / eval/README.md) as "of the context-dependent follow-ups --
+    those that fail the gate standing alone -- what fraction clear the gate
+    after rewrite." A follow-up whose raw question already passes the gate on
+    its own never reaches score_case's `if case.history and not
+    decision.passed:` guard, so rewrite_used stays None and gate_passed is
+    the ORIGINAL passing decision, not a replayed one -- rescue was never
+    attempted for it. Counting it here would grow the denominator with a case
+    structurally incapable of ever incrementing the numerator, permanently
+    depressing the rate.
+
+    It must not spill into n_positive either (mirroring
+    test_followup_rescue_is_counted_only_for_multi_turn_positives): a
+    multi-turn case that passed standalone is not a context-dependent
+    follow-up by the metric's own definition, so it belongs in neither
+    bucket -- it is simply not what this measurement is about."""
+    from portfolio_rag.evaluation import CaseResult, GoldenCase, aggregate
+
+    passed_standalone = GoldenCase(
+        id="a", role="visitor", lang="en", type="positive", q="q",
+        history=(("user", "u"), ("assistant", "a")),
+        expected_urls=("pages/skills.html",), expected_keywords=("UE5",),
+    )
+    result = CaseResult(
+        case=passed_standalone, gate_passed=True, gate_value=0.4, gate_available=True,
+        hit=True, top_urls=("pages/skills.html",), top_scores=(0.9,),
+        rewrite_used=None, rescued=None,
+    )
+
+    cell = aggregate([result])["visitor/en"]
+
+    assert cell["n_followup"] == 0, (
+        "a case that passed the gate standalone was never a rescue attempt"
+    )
+    assert cell["n_positive"] == 0, "nor is it a single-turn positive"
+    assert cell["followup_rescued"] == 0
 
 
 def test_a_post_context_negative_gets_its_own_bucket() -> None:
