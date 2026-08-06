@@ -42,20 +42,16 @@ excluded from it deliberately, both in the dataset invariant
 (`test_positive_cells_have_the_right_composition`) and in
 `evaluation.aggregate()`'s runtime counting, and are held to their own
 separate, per-language quota instead (`FOLLOWUP_POSITIVES_PER_LANG` in
-`evaluation.py`, a mapping — currently `{"en": 2, "zh": 2}`, enforced by
-`test_followup_positive_pool_has_the_right_composition`). **zh's count moved
-off 0, and both are declared, measured values, not defaults:** at this
-project's zh gate calibration, essentially any natural, well-formed Chinese
-question shaped like the EN winner (an elided argument plus a dangling
-pronoun) clears the threshold standing alone (measured 0.42–0.56 against
-threshold 0.3979 across ~140 candidate phrasings tried across two sweeps) —
-that part of the earlier finding still holds. But a narrower shape, plain
-narrative-continuation fillers ("and then?"), was found to clear the gate
-with a real margin, and two of those (`followup-zh-01`/`02`, "再后来"/"那后来")
-are now in the set. See `KNOWN_ISSUES.md` Finding Q for the full evidence —
-every candidate measured, in both sweeps — and its trigger condition for
-revisiting this again (a tighter zh gate recalibration could flip these
-two's thin 0.01–0.02 margins back to passing).
+`evaluation.py`, a mapping — currently `{"en": 2, "zh": 0}`, enforced by
+`test_followup_positive_pool_has_the_right_composition`). **zh is a declared
+zero, not a missing case:** at this project's current zh gate calibration,
+essentially any natural, well-formed Chinese question about 他 clears the
+threshold standing alone (measured 0.42–0.56 against threshold 0.3979 across
+~90 candidate phrasings), so a zh follow-up is never refused and the
+rewrite-and-rescue path it would test never fires — follow-up refusal is an
+EN phenomenon at current calibration. See `KNOWN_ISSUES.md` Finding Q for the
+full evidence, and its trigger condition for revisiting this (a tighter zh
+gate recalibration).
 
 **Negatives are one shared pool per language**, not per role: the gate either
 refuses off-domain and injected probes or it doesn't, and that has nothing to

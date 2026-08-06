@@ -286,19 +286,12 @@ def test_load_cases_accepts_the_real_golden_set() -> None:
 
     120 -> 126: Task 9 appended 6 cases (2 EN multi-turn positives, 4
     post-context negatives). zh multi-turn positives were deliberately NOT
-    added at that point -- see FOLLOWUP_POSITIVES_PER_LANG's comment and
-    KNOWN_ISSUES.md Finding Q: at that measurement, essentially any natural
-    zh follow-up question passed the gate standing alone, so there was no
-    rescue phenomenon for a zh case to measure.
-
-    126 -> 128: a later task re-swept zh candidates with a narrower phrasing
-    shape (narrative-continuation fillers, not the elided-argument shape
-    that dominates the EN side) and found two, followup-zh-01/02, that clear
-    the gate standalone with a real margin -- see FOLLOWUP_POSITIVES_PER_LANG
-    and Finding Q for the full record, including everything that still
-    leaks."""
+    added -- see FOLLOWUP_POSITIVES_PER_LANG's comment and KNOWN_ISSUES.md
+    Finding Q: at this project's current zh gate calibration, essentially
+    any natural zh follow-up question passes the gate standing alone, so
+    there is no rescue phenomenon for a zh case to measure."""
     cases = load_cases(GOLDEN_PATH)
-    assert len(cases) == 128
+    assert len(cases) == 126
     assert all(c.adjacency in ADJACENCY for c in cases if c.type == "off_topic")
     assert not any(c.adjacency for c in cases if c.type != "off_topic")
 

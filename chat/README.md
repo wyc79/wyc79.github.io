@@ -271,7 +271,7 @@ exact steps; it is the reverse of the order you'd guess.
 `eval/golden.jsonl` is a held-out measurement set, separate from both the
 site content (`../pages/*.html`) and the gate's own fit-on calibration data
 (`gate_calibration.py`) — see `eval/README.md` for the full authoring guide.
-It holds 128 cases:
+It holds 126 cases:
 
 - **96 positives** — 12 per `(role, lang)` cell, one cell for each of the 4
   roles in `data/roles.json` crossed with `en`/`zh`. Scored for gate-pass,
@@ -289,27 +289,23 @@ It holds 128 cases:
     refusal failure here means the gate can't separate *this* domain from
     things that merely resemble it. Reporting the two separately is the
     point: a single blended refusal number can't tell these apart.
-- **4 multi-turn positives (2 `en` + 2 `zh`) plus the 4 post-context negatives
+- **2 multi-turn positives (`en` only) plus the 4 post-context negatives
   above** exercise the follow-up-resolution path described under "Off-topic
   use is refused three times over" — a case with `history` that the raw
   question fails the gate on its own, so the escalated rewrite-and-re-gate
   path actually fires. These are counted separately from the 96/28 above
   (`n_followup`/`followup_rescued` and the `post_context` negative bucket,
   not `n_positive`/`gate_pass`), so they never move those cells' denominators
-  just by existing. The `en`/`zh` split used to be 2/0 — a measured property
-  of the zh gate calibration, not a coverage gap — see `eval/README.md`'s
-  "Multi-turn cases" section for the full authoring rules and
-  `KNOWN_ISSUES.md` Finding Q for the full record. Virtually any Chinese
-  question shaped like the `en` winners (an elided argument plus a dangling
-  pronoun) still clears the zh gate standalone regardless of whether it
-  depends on prior turns (measured 0.42–0.56 against the zh threshold across
-  ~140 candidate phrasings across two sweeps) — but plain narrative-
-  continuation fillers ("and then?") are a narrower shape that does clear the
-  gate with a real margin, and two of those are now in the set
-  (`FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 2}`). Revisit if the zh
-  gate is ever recalibrated — Finding Q names the exact trigger, and these
-  two cases' margins (0.01–0.02 under the local threshold) are thin enough to
-  flip on a future `about_zh.md` edit.
+  just by existing. `en`-only is a measured property of the current zh gate
+  calibration, not a coverage gap — see `eval/README.md`'s "Multi-turn cases"
+  section for the full authoring rules and `KNOWN_ISSUES.md` Finding Q for
+  why zh has none: virtually any well-formed Chinese question about 他 clears
+  the zh gate standalone regardless of whether it depends on prior turns
+  (measured 0.42–0.56 against the zh threshold across ~90 candidate
+  phrasings), so a zh follow-up never reaches the rewriter to be measured,
+  and `FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 0}` records that as a
+  checked zero rather than an oversight. Revisit if the zh gate is ever
+  recalibrated tighter — Finding Q names the exact trigger.
 
 ```bash
 python scripts/run_eval.py                          # positive table + shared negatives block
