@@ -757,7 +757,9 @@ fix do not overlap" at this calibration — a structural mismatch between the
 gate's separation behavior and the rewrite mechanism, not a search-coverage
 gap one more sweep would close.
 
-**Trigger condition, sharpened.** zh follow-up coverage becomes possible
+**Trigger condition, sharpened (superseded below — kept for the historical
+record; the referring-expression framing turns out to be the wrong axis, not
+wrong in kind).** zh follow-up coverage becomes possible
 only if the zh gate tightens enough that *referring-expression* questions —
 genuine dangling pronouns or elided arguments, the shape `followup-en-01`/
 `02` actually exercise, not narrative-continuation fillers — fall below
@@ -768,6 +770,101 @@ of the same unresolvable shape before it reaches far enough to admit a
 genuine referring expression. Recalibration must be evaluated by re-running
 this same live-rewrite-API check against whatever newly-under-threshold
 candidates a tighter gate admits, not by threshold movement alone.
+
+**Update (a later session): the subject-elided hypothesis — tested, and its
+failure is what upgrades this finding from a sweep result to a structural
+claim. Supersedes the "referring-expression" framing above with the
+mechanism underneath it.**
+
+The sweeps above cover two shapes: 他/这个-style interrogatives (~90
+candidates) and content-free narrative-continuation fillers (~50 structural
+analogues of the filler shape). Both came back the same way — everything
+clears the gate except a handful of fillers that a rewriter correctly
+declines to touch — which supports "zh has no rescue phenomenon" but is still
+a search-coverage claim: it says these two shapes don't work, not that no
+shape can. The repo owner named the specific gap directly: a third shape,
+**contentful but subject-elided** questions (a dropped referent — "what's
+optimized inside it," not "and then?"), carries a genuine dangling reference,
+unlike the fillers, so it was the strongest available candidate for a
+counterexample to "zh has none." It was measured with `rt.gate()` against the
+live zh gate (threshold `0.3979`):
+
+```
+有什么特别的        0.4271
+那里面呢            0.4250
+里面有什么优化      0.4731
+有什么巧思          0.4532
+有什么难点          0.4563
+性能上做了什么      0.4772
+怎么优化的          0.5048
+优化上有什么设计    0.5118
+里面用了什么技术    0.5377
+里面有什么设计      0.5420
+```
+
+All ten pass (leak) the gate on their own, several by a wide margin. For
+direct contrast, the two under-threshold fillers already on record in this
+finding: `再后来` `0.3768`, `那后来` `0.3857` — both comfortably below
+`0.3979`, and both already shown above to resolve into nothing a rewriter can
+use.
+
+**This is the actual reason for `zh: 0`, stated as a tension rather than a
+coincidence about which shapes happened to get tried.** The zh gate scores
+similarity against `chat/knowledge/about_zh.md`'s curated corpus (the `top`
+statistic in `gate_calibration.py`); 优化/设计/性能/技术/难点 — the words that
+make `里面有什么优化` etc. genuinely resolvable and genuinely on-topic — are
+exactly that corpus's vocabulary (check any of the ten against `about_zh.md`
+directly to verify). A question has to reuse domain vocabulary to have a
+recoverable referent to resolve in the first place, and reusing that
+vocabulary is precisely what the gate's similarity score rewards. So: below
+threshold implies content-free, hence nothing for a rewriter to resolve (the
+filler case, confirmed live above, `followup-zh-01`/`02`); enough content to
+be resolvable implies domain vocabulary, which the gate reads as on-topic and
+passes standalone before any rewrite runs. There is no region of "resolvable
+but under threshold" between them for a sweep to have missed — the two
+required properties are in tension by construction.
+
+**Not a gate defect.** `里面有什么优化`, asked mid-conversation about Prime
+Engine, genuinely is an on-topic question, and the gate admitting it
+standalone at `0.4731` is correct — nothing about that decision is wrong.
+What this shows is that follow-up-rescue is a no-op for Chinese at current
+calibration, because the zh gate does not refuse the class of question the
+mechanism exists to rescue. English draws its line on the content side of
+that boundary: `followup-en-01`'s raw question, "what about tuning it,"
+refuses at `0.1466`; its Chinese equivalent, "里面有什么优化" ("what's
+optimized inside it" — same referential shape, same missing subject), is
+admitted at `0.4731`. One pair of numbers is the whole asymmetry: English
+refuses before the content boundary that would need rescuing; Chinese admits
+past it.
+
+**Trigger condition, sharpened again.** zh follow-up coverage becomes
+possible only if the zh gate tightens enough that questions carrying
+**domain vocabulary** — not referring expressions in the abstract, but
+specifically the 优化/设计/性能/技术/难点 class that is what makes them
+resolvable — fall below threshold. Given the corpus-overlap mechanism just
+measured, threshold movement alone is unlikely to reach that: the gate would
+need to also refuse a large share of genuine on-topic vocabulary use, not
+just these ten follow-ups. The more plausible lever is changing what the gate
+corpus scores against — narrowing or restructuring `about_zh.md`'s coverage,
+or scoring by something other than raw top-1 similarity to it — not the
+threshold number in isolation. Either way, **any such change would need
+re-checking against the existing zh negatives** (`neg-post-zh-01`/`02`, and
+the `OFFTOPIC_ZH` sweep earlier in this finding): raising strictness enough
+to push domain-vocabulary follow-ups below threshold raises it for everything
+else scored against the same corpus too, and some of what currently passes
+correctly could stop doing so.
+
+**Why this sweep is worth more than the two before it.** The 他/这个 and
+filler sweeps each show "we tried a shape and it didn't work" — a
+search-coverage claim, always open to "did you try X." Subject-elided-but-
+contentful questions were exactly that X: the one shape where both required
+properties (resolvable, under-threshold) could plausibly coexist, proposed
+specifically because it was the strongest case *against* `zh: 0`, not a
+straw shape easy to fail. A clean 10/10 fail — using the gate's own contrast,
+fillers at `0.3768`/`0.3857` versus content at `0.4271`-`0.5420`, a gap of
+over `0.04` at the closest pair — is what turns "no counterexample found" into
+"no counterexample can exist here, and here is the mechanism." `zh: 0` rests
+on that structural claim now, not on the size of a sweep.
 
 **Measurement caveat (final whole-branch review, fix wave): only one of the
 two EN follow-up positives is a strong test of retrieval, not just the gate.**

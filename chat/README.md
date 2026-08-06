@@ -299,13 +299,15 @@ It holds 126 cases:
   just by existing. `en`-only is a measured property of the current zh gate
   calibration, not a coverage gap — see `eval/README.md`'s "Multi-turn cases"
   section for the full authoring rules and `KNOWN_ISSUES.md` Finding Q for
-  why zh has none: virtually any well-formed Chinese question about 他 clears
-  the zh gate standalone regardless of whether it depends on prior turns
-  (measured 0.42–0.56 against the zh threshold across ~90 candidate
-  phrasings), so a zh follow-up never reaches the rewriter to be measured,
-  and `FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 0}` records that as a
-  checked zero rather than an oversight. Revisit if the zh gate is ever
-  recalibrated tighter — Finding Q names the exact trigger.
+  why zh has none: a zh question below the gate's threshold and a zh question
+  a rewriter can actually resolve turn out to be mutually exclusive at this
+  calibration (the gate scores against `about_zh.md`'s own vocabulary, which
+  is exactly the vocabulary that makes a question resolvable), so a zh
+  follow-up never reaches the rewriter to be measured, and
+  `FOLLOWUP_POSITIVES_PER_LANG = {"en": 2, "zh": 0}` records that as a checked
+  zero rather than an oversight. Finding Q names the exact trigger — it takes
+  more than a tighter threshold; recalibration would likely need to change
+  the gate corpus itself, re-checked against the existing zh negatives.
 
 ```bash
 python scripts/run_eval.py                          # positive table + shared negatives block

@@ -44,14 +44,17 @@ excluded from it deliberately, both in the dataset invariant
 separate, per-language quota instead (`FOLLOWUP_POSITIVES_PER_LANG` in
 `evaluation.py`, a mapping — currently `{"en": 2, "zh": 0}`, enforced by
 `test_followup_positive_pool_has_the_right_composition`). **zh is a declared
-zero, not a missing case:** at this project's current zh gate calibration,
-essentially any natural, well-formed Chinese question about 他 clears the
-threshold standing alone (measured 0.42–0.56 against threshold 0.3979 across
-~90 candidate phrasings), so a zh follow-up is never refused and the
-rewrite-and-rescue path it would test never fires — follow-up refusal is an
-EN phenomenon at current calibration. See `KNOWN_ISSUES.md` Finding Q for the
-full evidence, and its trigger condition for revisiting this (a tighter zh
-gate recalibration).
+zero, not a missing case, and not a search-coverage gap:** at this project's
+current zh gate calibration, a zh question below the gate's threshold and a
+zh question a rewriter can actually resolve are mutually exclusive — the gate
+scores against `about_zh.md`'s own vocabulary, which is exactly the
+vocabulary that makes a question resolvable in the first place, so a zh
+follow-up is never refused and the rewrite-and-rescue path it would test
+never fires. See `KNOWN_ISSUES.md` Finding Q for the full measurements
+(including the subject-elided-question test this claim rests on) and its
+trigger condition: tightening the threshold alone will not do it; the more
+likely lever is changing the gate corpus itself, re-checked against the
+existing zh negatives.
 
 **Negatives are one shared pool per language**, not per role: the gate either
 refuses off-domain and injected probes or it doesn't, and that has nothing to
