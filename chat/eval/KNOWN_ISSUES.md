@@ -688,7 +688,7 @@ sweep is what surfaced the second one. `FOLLOWUP_POSITIVES_PER_LANG` in
 enforced zero (`test_followup_positive_pool_has_the_right_composition`), not
 an absent key indistinguishable from an oversight.
 
-**Trigger condition — revisit if the zh gate is ever recalibrated tighter.**
+**Trigger condition (superseded below — kept for the historical record).**
 This is not hypothetical: zh calibration moves with `about_zh.md`'s content
 (every edit to that file moves the threshold, per this document's own
 "Coupled cost, same root cause" note on the EN side), and the zh gate's
@@ -702,6 +702,72 @@ fixed by this task, since fixing the underlying separation (if it is even
 a defect to fix, rather than the zero-false-refusal policy working as
 designed) means recalibrating or reconsidering the gate statistic, out of
 this task's scope.
+
+**Update (a later task): live-API confirmation that the only zh shape under
+threshold is categorically unresolvable, not just unfound — supersedes the
+"too thin to be robust" / no-candidate-found framing above with a stronger,
+structural claim.**
+
+A subsequent re-sweep first confirmed the paragraph above still holds for
+the shape that actually matters most: ~50 fresh structural analogues of the
+EN winners' shape (`followup-en-01`/`02` — an elided argument plus a
+dangling pronoun; e.g. 那优化呢, 那这部分呢, 那性能呢, 那怎么调) were tried
+against the live zh gate and **every one leaked**, scoring 0.42–0.53
+regardless of topic — the same finding as above, reproduced exactly, not a
+fluke of the first sweep.
+
+But widening to plain **narrative-continuation fillers** ("and then?") found
+several that genuinely clear the gate with real margin — not just the two
+this document already knew about (`那后来呢` 0.3957, `再后来` 0.3768), but a
+better one still: `那再后来` (0.3645, margin 0.0334), plus `那后来` (0.3857,
+margin 0.0122) and `再往下` (0.3877, margin 0.0102). Two of these
+(`再后来`, `那后来`) were built into real golden cases and run through the
+**live rewrite API** (not a hand-written stand-in) to test whether a
+reference-resolution rewriter could actually turn them into something that
+clears the gate:
+
+```
+followup-zh-01  '再后来'  -> '再后来'    [echoed, unchanged]        FAILED
+followup-zh-02  '那后来'  -> '那后来？'  [only a '？' added]         FAILED
+```
+
+Both failed to resolve into anything gate-passing or page-retrieving. **This
+is not a rewriter bug — it is the correct behavior of a reference-resolution
+rule applied to text that has no reference to resolve.** `再后来`/`那后来`
+mean "and then?": a **narrative continuation, not a referring expression**.
+There is no dangling pronoun and no elided argument with a recoverable
+filler; resolving one would require *generating the next event in a
+sequence* from outside knowledge, not substituting a referent already
+implied by the conversation. `followup-zh-02` gaining only a `？` makes the
+point precisely — the model found nothing to substitute and, correctly
+under its own instructions, declined to invent content. This is the exact
+same "echo when nothing needs resolving" behavior the post-context negatives
+(`neg-post-zh-01`/`02`) are designed to rely on; here it is simply pointed at
+a positive case where that behavior means the case can never pass.
+
+**The stronger conclusion this supports:** the zh gate's compressed dynamic
+range (own off-topic calibration bottoms out around 0.3262 against a 0.3979
+threshold, versus English reaching 0.09 — see `evaluation.py`'s
+`FOLLOWUP_POSITIVES_PER_LANG` comment) leaves a narrow band of candidates
+under threshold at all, and — measured directly, not inferred — that band is
+occupied *entirely* by a shape a reference-resolution rewriter cannot act on
+by construction. This is not "we haven't searched hard enough yet," it is
+"the zh gate's under-threshold candidates and what reference resolution can
+fix do not overlap" at this calibration — a structural mismatch between the
+gate's separation behavior and the rewrite mechanism, not a search-coverage
+gap one more sweep would close.
+
+**Trigger condition, sharpened.** zh follow-up coverage becomes possible
+only if the zh gate tightens enough that *referring-expression* questions —
+genuine dangling pronouns or elided arguments, the shape `followup-en-01`/
+`02` actually exercise, not narrative-continuation fillers — fall below
+threshold. Widening the gap by tightening the threshold further, on its
+own, does not help: the filler shape already clears the gate with room to
+spare (down to 0.3645 measured), so a lower threshold mostly encloses more
+of the same unresolvable shape before it reaches far enough to admit a
+genuine referring expression. Recalibration must be evaluated by re-running
+this same live-rewrite-API check against whatever newly-under-threshold
+candidates a tighter gate admits, not by threshold movement alone.
 
 **Measurement caveat (final whole-branch review, fix wave): only one of the
 two EN follow-up positives is a strong test of retrieval, not just the gate.**

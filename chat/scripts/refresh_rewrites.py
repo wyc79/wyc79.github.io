@@ -19,12 +19,34 @@ Usage (from chat/, with LLM_API_KEY set):
 import argparse
 import importlib.util
 import json
+import re
 import sys
 
 from portfolio_rag.config import settings
 from portfolio_rag.evaluation import REWRITES_PATH, load_cases
 
 BACKEND_PATH = settings.chat_root / "functions" / "tencent" / "index.py"
+
+# Trailing whitespace and sentence-final punctuation, ASCII and full-width
+# alike (`. ! ?` / `。！？`).
+_TRAILING_PUNCT_RE = re.compile(r"[\s.!?。！？]+$")
+
+
+def _echo_key(text: str) -> str:
+    """Normalize trailing whitespace/punctuation before the
+    positive-echoed-unchanged comparison below, so a change that is
+    punctuation-only does not count as a rewrite.
+
+    Caught live: a zh follow-up positive whose question was a narrative
+    continuation ("再后来" / "那后来", "and then?") with nothing to resolve
+    came back from the real rewrite API as the same text plus a trailing
+    "？" -- outcome reported "rewritten", so a bare `out[c.id] == c.q`
+    comparison missed it and the case silently escaped the WARNING below,
+    which exists specifically to catch a positive case that needed real
+    resolution but got none. The rewrite prompt is a reference-resolution
+    rule; adding only a question mark resolves no referent, so this must
+    still read as an echo."""
+    return _TRAILING_PUNCT_RE.sub("", text)
 
 
 def _backend():
@@ -56,10 +78,14 @@ def main() -> int:
         flag = "" if outcome in ("rewritten", "echoed") else f"  <-- {outcome.upper()}"
         print(f"{case.id:<24} {case.q!r}\n{'':<24} -> {text!r}  [{outcome}]{flag}")
 
-    failed = [c.id for c in cases if out[c.id] == c.q and c.type == "positive"]
+    failed = [
+        c.id for c in cases
+        if _echo_key(out[c.id]) == _echo_key(c.q) and c.type == "positive"
+    ]
     if failed:
         print(
-            f"\nWARNING: {len(failed)} positive case(s) echoed unchanged: {failed}\n"
+            f"\nWARNING: {len(failed)} positive case(s) echoed unchanged "
+            f"(punctuation-only changes count as unchanged): {failed}\n"
             "A positive multi-turn case is one whose question CANNOT stand alone, so an "
             "echo means either the case is miswritten or the prompt stopped resolving.",
             file=sys.stderr,
