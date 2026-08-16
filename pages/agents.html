@@ -176,6 +176,38 @@
               <p class="meta"><a href="https://github.com/wyc79/calendar-creator-skill" target="_blank" rel="noopener">https://github.com/wyc79/calendar-creator-skill</a></p>
             </div>
           </details>
+
+          <details class="agent-item">
+            <summary>
+              <a class="agent-name" href="https://github.com/wyc79/agent-delegation-skill" target="_blank" rel="noopener">agent-delegation</a>
+              <span class="agent-pitch">
+                <span data-lang="en">Run jobs you already decomposed across multiple provider seats, each in its own worktree.</span>
+                <span data-lang="zh">把已拆分好的任务分发到多个提供方席位并行执行，每个任务一个独立 worktree。</span>
+              </span>
+            </summary>
+            <div class="agent-body">
+              <p class="agent-highlights">
+                <span class="pill"><span data-lang="en">Multi-provider routing</span><span data-lang="zh">多提供方路由</span></span>
+                <span class="pill"><span data-lang="en">Quota-aware failover</span><span data-lang="zh">配额感知故障转移</span></span>
+                <span class="pill"><span data-lang="en">Isolated worktrees</span><span data-lang="zh">隔离 worktree</span></span>
+                <span class="pill"><span data-lang="en">Scope + cost per job</span><span data-lang="zh">按任务记录范围与开销</span></span>
+                <span class="pill"><span data-lang="en">Wrapper, not workflow</span><span data-lang="zh">只调度，不做工作流</span></span>
+              </p>
+              <p>
+                <span data-lang="en">A CLI wrapper with no planner and no reviewer: your agent writes the jobs, <code>delegate</code> sends each to a seat that still has quota, runs it in an isolated git worktree, and moves work when one provider hits a wall. Only worth it with more than one provider enrolled — <code>delegate init</code> prints the tier-to-seat table and says so outright. Nothing reviews the result; you get the files each job touched, what the checks said, and what each seat cost.</span>
+                <span data-lang="zh">一个命令行封装：没有规划器，也没有评审器。任务由你的 agent 拆好，<code>delegate</code> 把每个任务分给仍有配额的席位，在隔离的 git worktree 中执行，某个提供方撞上配额墙时自动转移。只有接入多个提供方才值得用——<code>delegate init</code> 会打印 tier 与席位的对应表并直接给出结论。它不评审结果，只告诉你每个任务改了哪些文件、检查输出如何、各席位花了多少。</span>
+              </p>
+              <p class="meta">
+                <span data-lang="en">Two halves: clone the repo for the <code>delegate</code> CLI (Python 3.9+, stdlib only), then copy <code>agent-delegation/</code> into your agent's skills directory — the skill alone does nothing.</span>
+                <span data-lang="zh">分两部分：克隆仓库得到 <code>delegate</code> CLI（Python 3.9+，仅标准库），再把 <code>agent-delegation/</code> 复制到 agent 的 skills 目录——只装技能本身不起作用。</span>
+              </p>
+              <div class="agent-install">
+                <code data-install>git clone https://github.com/wyc79/agent-delegation-skill.git</code>
+                <button type="button" class="toggle agent-copy" data-en="Copy" data-zh="复制">Copy</button>
+              </div>
+              <p class="meta"><a href="https://github.com/wyc79/agent-delegation-skill" target="_blank" rel="noopener">https://github.com/wyc79/agent-delegation-skill</a></p>
+            </div>
+          </details>
         </div>
       </section>
     </main>
