@@ -59,8 +59,8 @@
   <rect class="node-client" x="58" y="198" width="214" height="112" rx="8"/>
   <text class="t-node" x="74" y="224">Your API key</text>
   <text class="t-sub" x="74" y="244">typed into Settings, held in</text>
-  <text class="t-sub" x="74" y="262">memory for the tab &#8212; written</text>
-  <text class="t-sub" x="74" y="280">to the device only if you tick</text>
+  <text class="t-sub" x="74" y="262">memory for the tab. Written to</text>
+  <text class="t-sub" x="74" y="280">the device only if you tick</text>
   <text class="t-sub" x="74" y="298">&#8220;remember on this device&#8221;</text>
 
   <rect class="node-client" x="58" y="326" width="214" height="76" rx="8"/>
@@ -96,7 +96,7 @@
   <text class="t-rule" x="392" y="320">Inside either one, the key is:</text>
   <text class="t-rule" x="404" y="342">&#183; used in the single request that carried it, then <tspan class="gone">gone</tspan></text>
   <text class="t-rule" x="404" y="362">&#183; never written to a session map, a global, a file or a database</text>
-  <text class="t-rule" x="404" y="382">&#183; never logged &#8212; redacted by header name <tspan font-style="italic">and</tspan> by value</text>
+  <text class="t-rule" x="404" y="382">&#183; never logged: redacted by header name <tspan font-style="italic">and</tspan> by value</text>
   <text class="t-rule" x="404" y="402">&#183; never echoed back in an error response</text>
 
   <!-- relay to provider -->
@@ -120,7 +120,7 @@
   <!-- test band -->
   <rect class="band" x="40" y="450" width="1040" height="160" rx="10"/>
   <text class="t-band" x="60" y="478">TESTED, NOT ASSERTED</text>
-  <text class="t-rule" x="60" y="506">One contract suite &#8212; 20 tests &#8212; runs against <tspan font-weight="700">both</tspan> relays and requires them to agree on every branch: the same</text>
+  <text class="t-rule" x="60" y="506">One contract suite of 20 tests runs against <tspan font-weight="700">both</tspan> relays and requires them to agree on every branch: the same</text>
   <text class="t-rule" x="60" y="528">health shape, one that does not name which implementation answered, the same errors, the same forwarded</text>
   <text class="t-rule" x="60" y="550">payload, the same stream.</text>
   <text class="t-rule" x="60" y="578">A canary key rides every path, error paths included, and must appear in no captured output. A further test greps</text>
