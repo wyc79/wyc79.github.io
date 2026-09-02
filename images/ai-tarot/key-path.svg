@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" width="1120" height="640" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">AI Tarot Projection: the path an API key takes</title>
+  <desc id="desc">The key is typed into the browser's settings panel and held in memory for the tab, written to the device only if the visitor ticks "remember on this device". It travels to a relay in an Authorization header, one key per request. Either of two relays may answer: server/relay.py, about three hundred lines of dependency-free Python for self-hosting, or a Cloudflare Worker of about a hundred and forty lines for the hosted path. Both implement the same contract, RELAY.md, and the frontend cannot tell which one is answering. Inside a relay the key is used in the single request that carried it and then dropped: never written to a session map, a global, a file or a database; never logged, redacted by header name and by value so a key echoed inside an upstream error is scrubbed before reaching any output; never returned in an error response. The relay holds no session state and knows nothing about tarot. It forwards the call to the model provider using that provider's own auth header, and the answer streams back to the browser, where the transcript lives in the visitor's own localStorage and on no server. One contract test suite of twenty tests runs against both relays: it checks that they agree on every branch and that a canary key appears in no captured output, including on every error path, and a further test greps the Worker source to confirm it contains no logging code at all.</desc>
+  <style>
+    text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
+    .bg{fill:#ffffff;}
+    .t-title{font-size:17px;font-weight:700;}
+    .t-band{font-size:12.5px;font-weight:700;letter-spacing:.05em;fill:#5f6368;}
+    .t-node{font-size:13px;font-weight:600;}
+    .t-sub{font-size:11px;fill:#5f6368;}
+    .t-edge{font-size:10.5px;fill:#5f6368;font-weight:600;text-anchor:middle;}
+    .t-rule{font-size:11.5px;}
+    .t-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;}
+    .lbl-client{fill:#0b57d0;} .lbl-server{fill:#0d9488;} .lbl-ext{fill:#b45309;}
+    .band{fill:#f4f5f7;stroke:#dfe1e5;stroke-width:1.2;}
+    .col-client{fill:rgba(11,87,208,.07);stroke:#0b57d0;stroke-width:1.4;}
+    .col-server{fill:rgba(13,148,136,.07);stroke:#0d9488;stroke-width:1.4;}
+    .col-ext{fill:rgba(180,83,9,.07);stroke:#b45309;stroke-width:1.4;}
+    .node{fill:#ffffff;stroke:#dfe1e5;stroke-width:1.3;}
+    .node-client{fill:#ffffff;stroke:#0b57d0;stroke-width:1.5;}
+    .node-server{fill:#ffffff;stroke:#0d9488;stroke-width:1.5;}
+    .node-ext{fill:#ffffff;stroke:#b45309;stroke-width:1.5;}
+    .group{fill:none;stroke:#0d9488;stroke-width:1.3;stroke-dasharray:6 4;}
+    .flow{stroke:#9aa0a6;stroke-width:2;fill:none;}
+    .arrowhead{fill:#9aa0a6;}
+    .gone{fill:#c0392b;font-weight:700;}
+    @media (prefers-color-scheme: dark){
+      text{fill:#e9e9ea;}
+      .bg{fill:#0c0c0c;}
+      .t-band,.t-sub,.t-edge{fill:#9aa0a6;}
+      .lbl-client{fill:#8ab4f8;} .lbl-server{fill:#5eead4;} .lbl-ext{fill:#fbbf24;}
+      .band{fill:#161616;stroke:#2c2c2c;}
+      .col-client{fill:rgba(138,180,248,.10);stroke:#8ab4f8;}
+      .col-server{fill:rgba(94,234,212,.10);stroke:#5eead4;}
+      .col-ext{fill:rgba(251,191,36,.10);stroke:#fbbf24;}
+      .node{fill:#1b1b1b;stroke:#2c2c2c;}
+      .node-client{fill:#1b1b1b;stroke:#8ab4f8;}
+      .node-server{fill:#1b1b1b;stroke:#5eead4;}
+      .node-ext{fill:#1b1b1b;stroke:#fbbf24;}
+      .group{stroke:#5eead4;}
+      .flow{stroke:#6b7075;}
+      .arrowhead{fill:#6b7075;}
+      .gone{fill:#f87171;}
+    }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="1120" height="640"/>
+  <text class="t-title" x="40" y="34">Where the key goes, and where it stops</text>
+
+  <!-- browser column -->
+  <rect class="col-client" x="40" y="60" width="250" height="360" rx="10"/>
+  <text class="t-band lbl-client" x="56" y="84">YOUR BROWSER</text>
+
+  <rect class="node-client" x="58" y="100" width="214" height="82" rx="8"/>
+  <text class="t-node" x="74" y="126">Reading page</text>
+  <text class="t-sub" x="74" y="146">engine, UI and transcript,</text>
+  <text class="t-sub" x="74" y="164">served as static files</text>
+
+  <rect class="node-client" x="58" y="198" width="214" height="112" rx="8"/>
+  <text class="t-node" x="74" y="224">Your API key</text>
+  <text class="t-sub" x="74" y="244">typed into Settings, held in</text>
+  <text class="t-sub" x="74" y="262">memory for the tab &#8212; written</text>
+  <text class="t-sub" x="74" y="280">to the device only if you tick</text>
+  <text class="t-sub" x="74" y="298">&#8220;remember on this device&#8221;</text>
+
+  <rect class="node-client" x="58" y="326" width="214" height="76" rx="8"/>
+  <text class="t-node" x="74" y="352">Past readings</text>
+  <text class="t-sub" x="74" y="372">localStorage, on your device.</text>
+  <text class="t-sub" x="74" y="390">No relay holds any of it.</text>
+
+  <!-- browser to relay -->
+  <path class="flow" d="M290 232 H 356"/>
+  <polygon class="arrowhead" points="368,232 354,226 354,238"/>
+  <text class="t-edge t-mono" x="330" y="216" font-size="9.5">Authorization</text>
+  <text class="t-edge" x="330" y="256">one key,</text>
+  <text class="t-edge" x="330" y="270">one request</text>
+
+  <!-- relay column -->
+  <rect class="col-server" x="376" y="60" width="368" height="360" rx="10"/>
+  <text class="t-band lbl-server" x="392" y="84">EITHER RELAY &#183; ONE CONTRACT (RELAY.md)</text>
+
+  <rect class="group" x="392" y="96" width="336" height="176" rx="9"/>
+
+  <rect class="node-server" x="408" y="110" width="304" height="70" rx="8"/>
+  <text class="t-node t-mono" x="424" y="134">server/relay.py</text>
+  <text class="t-sub" x="424" y="154">~300 lines, nothing outside the</text>
+  <text class="t-sub" x="424" y="172">standard library &#183; self-host</text>
+
+  <rect class="node-server" x="408" y="188" width="304" height="70" rx="8"/>
+  <text class="t-node" x="424" y="212">Cloudflare Worker</text>
+  <text class="t-sub" x="424" y="232">~140 lines &#183; hosted &#183; no logging code</text>
+  <text class="t-sub" x="424" y="250">path at all, not even a disabled one</text>
+
+  <text class="t-sub" x="392" y="292">The frontend cannot tell which one answered. That is the design rule.</text>
+
+  <text class="t-rule" x="392" y="320">Inside either one, the key is:</text>
+  <text class="t-rule" x="404" y="342">&#183; used in the single request that carried it, then <tspan class="gone">gone</tspan></text>
+  <text class="t-rule" x="404" y="362">&#183; never written to a session map, a global, a file or a database</text>
+  <text class="t-rule" x="404" y="382">&#183; never logged &#8212; redacted by header name <tspan font-style="italic">and</tspan> by value</text>
+  <text class="t-rule" x="404" y="402">&#183; never echoed back in an error response</text>
+
+  <!-- relay to provider -->
+  <path class="flow" d="M744 232 H 810"/>
+  <polygon class="arrowhead" points="822,232 808,226 808,238"/>
+  <text class="t-edge" x="784" y="216" font-size="9.5">provider's own</text>
+  <text class="t-edge" x="784" y="230" font-size="9.5">auth header</text>
+  <text class="t-edge" x="784" y="262" font-size="9.5">forwarded once</text>
+
+  <!-- provider column -->
+  <rect class="col-ext" x="830" y="60" width="250" height="360" rx="10"/>
+  <text class="t-band lbl-ext" x="846" y="84">THE MODEL PROVIDER</text>
+
+  <rect class="node-ext" x="848" y="176" width="214" height="112" rx="8"/>
+  <text class="t-node" x="864" y="202">Your account</text>
+  <text class="t-sub" x="864" y="222">the provider you chose,</text>
+  <text class="t-sub" x="864" y="240">on your own key</text>
+  <text class="t-sub" x="864" y="262">the answer streams back</text>
+  <text class="t-sub" x="864" y="280">through the relay, unstored</text>
+
+  <!-- test band -->
+  <rect class="band" x="40" y="450" width="1040" height="160" rx="10"/>
+  <text class="t-band" x="60" y="478">TESTED, NOT ASSERTED</text>
+  <text class="t-rule" x="60" y="506">One contract suite &#8212; 20 tests &#8212; runs against <tspan font-weight="700">both</tspan> relays and requires them to agree on every branch: the same</text>
+  <text class="t-rule" x="60" y="528">health shape, one that does not name which implementation answered, the same errors, the same forwarded</text>
+  <text class="t-rule" x="60" y="550">payload, the same stream.</text>
+  <text class="t-rule" x="60" y="578">A canary key rides every path, error paths included, and must appear in no captured output. A further test greps</text>
+  <text class="t-rule" x="60" y="600">the Worker source to keep it free of logging code.</text>
+</svg>
