@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" width="1120" height="640" role="img" aria-labelledby="ttl desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" width="1120" height="640" role="img" aria-labelledby="ttl desc" xml:lang="en">
   <title id="ttl">AI Tarot Projection: the path an API key takes</title>
-  <desc id="desc">The key is typed into the browser's settings panel and held in memory for the tab, written to the device only if the visitor ticks "remember on this device". It travels to a relay in an Authorization header, one key per request. Either of two relays may answer: server/relay.py, about three hundred lines of dependency-free Python for self-hosting, or a Cloudflare Worker of about a hundred and forty lines for the hosted path. Both implement the same contract, RELAY.md, and the frontend cannot tell which one is answering. Inside a relay the key is used in the single request that carried it and then dropped: never written to a session map, a global, a file or a database; never logged, redacted by header name and by value so a key echoed inside an upstream error is scrubbed before reaching any output; never returned in an error response. The relay holds no session state and knows nothing about tarot. It forwards the call to the model provider using that provider's own auth header, and the answer streams back to the browser, where the transcript lives in the visitor's own localStorage and on no server. One contract test suite of twenty tests runs against both relays: it checks that they agree on every branch and that a canary key appears in no captured output, including on every error path, and a further test greps the Worker source to confirm it contains no logging code at all.</desc>
+  <desc id="desc">The visitor enters an API key in the browser's settings panel. It remains in memory for the current tab unless the visitor selects "remember on this device." The browser sends the key in an Authorization header, one key per request, to one of two relays: a roughly 300-line, standard-library-only Python relay for self-hosting or a roughly 140-line Cloudflare Worker for the hosted option. Both implement the contract documented in RELAY.md, and the frontend cannot tell which relay responded. A relay uses the key for the request that carried it and then discards it. The key is never stored in a session map, global variable, file, or database; never logged; redacted by both header name and value; and never echoed in an error response. The relay keeps no session state and contains no tarot logic. It forwards the request with the model provider's own authorization header, and the answer streams back to the browser without being stored by the relay. The transcript remains in the visitor's localStorage. One 20-test contract suite runs against both relays, requiring identical behavior on every branch and ensuring that a canary key never appears in captured output, including on error paths. Another test scans the Worker source to confirm that it contains no logging code.</desc>
   <style>
     text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
     .bg{fill:#ffffff;}
@@ -45,15 +45,15 @@
   </style>
 
   <rect class="bg" x="0" y="0" width="1120" height="640"/>
-  <text class="t-title" x="40" y="34">Where the key goes, and where it stops</text>
+  <text class="t-title" x="40" y="34">Where the key goes and where it stops</text>
 
   <!-- browser column -->
   <rect class="col-client" x="40" y="60" width="250" height="360" rx="10"/>
   <text class="t-band lbl-client" x="56" y="84">YOUR BROWSER</text>
 
   <rect class="node-client" x="58" y="100" width="214" height="82" rx="8"/>
-  <text class="t-node" x="74" y="126">Reading page</text>
-  <text class="t-sub" x="74" y="146">engine, UI and transcript,</text>
+  <text class="t-node" x="74" y="126">Reading interface</text>
+  <text class="t-sub" x="74" y="146">Engine, UI, and transcript</text>
   <text class="t-sub" x="74" y="164">served as static files</text>
 
   <rect class="node-client" x="58" y="198" width="214" height="112" rx="8"/>
@@ -65,7 +65,7 @@
 
   <rect class="node-client" x="58" y="326" width="214" height="76" rx="8"/>
   <text class="t-node" x="74" y="352">Past readings</text>
-  <text class="t-sub" x="74" y="372">localStorage, on your device.</text>
+  <text class="t-sub" x="74" y="372">localStorage on your device</text>
   <text class="t-sub" x="74" y="390">No relay holds any of it.</text>
 
   <!-- browser to relay -->
@@ -77,27 +77,27 @@
 
   <!-- relay column -->
   <rect class="col-server" x="376" y="60" width="368" height="360" rx="10"/>
-  <text class="t-band lbl-server" x="392" y="84">EITHER RELAY &#183; ONE CONTRACT (RELAY.md)</text>
+  <text class="t-band lbl-server" x="392" y="84">EITHER RELAY · ONE CONTRACT (RELAY.md)</text>
 
   <rect class="group" x="392" y="96" width="336" height="176" rx="9"/>
 
   <rect class="node-server" x="408" y="110" width="304" height="70" rx="8"/>
   <text class="t-node t-mono" x="424" y="134">server/relay.py</text>
-  <text class="t-sub" x="424" y="154">~300 lines, nothing outside the</text>
-  <text class="t-sub" x="424" y="172">standard library &#183; self-host</text>
+  <text class="t-sub" x="424" y="154">About 300 lines · standard library only</text>
+  <text class="t-sub" x="424" y="172">for self-hosting</text>
 
   <rect class="node-server" x="408" y="188" width="304" height="70" rx="8"/>
   <text class="t-node" x="424" y="212">Cloudflare Worker</text>
-  <text class="t-sub" x="424" y="232">~140 lines &#183; hosted &#183; no logging code</text>
-  <text class="t-sub" x="424" y="250">path at all, not even a disabled one</text>
+  <text class="t-sub" x="424" y="232">About 140 lines · hosted · no logging path</text>
+  <text class="t-sub" x="424" y="250">Not even a disabled code path</text>
 
-  <text class="t-sub" x="392" y="292">The frontend cannot tell which one answered. That is the design rule.</text>
+  <text class="t-sub" x="392" y="292">The frontend cannot tell which relay responded. That is a design rule.</text>
 
   <text class="t-rule" x="392" y="320">Inside either one, the key is:</text>
-  <text class="t-rule" x="404" y="342">&#183; used in the single request that carried it, then <tspan class="gone">gone</tspan></text>
-  <text class="t-rule" x="404" y="362">&#183; never written to a session map, a global, a file or a database</text>
-  <text class="t-rule" x="404" y="382">&#183; never logged: redacted by header name <tspan font-style="italic">and</tspan> by value</text>
-  <text class="t-rule" x="404" y="402">&#183; never echoed back in an error response</text>
+  <text class="t-rule" x="404" y="342">· used for one request, then <tspan class="gone">gone</tspan></text>
+  <text class="t-rule" x="404" y="362">· never stored in a session map, a global, a file, or a database</text>
+  <text class="t-rule" x="404" y="382">· never logged; redacted by header name <tspan font-style="italic">and</tspan> by value</text>
+  <text class="t-rule" x="404" y="402">· never echoed in an error response</text>
 
   <!-- relay to provider -->
   <path class="flow" d="M744 232 H 810"/>
@@ -112,17 +112,16 @@
 
   <rect class="node-ext" x="848" y="176" width="214" height="112" rx="8"/>
   <text class="t-node" x="864" y="202">Your account</text>
-  <text class="t-sub" x="864" y="222">the provider you chose,</text>
-  <text class="t-sub" x="864" y="240">on your own key</text>
-  <text class="t-sub" x="864" y="262">the answer streams back</text>
-  <text class="t-sub" x="864" y="280">through the relay, unstored</text>
+  <text class="t-sub" x="864" y="222">The provider you chose,</text>
+  <text class="t-sub" x="864" y="240">using your own key</text>
+  <text class="t-sub" x="864" y="262">streams the answer back</text>
+  <text class="t-sub" x="864" y="280">through the relay without storage</text>
 
   <!-- test band -->
   <rect class="band" x="40" y="450" width="1040" height="160" rx="10"/>
-  <text class="t-band" x="60" y="478">TESTED, NOT ASSERTED</text>
-  <text class="t-rule" x="60" y="506">One contract suite of 20 tests runs against <tspan font-weight="700">both</tspan> relays and requires them to agree on every branch: the same</text>
-  <text class="t-rule" x="60" y="528">health shape, one that does not name which implementation answered, the same errors, the same forwarded</text>
-  <text class="t-rule" x="60" y="550">payload, the same stream.</text>
-  <text class="t-rule" x="60" y="578">A canary key rides every path, error paths included, and must appear in no captured output. A further test greps</text>
-  <text class="t-rule" x="60" y="600">the Worker source to keep it free of logging code.</text>
+  <text class="t-band" x="60" y="478">VERIFIED, NOT MERELY ASSERTED</text>
+  <text class="t-rule" x="60" y="506">One 20-test contract suite runs against <tspan font-weight="700">both</tspan> relays. They must agree on every branch: the same health response,</text>
+  <text class="t-rule" x="60" y="528">which does not identify the implementation, as well as the same errors, forwarded payload, and stream.</text>
+  <text class="t-rule" x="60" y="578">A canary key travels through every path, including errors, and must never appear in captured output. Another test</text>
+  <text class="t-rule" x="60" y="600">scans the Worker source to ensure that it remains free of logging code.</text>
 </svg>

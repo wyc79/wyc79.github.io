@@ -36,7 +36,7 @@
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
               <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
-              <p class="meta"><span data-lang="en">In this project, I modified and extended Prime Engine, a minimal C++ game engine used for gameplay and rendering experiments.</span><span data-lang="zh">这个项目围绕 Prime Engine 展开：我在这款用于玩法和渲染实验的精简 C++ 游戏引擎中修改并扩展多项底层系统。</span></p>
+              <p class="meta"><span data-lang="en">I modified and extended Prime Engine, a compact C++ game engine designed for gameplay and rendering experiments.</span><span data-lang="zh">这个项目围绕 Prime Engine 展开：我在这款用于玩法和渲染实验的精简 C++ 游戏引擎中修改并扩展多项底层系统。</span></p>
               <p class="meta"><span data-lang="en">I implemented several engine-level systems, including:</span><span data-lang="zh">我实现了多个引擎级系统，包括：</span></p>
               <ul>
                 <li data-lang="en">View frustum culling for rendering optimization</li>
@@ -50,13 +50,13 @@
                 <li data-lang="en">Debug visualization tools for bounding volumes and animation state</li>
                 <li data-lang="zh">包围体与动画状态的调试可视化工具</li>
               </ul>
-              <p class="meta"><span data-lang="en">Working inside the engine required understanding its component system, event system, and scene graph structure in order to integrate new features without breaking the existing architecture.</span><span data-lang="zh">要在引擎内部动手，得先摸清它的组件系统、事件系统和场景图结构，才能在不破坏原有架构的前提下加入新功能。</span></p>
+              <p class="meta"><span data-lang="en">Integrating these features without disrupting the existing architecture required a working understanding of the engine&rsquo;s component system, event system, and scene graph.</span><span data-lang="zh">要在引擎内部动手，得先摸清它的组件系统、事件系统和场景图结构，才能在不破坏原有架构的前提下加入新功能。</span></p>
             </div>
 
             <div>
               <h3 style="margin-top: 0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
               <ul>
-                <li data-lang="en">Learned and navigated a large C++ codebase for a minimal custom game engine.</li>
+                <li data-lang="en">Learned and extended a substantial C++ codebase for a custom game engine.</li>
                 <li data-lang="zh">快速熟悉并扩展一套规模较大的 C++ 自研游戏引擎代码库。</li>
                 <li data-lang="en">Implemented view frustum culling for rendering optimization.</li>
                 <li data-lang="zh">实现了视锥剔除，用于渲染优化。</li>
@@ -89,7 +89,7 @@
 
           <h4 style="margin-top: 0;"><span data-lang="en">Frustum Culling</span><span data-lang="zh">视锥剔除</span></h4>
           <p class="meta"><span data-lang="en">To reduce unnecessary rendering work, I implemented view frustum culling using bounding boxes.</span><span data-lang="zh">为减少不必要的渲染开销，我使用包围盒实现了视锥剔除。</span></p>
-          <p class="meta"><span data-lang="en">Steps:</span><span data-lang="zh">步骤：</span></p>
+          <p class="meta"><span data-lang="en">Pipeline:</span><span data-lang="zh">步骤：</span></p>
           <ul>
             <li data-lang="en">Compute the world-space bounding box of each mesh instance.</li>
             <li data-lang="zh">计算每个网格实例的世界空间包围盒。</li>
@@ -100,30 +100,38 @@
             <li data-lang="en">If all corners lie outside any plane, the object is marked as culled and skipped during rendering.</li>
             <li data-lang="zh">若所有顶点都位于某一平面之外，则该物体被标记为剔除并在渲染时跳过。</li>
           </ul>
-          <p class="meta"><span data-lang="en">I also added debug rendering for bounding boxes to visually verify the correctness of the culling logic. This significantly reduced the number of objects sent to the renderer when many objects were outside the camera view.</span><span data-lang="zh">我还为包围盒添加了调试渲染，以直观验证剔除逻辑的正确性。当大量物体位于相机视野之外时，这显著减少了送入渲染器的物体数量。</span></p>
+          <p class="meta"><span data-lang="en">I also added bounding-box debug rendering to verify the culling logic visually. When many objects were outside the camera view, culling substantially reduced the number submitted to the renderer.</span><span data-lang="zh">我还为包围盒添加了调试渲染，以直观验证剔除逻辑的正确性。当大量物体位于相机视野之外时，这显著减少了送入渲染器的物体数量。</span></p>
 
           <div class="diagram-card">
             <h3><span data-lang="en">Frustum Culling Pipeline</span><span data-lang="zh">视锥剔除流程</span></h3>
-            <svg viewBox="0 0 900 180" aria-label="Frustum culling pipeline diagram" role="img" style="font-family: Arial, sans-serif;">
+            <svg viewBox="0 0 900 180" aria-label="Frustum culling pipeline diagram" data-al-en="Frustum culling pipeline diagram" data-al-zh="视锥剔除流程图" role="img" style="font-family: Arial, sans-serif;">
               <rect x="0" y="0" width="900" height="180" rx="16" fill="#ffffff"/>
               <!-- Boxes -->
               <rect x="20" y="50" width="150" height="60" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="95" y="78" text-anchor="middle" font-size="16" font-weight="bold">Mesh Instance</text>
-              <text x="95" y="98" text-anchor="middle" font-size="13">world bounding box</text>
+              <text data-lang="en" x="95" y="78" text-anchor="middle" font-size="16" font-weight="bold">Mesh Instance</text>
+              <text data-lang="zh" x="95" y="78" text-anchor="middle" font-size="16" font-weight="bold">网格实例</text>
+              <text data-lang="en" x="95" y="98" text-anchor="middle" font-size="13">World-space bounds</text>
+              <text data-lang="zh" x="95" y="98" text-anchor="middle" font-size="13">世界空间包围盒</text>
 
               <rect x="220" y="50" width="150" height="60" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="295" y="78" text-anchor="middle" font-size="16" font-weight="bold">Transform</text>
-              <text x="295" y="98" text-anchor="middle" font-size="13">corners to clip space</text>
+              <text data-lang="en" x="295" y="78" text-anchor="middle" font-size="16" font-weight="bold">Transform</text>
+              <text data-lang="zh" x="295" y="78" text-anchor="middle" font-size="16" font-weight="bold">坐标变换</text>
+              <text data-lang="en" x="295" y="98" text-anchor="middle" font-size="13">Corners to clip space</text>
+              <text data-lang="zh" x="295" y="98" text-anchor="middle" font-size="13">顶点变换至裁剪空间</text>
 
               <rect x="420" y="50" width="150" height="60" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="495" y="78" text-anchor="middle" font-size="16" font-weight="bold">Frustum Test</text>
-              <text x="495" y="98" text-anchor="middle" font-size="13">6 plane checks</text>
+              <text data-lang="en" x="495" y="78" text-anchor="middle" font-size="16" font-weight="bold">Frustum Test</text>
+              <text data-lang="zh" x="495" y="78" text-anchor="middle" font-size="16" font-weight="bold">视锥测试</text>
+              <text data-lang="en" x="495" y="98" text-anchor="middle" font-size="13">Check six planes</text>
+              <text data-lang="zh" x="495" y="98" text-anchor="middle" font-size="13">检查六个平面</text>
 
               <rect x="680" y="20" width="120" height="50" rx="12" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
-              <text x="740" y="50" text-anchor="middle" font-size="15" font-weight="bold">Cull</text>
+              <text data-lang="en" x="740" y="50" text-anchor="middle" font-size="15" font-weight="bold">Cull</text>
+              <text data-lang="zh" x="740" y="50" text-anchor="middle" font-size="15" font-weight="bold">剔除</text>
 
               <rect x="680" y="95" width="120" height="50" rx="12" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
-              <text x="740" y="125" text-anchor="middle" font-size="15" font-weight="bold">Render</text>
+              <text data-lang="en" x="740" y="125" text-anchor="middle" font-size="15" font-weight="bold">Render</text>
+              <text data-lang="zh" x="740" y="125" text-anchor="middle" font-size="15" font-weight="bold">渲染</text>
 
               <!-- Arrows -->
               <line x1="170" y1="80" x2="220" y2="80" stroke="#555" stroke-width="2"/>
@@ -141,12 +149,17 @@
               <!-- Decision labels -->
               <rect x="570" y="40" width="100" height="18" rx="6" fill="#ffffff" fill-opacity="0.92"/>
               <rect x="570" y="100" width="100" height="18" rx="6" fill="#ffffff" fill-opacity="0.92"/>
-              <text x="670" y="52" text-anchor="end" font-size="12" fill="#444">outside any plane</text>
-              <text x="670" y="112" text-anchor="end" font-size="12" fill="#444">intersects / inside</text>
+              <text data-lang="en" x="670" y="52" text-anchor="end" font-size="12" fill="#444">Outside any plane</text>
+              <text data-lang="zh" x="670" y="52" text-anchor="end" font-size="12" fill="#444">位于任一平面外</text>
+              <text data-lang="en" x="670" y="112" text-anchor="end" font-size="12" fill="#444">Intersecting or inside</text>
+              <text data-lang="zh" x="670" y="112" text-anchor="end" font-size="12" fill="#444">相交或位于内部</text>
 
               <!-- Caption -->
-              <text x="450" y="168" text-anchor="middle" font-size="13" fill="#444">
-                Bounding box corners are transformed and tested against the camera frustum to skip off-screen objects.
+              <text data-lang="en" x="450" y="168" text-anchor="middle" font-size="13" fill="#444">
+                Transform and test bounding-box corners against the camera frustum to skip off-screen objects.
+              </text>
+              <text data-lang="zh" x="450" y="168" text-anchor="middle" font-size="13" fill="#444">
+                将包围盒顶点变换并与相机视锥测试，以跳过视野外物体。
               </text>
             </svg>
           </div>
@@ -190,31 +203,42 @@
 
           <div class="diagram-card">
             <h3><span data-lang="en">Physics: Move-and-Slide with Gravity</span><span data-lang="zh">物理：带重力的移动-滑动</span></h3>
-            <svg viewBox="0 0 960 220" aria-label="Move-and-slide with gravity diagram" role="img" style="font-family: Arial, sans-serif;">
+            <svg viewBox="0 0 960 220" aria-label="Move-and-slide with gravity diagram" data-al-en="Move-and-slide with gravity diagram" data-al-zh="带重力的移动与滑动流程图" role="img" style="font-family: Arial, sans-serif;">
               <rect x="0" y="0" width="960" height="220" rx="16" fill="#ffffff"/>
               <!-- Step boxes -->
               <rect x="20" y="70" width="150" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="95" y="98" text-anchor="middle" font-size="16" font-weight="bold">Input Move</text>
-              <text x="95" y="118" text-anchor="middle" font-size="13">desired displacement</text>
+              <text data-lang="en" x="95" y="98" text-anchor="middle" font-size="16" font-weight="bold">Movement Input</text>
+              <text data-lang="zh" x="95" y="98" text-anchor="middle" font-size="16" font-weight="bold">移动输入</text>
+              <text data-lang="en" x="95" y="118" text-anchor="middle" font-size="13">Desired displacement</text>
+              <text data-lang="zh" x="95" y="118" text-anchor="middle" font-size="13">期望位移</text>
 
               <rect x="210" y="70" width="150" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="285" y="98" text-anchor="middle" font-size="16" font-weight="bold">Apply Gravity</text>
-              <text x="285" y="118" text-anchor="middle" font-size="13">update vertical velocity</text>
+              <text data-lang="en" x="285" y="98" text-anchor="middle" font-size="16" font-weight="bold">Apply Gravity</text>
+              <text data-lang="zh" x="285" y="98" text-anchor="middle" font-size="16" font-weight="bold">应用重力</text>
+              <text data-lang="en" x="285" y="118" text-anchor="middle" font-size="13">Update vertical velocity</text>
+              <text data-lang="zh" x="285" y="118" text-anchor="middle" font-size="13">更新竖直速度</text>
 
               <rect x="400" y="70" width="150" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="475" y="98" text-anchor="middle" font-size="16" font-weight="bold">Collision Query</text>
-              <text x="475" y="118" text-anchor="middle" font-size="13">check candidate position</text>
+              <text data-lang="en" x="475" y="98" text-anchor="middle" font-size="16" font-weight="bold">Collision Query</text>
+              <text data-lang="zh" x="475" y="98" text-anchor="middle" font-size="16" font-weight="bold">碰撞查询</text>
+              <text data-lang="en" x="475" y="118" text-anchor="middle" font-size="13">Test candidate position</text>
+              <text data-lang="zh" x="475" y="118" text-anchor="middle" font-size="13">检测候选位置</text>
 
               <rect x="590" y="25" width="150" height="55" rx="12" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
-              <text x="665" y="57" text-anchor="middle" font-size="15" font-weight="bold">No Hit → Move</text>
+              <text data-lang="en" x="665" y="57" text-anchor="middle" font-size="15" font-weight="bold">No Collision → Move</text>
+              <text data-lang="zh" x="665" y="57" text-anchor="middle" font-size="15" font-weight="bold">无碰撞 → 移动</text>
 
               <rect x="590" y="115" width="170" height="65" rx="12" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
-              <text x="675" y="143" text-anchor="middle" font-size="15" font-weight="bold">Hit Surface</text>
-              <text x="675" y="163" text-anchor="middle" font-size="13">remove normal component</text>
+              <text data-lang="en" x="675" y="143" text-anchor="middle" font-size="15" font-weight="bold">Surface Collision</text>
+              <text data-lang="zh" x="675" y="143" text-anchor="middle" font-size="15" font-weight="bold">表面碰撞</text>
+              <text data-lang="en" x="675" y="163" text-anchor="middle" font-size="13">Remove normal component</text>
+              <text data-lang="zh" x="675" y="163" text-anchor="middle" font-size="13">移除法向分量</text>
 
               <rect x="800" y="115" width="140" height="65" rx="12" fill="#f3f4f6" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="870" y="143" text-anchor="middle" font-size="15" font-weight="bold">Slide</text>
-              <text x="870" y="163" text-anchor="middle" font-size="13">move along tangent</text>
+              <text data-lang="en" x="870" y="143" text-anchor="middle" font-size="15" font-weight="bold">Slide</text>
+              <text data-lang="zh" x="870" y="143" text-anchor="middle" font-size="15" font-weight="bold">滑动</text>
+              <text data-lang="en" x="870" y="163" text-anchor="middle" font-size="13">Move along tangent</text>
+              <text data-lang="zh" x="870" y="163" text-anchor="middle" font-size="13">沿切线移动</text>
 
               <!-- Arrows -->
               <line x1="170" y1="102" x2="210" y2="102" stroke="#555" stroke-width="2"/>
@@ -235,11 +259,15 @@
               <!-- Gravity arrow -->
               <line x1="285" y1="30" x2="285" y2="65" stroke="#666" stroke-width="2" stroke-dasharray="5,5"/>
               <polygon points="285,65 279,55 291,55" fill="#666"/>
-              <text x="300" y="48" font-size="13" fill="#444">gravity</text>
+              <text data-lang="en" x="300" y="48" font-size="13" fill="#444">Gravity</text>
+              <text data-lang="zh" x="300" y="48" font-size="13" fill="#444">重力</text>
 
               <!-- Caption -->
-              <text x="480" y="208" text-anchor="middle" font-size="13" fill="#444">
-                Candidate movement is tested for collisions; if blocked, the engine cancels motion into the surface and keeps the tangential part for sliding.
+              <text data-lang="en" x="480" y="208" text-anchor="middle" font-size="13" fill="#444">
+                Test the candidate displacement; on contact, remove its normal component and preserve the tangent for sliding.
+              </text>
+              <text data-lang="zh" x="480" y="208" text-anchor="middle" font-size="13" fill="#444">
+                检测候选位移；发生碰撞时移除法向分量，并保留切向分量用于滑动。
               </text>
             </svg>
           </div>
@@ -258,18 +286,18 @@
           <h4><span data-lang="en">Animation Blending</span><span data-lang="zh">动画混合</span></h4>
           <p class="meta"><span data-lang="en">I extended the soldier's animation state machine with several blending modes, chosen at spawn via an <code>npcType</code> value from Lua. The skeleton is split into an upper body (joints 2-37) and a lower body (joints 38-47), so clips can drive different parts at once.</span><span data-lang="zh">我为士兵的动画状态机扩展了多种混合模式，在生成时通过来自 Lua 的 <code>npcType</code> 值选择。骨架被划分为上半身（关节 2-37）与下半身（关节 38-47），因此不同片段可同时驱动不同部位。</span></p>
           <ul>
-            <li data-lang="en">Full-body blend - two clips mixed by a factor (e.g. idle + run, weighted 0.5 each).</li>
+            <li data-lang="en">Full-body blend—two clips mixed by a weighting factor (for example, idle and run at 0.5 each).</li>
             <li data-lang="zh">全身混合：按权重混合两个片段（例如待机 + 奔跑，各占 0.5）。</li>
-            <li data-lang="en">Partial blend - a clip overrides only a joint range via <code>PARTIAL_BODY_ANIMATION</code> (e.g. upper-body shoot over a full-body idle).</li>
+            <li data-lang="en">Partial-body blend—a clip overrides only a specified joint range through <code>PARTIAL_BODY_ANIMATION</code> (for example, upper-body shooting over a full-body idle).</li>
             <li data-lang="zh">局部混合：某个片段通过 <code>PARTIAL_BODY_ANIMATION</code> 仅覆盖某一关节范围（例如在全身待机之上叠加上半身射击）。</li>
-            <li data-lang="en">Additive blend - a clip layered <em>on top of</em> the existing pose instead of replacing it.</li>
+            <li data-lang="en">Additive blend—a clip is layered <em>over</em> the existing pose rather than replacing it.</li>
             <li data-lang="zh">叠加混合：将某个片段<em>叠加</em>在现有姿势之上，而非替换它。</li>
           </ul>
-          <p class="meta"><span data-lang="en">For additive motion I added an <code>ADDITIVE</code> slot flag. The additive pass takes the clip's delta from its reference pose (frame 0) as a rotation-only quaternion and pre-multiplies it onto the joint's local transform - so a base motion stays intact while extra movement is layered on (e.g. lower-body run + upper-body shoot, running and aiming at once).</span><span data-lang="zh">为实现叠加运动，我增加了一个 <code>ADDITIVE</code> 槽位标志。叠加阶段将片段相对其参考姿势（第 0 帧）的增量作为仅含旋转的四元数，并左乘到关节的局部变换上，这样基础动作保持不变，而额外动作被叠加其上（例如下半身奔跑 + 上半身射击，边跑边瞄准）。</span></p>
+          <p class="meta"><span data-lang="en">For additive motion, I added an <code>ADDITIVE</code> slot flag. The additive pass computes each joint&rsquo;s rotational delta from the clip&rsquo;s reference pose (frame 0), then premultiplies that quaternion into the joint&rsquo;s local transform. The base motion remains intact while the additional movement is layered over it—for example, a lower-body run combined with upper-body shooting.</span><span data-lang="zh">为实现叠加运动，我增加了一个 <code>ADDITIVE</code> 槽位标志。叠加阶段将片段相对其参考姿势（第 0 帧）的增量作为仅含旋转的四元数，并左乘到关节的局部变换上，这样基础动作保持不变，而额外动作被叠加其上（例如下半身奔跑 + 上半身射击，边跑边瞄准）。</span></p>
 
           <div class="diagram-card">
             <h3><span data-lang="en">Animation Blending Modes</span><span data-lang="zh">动画混合模式</span></h3>
-            <svg viewBox="0 0 960 320" aria-label="Animation blending modes diagram" role="img" style="font-family: Arial, sans-serif;">
+            <svg viewBox="0 0 960 320" aria-label="Animation blending modes diagram" data-al-en="Animation blending modes diagram" data-al-zh="动画混合模式示意图" role="img" style="font-family: Arial, sans-serif;">
               <defs>
                 <pattern id="additiveHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                   <rect width="8" height="8" fill="#eceef2"/>
@@ -279,35 +307,45 @@
               <rect x="0" y="0" width="960" height="320" rx="16" fill="#ffffff"/>
 
               <!-- Full-body blend -->
-              <text x="160" y="40" text-anchor="middle" font-size="16" font-weight="bold">Full-body blend</text>
+              <text data-lang="en" x="160" y="40" text-anchor="middle" font-size="16" font-weight="bold">Full-Body Blend</text>
+              <text data-lang="zh" x="160" y="40" text-anchor="middle" font-size="16" font-weight="bold">全身混合</text>
               <circle cx="160" cy="80" r="20" fill="#dbeae4" stroke="#3f9b57" stroke-width="2"/>
               <rect x="128" y="105" width="64" height="70" rx="8" fill="#dbeae4" stroke="#3f9b57" stroke-width="2"/>
               <rect x="128" y="180" width="64" height="75" rx="8" fill="#dbeae4" stroke="#3f9b57" stroke-width="2"/>
-              <text x="160" y="280" text-anchor="middle" font-size="13" fill="#444">STAND + RUN</text>
-              <text x="160" y="298" text-anchor="middle" font-size="12" fill="#777">0.5 / 0.5 across all joints</text>
+              <text data-lang="en" x="160" y="280" text-anchor="middle" font-size="13" fill="#444">STAND + RUN</text>
+              <text data-lang="zh" x="160" y="280" text-anchor="middle" font-size="13" fill="#444">待机 + 奔跑</text>
+              <text data-lang="en" x="160" y="298" text-anchor="middle" font-size="12" fill="#777">0.5 / 0.5 across all joints</text>
+              <text data-lang="zh" x="160" y="298" text-anchor="middle" font-size="12" fill="#777">所有关节各占 0.5</text>
 
               <!-- Partial blend -->
-              <text x="480" y="40" text-anchor="middle" font-size="16" font-weight="bold">Partial blend</text>
+              <text data-lang="en" x="480" y="40" text-anchor="middle" font-size="16" font-weight="bold">Partial-Body Blend</text>
+              <text data-lang="zh" x="480" y="40" text-anchor="middle" font-size="16" font-weight="bold">局部混合</text>
               <circle cx="480" cy="80" r="20" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
               <rect x="448" y="105" width="64" height="70" rx="8" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
               <rect x="448" y="180" width="64" height="75" rx="8" fill="#eceef2" stroke="#b9bcc3" stroke-width="2"/>
-              <text x="525" y="145" font-size="12" fill="#c94b4b">Shoot (2-37)</text>
-              <text x="525" y="222" font-size="12" fill="#777">STAND (lower)</text>
-              <text x="480" y="280" text-anchor="middle" font-size="13" fill="#444">upper-body override</text>
-              <text x="480" y="298" text-anchor="middle" font-size="12" fill="#777">replaces joints 2-37</text>
+              <text data-lang="en" x="525" y="145" font-size="12" fill="#c94b4b">SHOOT (2–37)</text>
+              <text data-lang="zh" x="525" y="145" font-size="12" fill="#c94b4b">射击（2–37）</text>
+              <text data-lang="en" x="525" y="222" font-size="12" fill="#777">STAND (lower body)</text>
+              <text data-lang="zh" x="525" y="222" font-size="12" fill="#777">待机（下半身）</text>
+              <text data-lang="en" x="480" y="280" text-anchor="middle" font-size="13" fill="#444">Upper-body override</text>
+              <text data-lang="zh" x="480" y="280" text-anchor="middle" font-size="13" fill="#444">覆盖上半身</text>
+              <text data-lang="en" x="480" y="298" text-anchor="middle" font-size="12" fill="#777">Replaces joints 2–37</text>
+              <text data-lang="zh" x="480" y="298" text-anchor="middle" font-size="12" fill="#777">替换关节 2–37</text>
 
               <!-- Additive blend -->
-              <text x="800" y="40" text-anchor="middle" font-size="16" font-weight="bold">Additive blend</text>
+              <text data-lang="en" x="800" y="40" text-anchor="middle" font-size="16" font-weight="bold">Additive Blend</text>
+              <text data-lang="zh" x="800" y="40" text-anchor="middle" font-size="16" font-weight="bold">叠加混合</text>
               <circle cx="800" cy="80" r="20" fill="url(#additiveHatch)" stroke="#c94b4b" stroke-width="2"/>
               <rect x="768" y="105" width="64" height="70" rx="8" fill="url(#additiveHatch)" stroke="#c94b4b" stroke-width="2"/>
               <rect x="768" y="180" width="64" height="75" rx="8" fill="#d9f0e0" stroke="#3f9b57" stroke-width="2"/>
-              <text x="845" y="145" font-size="12" fill="#c94b4b">STAND + Shoot</text>
-              <text x="845" y="222" font-size="12" fill="#3f9b57">RUN (38-47)</text>
-              <text x="800" y="280" text-anchor="middle" font-size="13" fill="#444">layered on top</text>
-              <text x="800" y="298" text-anchor="middle" font-size="12" fill="#777">delta pose added to upper body</text>
-
-              <!-- Caption -->
-              <text x="480" y="315" text-anchor="middle" font-size="13" fill="#444"></text>
+              <text data-lang="en" x="845" y="145" font-size="12" fill="#c94b4b">STAND + SHOOT</text>
+              <text data-lang="zh" x="845" y="145" font-size="12" fill="#c94b4b">待机 + 射击</text>
+              <text data-lang="en" x="845" y="222" font-size="12" fill="#3f9b57">RUN (38–47)</text>
+              <text data-lang="zh" x="845" y="222" font-size="12" fill="#3f9b57">奔跑（38–47）</text>
+              <text data-lang="en" x="800" y="280" text-anchor="middle" font-size="13" fill="#444">Layered over the base pose</text>
+              <text data-lang="zh" x="800" y="280" text-anchor="middle" font-size="13" fill="#444">叠加到基础姿势</text>
+              <text data-lang="en" x="800" y="298" text-anchor="middle" font-size="12" fill="#777">Adds a delta pose to the upper body</text>
+              <text data-lang="zh" x="800" y="298" text-anchor="middle" font-size="12" fill="#777">上半身叠加增量姿势</text>
             </svg>
           </div>
 
@@ -322,25 +360,27 @@
             </iframe>
           </article>
 
-          <h4><span data-lang="en">Hierarchical Culling - Static &amp; Dynamic BVH</span><span data-lang="zh">层级式剔除：静态与动态 BVH</span></h4>
-          <p class="meta"><span data-lang="en">I extended frustum culling into a Bounding Volume Hierarchy managed by a central <code>CullingManager</code>, so large groups of objects can be rejected with a few AABB-vs-frustum tests instead of one test per mesh. Each instance is bucketed as static or dynamic.</span><span data-lang="zh">我将视锥剔除扩展为由中央 <code>CullingManager</code> 管理的包围体层级（BVH），从而只需少量 AABB 与视锥的测试即可剔除大批物体，而非对每个网格逐一测试。每个实例被归类为静态或动态。</span></p>
+          <h4><span data-lang="en">Hierarchical Culling: Static and Dynamic BVHs</span><span data-lang="zh">层级式剔除：静态与动态 BVH</span></h4>
+          <p class="meta"><span data-lang="en">I extended frustum culling with a bounding volume hierarchy managed by a central <code>CullingManager</code>. This allows the engine to reject large groups of objects with a few AABB–frustum tests instead of testing every mesh individually. Each instance is classified as static or dynamic.</span><span data-lang="zh">我将视锥剔除扩展为由中央 <code>CullingManager</code> 管理的包围体层级（BVH），从而只需少量 AABB 与视锥的测试即可剔除大批物体，而非对每个网格逐一测试。每个实例被归类为静态或动态。</span></p>
           <ul>
-            <li data-lang="en">Static BVH - built once, recursively median-split along the widest centroid axis, with leaves holding ≤ 8 instances. Traversal prunes whole subtrees whose bounds miss the frustum.</li>
+            <li data-lang="en">Static BVH—built once through recursive median splits along the widest centroid axis, with each leaf holding no more than eight instances. Traversal prunes entire subtrees whose bounds miss the frustum.</li>
             <li data-lang="zh">静态 BVH：一次性构建，沿质心分布最广的轴递归进行中位数划分，叶节点最多容纳 8 个实例。遍历时会剪除包围盒未命中视锥的整棵子树。</li>
-            <li data-lang="en">Dynamic BVH - rebuilt every frame for moving objects (to stress-test it I spawned many small meshes given simple random movement). Centroids are normalized and encoded as 30-bit Morton codes (Z-order), sorted, then split at the midpoint - a linear, cache-friendly construction.</li>
+            <li data-lang="en">Dynamic BVH—rebuilt every frame for moving objects. To stress-test it, I spawned many small meshes with simple random movement. Their centroids are normalized, encoded as 30-bit Morton codes (Z-order), sorted, and split at the midpoint, producing a linear, cache-friendly construction.</li>
             <li data-lang="zh">动态 BVH：针对运动物体每帧重建（为了给它加压测试，我生成了大量随机运动的小网格）。质心被归一化并编码为 30 位 Morton 码（Z 序），排序后在中点划分：一种线性、对缓存友好的构建方式。</li>
           </ul>
           <p class="meta"><span data-lang="en">The static tree produces tighter partitions for buildings and terrain, while the Morton-code rebuild is cheap enough to run every frame for many moving units. Z-order keeps spatially close objects adjacent in memory, allowing both construction and traversal to access nodes almost linearly and remain cache-friendly. Both approaches are roughly <em>O(n log n)</em>, dominated by sorting.</span><span data-lang="zh">静态树能为建筑和地形生成更紧密的空间划分；Morton 码方案的重建成本则足够低，可以为大量运动物体逐帧执行。Z 序让空间上相近的物体在内存中也彼此相邻，使构建和遍历几乎按线性顺序访问节点，更有利于缓存。两种方法的复杂度都约为 <em>O(n log n)</em>，主要开销来自排序。</span></p>
 
           <div class="diagram-card">
             <h3><span data-lang="en">Static vs. Dynamic BVH Construction</span><span data-lang="zh">静态与动态 BVH 的构建对比</span></h3>
-            <svg viewBox="0 0 960 280" aria-label="Static versus dynamic BVH construction diagram" role="img" style="font-family: Arial, sans-serif;">
+            <svg viewBox="0 0 960 280" aria-label="Static versus dynamic BVH construction diagram" data-al-en="Static versus dynamic BVH construction diagram" data-al-zh="静态与动态 BVH 构建方式对比图" role="img" style="font-family: Arial, sans-serif;">
               <rect x="0" y="0" width="960" height="280" rx="16" fill="#ffffff"/>
 
               <!-- Static side -->
-              <text x="240" y="40" text-anchor="middle" font-size="16" font-weight="bold">Static BVH - median split</text>
+              <text data-lang="en" x="240" y="40" text-anchor="middle" font-size="16" font-weight="bold">Static BVH — Median Split</text>
+              <text data-lang="zh" x="240" y="40" text-anchor="middle" font-size="16" font-weight="bold">静态 BVH——中位数划分</text>
               <rect x="190" y="60" width="100" height="34" rx="8" fill="#ffe6e6" stroke="#c94b4b" stroke-width="2"/>
-              <text x="240" y="82" text-anchor="middle" font-size="13">root AABB</text>
+              <text data-lang="en" x="240" y="82" text-anchor="middle" font-size="13">Root AABB</text>
+              <text data-lang="zh" x="240" y="82" text-anchor="middle" font-size="13">根 AABB</text>
               <rect x="110" y="120" width="90" height="32" rx="8" fill="#fff3d6" stroke="#c9a93f" stroke-width="2"/>
               <rect x="280" y="120" width="90" height="32" rx="8" fill="#fff3d6" stroke="#c9a93f" stroke-width="2"/>
               <rect x="70" y="178" width="70" height="30" rx="8" fill="#e6f7ea" stroke="#3f9b57" stroke-width="2"/>
@@ -353,14 +393,17 @@
               <line x1="170" y1="152" x2="195" y2="178" stroke="#888" stroke-width="2"/>
               <line x1="310" y1="152" x2="295" y2="178" stroke="#888" stroke-width="2"/>
               <line x1="340" y1="152" x2="385" y2="178" stroke="#888" stroke-width="2"/>
-              <text x="240" y="232" text-anchor="middle" font-size="13" fill="#444">split on widest axis · leaves ≤ 8 instances</text>
-              <text x="240" y="252" text-anchor="middle" font-size="12" fill="#777">built once for static geometry</text>
+              <text data-lang="en" x="240" y="232" text-anchor="middle" font-size="13" fill="#444">Split widest axis · up to 8 instances per leaf</text>
+              <text data-lang="zh" x="240" y="232" text-anchor="middle" font-size="13" fill="#444">沿最宽轴划分 · 每个叶节点最多 8 个实例</text>
+              <text data-lang="en" x="240" y="252" text-anchor="middle" font-size="12" fill="#777">Built once for static geometry</text>
+              <text data-lang="zh" x="240" y="252" text-anchor="middle" font-size="12" fill="#777">为静态几何体构建一次</text>
 
               <!-- Divider -->
               <line x1="480" y1="55" x2="480" y2="225" stroke="#e0e0e0" stroke-width="2"/>
 
               <!-- Dynamic side: Z-order curve -->
-              <text x="720" y="40" text-anchor="middle" font-size="16" font-weight="bold">Dynamic BVH - Morton (Z-order)</text>
+              <text data-lang="en" x="720" y="40" text-anchor="middle" font-size="16" font-weight="bold">Dynamic BVH — Morton (Z-Order)</text>
+              <text data-lang="zh" x="720" y="40" text-anchor="middle" font-size="16" font-weight="bold">动态 BVH——Morton（Z 序）</text>
               <polyline points="600,80 660,80 600,130 660,130 740,80 800,80 740,130 800,130 600,180 660,180 600,210 660,210 740,180 800,180 740,210 800,210"
                         fill="none" stroke="#3f6fb9" stroke-width="2"/>
               <g fill="#c94b4b">
@@ -373,8 +416,10 @@
                 <circle cx="740" cy="180" r="5"/><circle cx="800" cy="180" r="5"/>
                 <circle cx="740" cy="210" r="5"/><circle cx="800" cy="210" r="5"/>
               </g>
-              <text x="720" y="240" text-anchor="middle" font-size="13" fill="#444">Morton code → sort → midpoint split</text>
-              <text x="720" y="260" text-anchor="middle" font-size="12" fill="#777">rebuilt every frame for moving objects</text>
+              <text data-lang="en" x="720" y="240" text-anchor="middle" font-size="13" fill="#444">Morton code → sort → midpoint split</text>
+              <text data-lang="zh" x="720" y="240" text-anchor="middle" font-size="13" fill="#444">Morton 编码 → 排序 → 中点划分</text>
+              <text data-lang="en" x="720" y="260" text-anchor="middle" font-size="12" fill="#777">Rebuilt each frame for moving objects</text>
+              <text data-lang="zh" x="720" y="260" text-anchor="middle" font-size="12" fill="#777">为运动物体逐帧重建</text>
             </svg>
           </div>
 
@@ -388,7 +433,7 @@
                 title="Static BVH debug demo"
                 style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
               </iframe>
-              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Static BVH - rainbow boxes from root (red) to leaf (purple).</span><span data-lang="zh">静态 BVH：从根节点（红色）到叶节点（紫色）的彩虹色包围盒。</span></p>
+              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Static BVH—rainbow-colored bounds from the root (red) to the leaves (purple).</span><span data-lang="zh">静态 BVH：从根节点（红色）到叶节点（紫色）的彩虹色包围盒。</span></p>
             </article>
             <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
               <iframe
@@ -399,7 +444,7 @@
                 title="Dynamic BVH debug demo"
                 style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
               </iframe>
-              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Dynamic BVH - white boxes over randomly moving meshes, leaves shown as dots.</span><span data-lang="zh">动态 BVH：覆盖在随机运动网格上的白色包围盒，叶节点以圆点表示。</span></p>
+              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Dynamic BVH—white bounds around randomly moving meshes, with leaves shown as dots.</span><span data-lang="zh">动态 BVH：覆盖在随机运动网格上的白色包围盒，叶节点以圆点表示。</span></p>
             </article>
           </div>
         </section>

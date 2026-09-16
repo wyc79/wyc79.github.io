@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 960" width="1120" height="960" role="img" aria-labelledby="ttl desc" xml:lang="en">
-  <title id="ttl">Portfolio Chat Agent: Information Flow</title>
-  <desc id="desc">At build time, three encoders process the site's English and Chinese pages, about_en.md, and about_zh.md to produce four static files. The e5 encoder builds the retrieval corpus in chunks_e5.json. MiniLM builds the English relevance gate from about_en.md and re-embeds the corpus's English chunks for the offline fallback in chunks_en_minilm.json. The bge-small-zh encoder builds the Chinese relevance gate from about_zh.md. Both gates therefore use a small, curated corpus, while page content feeds retrieval only. The browser receives gate_en_minilm.json, chunks_en_minilm.json, and meta.json; chunks_e5.json and gate_zh_bge.json remain bundled with the serverless function. For each turn, the browser sends a name-normalized query to /embed. That endpoint runs the appropriate relevance gate and returns a pass-or-block result. Off-topic queries stop before retrieval or an LLM call. After a pass, the browser sends the question and current page URL to /chat. The function embeds the question with e5, searches its bundled chunks_e5.json, adds the top-scoring passages and the current page's passages to the role prompt, calls the LLM, and returns the answer with the source chunks used to populate the source cards. If the function is unavailable, an in-browser MiniLM model can, with the visitor's consent, retrieve English content locally from chunks_en_minilm.json.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 960" width="1120" height="960" role="img" aria-labelledby="ttl desc" xml:lang="zh-Hans">
+  <title id="ttl">作品集聊天智能体：信息流</title>
+  <desc id="desc">构建阶段由三个编码器处理站点的中英文页面、about_en.md 和 about_zh.md，生成四份静态文件。e5 编码器把所有来源写入检索语料 chunks_e5.json；MiniLM 基于 about_en.md 构建英文相关性门控，并将语料中的英文段落重新嵌入为离线回退语料 chunks_en_minilm.json；bge-small-zh 基于 about_zh.md 构建中文相关性门控。两个门控都只使用精简且经过整理的语料，页面正文仅参与检索。浏览器会获取 gate_en_minilm.json、chunks_en_minilm.json 和 meta.json；chunks_e5.json 与 gate_zh_bge.json 则只随无服务器函数打包。每一轮中，浏览器先把姓名归一化后的查询发往 /embed，由该端点运行对应语言的相关性门控并返回通过或拦截结果。跑题查询会在检索及调用大模型之前终止。通过门控后，浏览器把问题和当前页面 URL 发往 /chat；函数用 e5 嵌入问题，在打包的 chunks_e5.json 中检索，将得分最高的段落与当前页面的段落加入角色提示词，再调用大模型，并把回答与用于生成来源卡片的段落一并返回。如果函数不可用，经用户同意后，浏览器内的 MiniLM 可以在 chunks_en_minilm.json 上完成本地英文检索。</desc>
   <style>
     text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
     .bg{fill:#ffffff;}
@@ -54,15 +54,15 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1120" height="960"/>
-  <text class="t-title" x="34" y="36">Portfolio Chat Agent: Information Flow</text>
+  <text class="t-title" x="34" y="36">作品集聊天智能体：信息流</text>
 
   <!-- ===================== BUILD TIME BAND ===================== -->
   <rect class="band" x="30" y="54" width="1060" height="228" rx="16"/>
-  <text class="t-band" x="50" y="80">BUILD TIME · one-time, offline</text>
+  <text class="t-band" x="50" y="80">构建阶段 · 单次离线执行</text>
 
   <rect class="node" x="54" y="114" width="196" height="44" rx="10"/>
-  <text class="t-node" x="152" y="134">Site pages</text>
-  <text class="t-sub"  x="152" y="150">English + Chinese · all sections</text>
+  <text class="t-node" x="152" y="134">站点页面</text>
+  <text class="t-sub"  x="152" y="150">中英文 · 所有栏目</text>
   <rect class="node" x="54" y="174" width="196" height="44" rx="10"/>
   <text class="t-node" x="152" y="201">about_en</text>
   <rect class="node" x="54" y="234" width="196" height="44" rx="10"/>
@@ -70,31 +70,31 @@
 
   <rect class="node" x="330" y="112" width="182" height="48" rx="10"/>
   <text class="t-node" x="421" y="132">MiniLM</text>
-  <text class="t-sub"  x="421" y="149">English gate · about_en only</text>
+  <text class="t-sub"  x="421" y="149">英文相关性门控 · 仅 about_en</text>
   <rect class="node" x="330" y="172" width="182" height="48" rx="10"/>
-  <text class="t-node" x="421" y="192">e5 encoder</text>
-  <text class="t-sub"  x="421" y="209">Retrieval · all sources</text>
+  <text class="t-node" x="421" y="192">e5 编码器</text>
+  <text class="t-sub"  x="421" y="209">检索 · 全部来源</text>
   <rect class="node" x="330" y="232" width="182" height="48" rx="10"/>
   <text class="t-node" x="421" y="252">bge-small-zh</text>
-  <text class="t-sub"  x="421" y="269">Chinese gate · about_zh only</text>
+  <text class="t-sub"  x="421" y="269">中文相关性门控 · 仅 about_zh</text>
 
   <rect class="node" x="592" y="112" width="214" height="48" rx="10"/>
-  <text class="t-node" x="699" y="132">Gate vectors · English</text>
+  <text class="t-node" x="699" y="132">门控向量 · 英文</text>
   <text class="t-sub"  x="699" y="149">MiniLM</text>
   <rect class="node" x="592" y="172" width="214" height="48" rx="10"/>
   <text class="t-node" x="699" y="192">chunks_e5.json</text>
-  <text class="t-sub"  x="699" y="209">Retrieval corpus · e5</text>
+  <text class="t-sub"  x="699" y="209">检索语料 · e5</text>
   <rect class="node" x="592" y="232" width="214" height="48" rx="10"/>
-  <text class="t-node" x="699" y="252">Gate vectors · Chinese</text>
+  <text class="t-node" x="699" y="252">门控向量 · 中文</text>
   <text class="t-sub"  x="699" y="269">bge-zh</text>
 
   <rect class="node" x="842" y="120" width="222" height="148" rx="12"/>
-  <text class="t-nodeL" x="862" y="148">Static assets</text>
-  <text class="t-subL"  x="862" y="170">Served to the browser:</text>
-  <text class="t-subL"  x="862" y="188">meta.json, MiniLM gate,</text>
-  <text class="t-subL"  x="862" y="206">offline corpus</text>
-  <text class="t-subL"  x="862" y="224">Bundled in function:</text>
-  <text class="t-subL"  x="862" y="242">chunks_e5.json + both gates</text>
+  <text class="t-nodeL" x="862" y="148">静态资源</text>
+  <text class="t-subL"  x="862" y="170">提供给浏览器：</text>
+  <text class="t-subL"  x="862" y="188">meta.json、MiniLM 门控、</text>
+  <text class="t-subL"  x="862" y="206">离线语料</text>
+  <text class="t-subL"  x="862" y="224">随函数打包：</text>
+  <text class="t-subL"  x="862" y="242">chunks_e5.json + 两种门控</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M250,136 C296,136 296,190 328,190"/>
   <path class="flow" marker-end="url(#arrow)" d="M250,190 C296,190 296,140 328,140"/>
@@ -111,55 +111,55 @@
   <path class="flow" marker-end="url(#arrow)" d="M806,256 C824,256 824,238 840,238"/>
 
   <path class="flow-dash" marker-end="url(#arrow)" d="M950,268 C950,306 640,300 474,332"/>
-  <text class="t-edge" x="690" y="300">served to the browser</text>
+  <text class="t-edge" x="690" y="300">提供给浏览器</text>
 
   <!-- ===================== RUNTIME ===================== -->
-  <text class="t-band" x="34" y="320">RUNTIME · per turn</text>
+  <text class="t-band" x="34" y="320">运行时 · 每一轮</text>
 
   <rect class="col-client" x="30" y="332" width="486" height="472" rx="16"/>
-  <text class="t-lbl lbl-client" x="50" y="356">BROWSER · CLIENT WIDGET</text>
+  <text class="t-lbl lbl-client" x="50" y="356">浏览器 · 客户端组件</text>
   <rect class="col-server" x="634" y="332" width="456" height="472" rx="16"/>
-  <text class="t-lbl lbl-server" x="654" y="356">SERVERLESS FUNCTION</text>
+  <text class="t-lbl lbl-server" x="654" y="356">无服务器函数</text>
 
   <rect class="node-client" x="52" y="378" width="442" height="44" rx="10"/>
-  <text class="t-node" x="273" y="405">User query</text>
+  <text class="t-node" x="273" y="405">用户查询</text>
 
   <rect class="node-client" x="52" y="472" width="442" height="44" rx="10"/>
-  <text class="t-node" x="273" y="499">Gate result returned</text>
+  <text class="t-node" x="273" y="499">返回门控结果</text>
 
-  <text class="t-sub" x="273" y="608">Browser waits for the /chat response</text>
+  <text class="t-sub" x="273" y="608">浏览器等待 /chat 响应</text>
 
   <rect class="node-client" x="52" y="728" width="442" height="48" rx="10"/>
-  <text class="t-node" x="273" y="757">Render answer and source cards</text>
+  <text class="t-node" x="273" y="757">渲染回答与来源卡片</text>
 
   <rect class="node-server" x="656" y="378" width="412" height="76" rx="10"/>
   <text class="t-nodeL" x="676" y="402">/embed</text>
-  <text class="t-subL"  x="676" y="422">Run relevance gate — MiniLM (EN) / bge-small-zh (ZH)</text>
-  <text class="t-subL"  x="676" y="440">on the name-normalized query</text>
+  <text class="t-subL"  x="676" y="422">执行相关性门控——英文用 MiniLM，中文用 bge-small-zh</text>
+  <text class="t-subL"  x="676" y="440">处理姓名归一化后的查询</text>
 
   <rect class="node-stop" x="656" y="476" width="256" height="42" rx="10"/>
-  <text class="t-nodeL txt-stop" x="676" y="502">Off-topic → stop after one call</text>
+  <text class="t-nodeL txt-stop" x="676" y="502">跑题 → 一次调用后终止</text>
 
   <rect class="node-server" x="656" y="548" width="412" height="66" rx="10"/>
-  <text class="t-nodeL" x="676" y="576">Embed query with e5 · cosine similarity</text>
-  <text class="t-subL"  x="676" y="596">chunks_e5.json → top-k above the score threshold</text>
+  <text class="t-nodeL" x="676" y="576">使用 e5 嵌入查询 · 计算余弦相似度</text>
+  <text class="t-subL"  x="676" y="596">chunks_e5.json → 选取高于分数阈值的 top-k</text>
 
   <rect class="node-server" x="656" y="636" width="412" height="58" rx="10"/>
-  <text class="t-nodeL" x="676" y="660">/chat · call the LLM</text>
-  <text class="t-subL"  x="676" y="680">Top-k passages added to the role prompt</text>
+  <text class="t-nodeL" x="676" y="660">/chat · 调用大模型</text>
+  <text class="t-subL"  x="676" y="680">将 top-k 段落加入角色提示词</text>
 
   <rect class="node-ext" x="760" y="716" width="308" height="48" rx="10"/>
-  <text class="t-node txt-ext" x="914" y="745">LLM · cloud API</text>
+  <text class="t-node txt-ext" x="914" y="745">大模型 · 云端 API</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M494,400 H654"/>
   <circle class="badge" cx="574" cy="386" r="11"/><text class="t-num" x="574" y="390">1</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M654,430 C560,430 588,494 496,494"/>
   <circle class="badge" cx="574" cy="450" r="11"/><text class="t-num" x="574" y="454">2</text>
-  <text class="t-edge" x="600" y="444">gate passed</text>
+  <text class="t-edge" x="600" y="444">门控通过</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M760,454 V474"/>
-  <text class="t-edge" x="768" y="470">blocked</text>
+  <text class="t-edge" x="768" y="470">已拦截</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M494,494 C580,494 580,575 654,575"/>
   <circle class="badge" cx="574" cy="534" r="11"/><text class="t-num" x="574" y="538">3</text>
@@ -172,33 +172,34 @@
 
   <path class="flow" marker-end="url(#arrow)" d="M760,740 C600,740 640,752 496,752"/>
   <circle class="badge" cx="574" cy="747" r="11"/><text class="t-num" x="574" y="751">6</text>
-  <text class="t-edge" x="600" y="729">answer</text>
+  <text class="t-edge" x="600" y="729">回答</text>
 
   <!-- ===================== OFFLINE FALLBACK ===================== -->
-  <text class="t-band" x="34" y="838">OFFLINE FALLBACK · serverless function unavailable</text>
+  <text class="t-band" x="34" y="838">离线回退 · 无服务器函数不可用</text>
   <rect class="band" x="30" y="850" width="1060" height="92" rx="16"/>
 
   <rect class="node" x="50" y="872" width="150" height="48" rx="10"/>
-  <text class="t-node" x="125" y="901">Function unavailable</text>
+  <text class="t-node" x="125" y="901">函数不可用</text>
 
   <rect class="node-client" x="228" y="872" width="220" height="48" rx="10"/>
-  <text class="t-node" x="338" y="894">Consent prompt</text>
-  <text class="t-sub"  x="338" y="911">Allow a ~23 MB MiniLM download?</text>
+  <text class="t-node" x="338" y="894">征求下载同意</text>
+  <text class="t-sub"  x="338" y="911">是否允许下载约 23 MB 的 MiniLM？</text>
 
   <rect class="node" x="476" y="872" width="196" height="48" rx="10"/>
-  <text class="t-node" x="574" y="894">In-browser MiniLM</text>
-  <text class="t-sub"  x="574" y="911">Embeds the query locally</text>
+  <text class="t-node" x="574" y="894">浏览器内 MiniLM</text>
+  <text class="t-sub"  x="574" y="911">在本地嵌入查询</text>
 
   <rect class="node" x="700" y="872" width="196" height="48" rx="10"/>
-  <text class="t-node" x="798" y="894">Local retrieval</text>
-  <text class="t-sub"  x="798" y="911">Runs over chunks_en_minilm.json</text>
+  <text class="t-node" x="798" y="894">本地检索</text>
+  <text class="t-sub"  x="798" y="911">基于 chunks_en_minilm.json 运行</text>
 
   <rect class="node" x="924" y="872" width="146" height="48" rx="10"/>
-  <text class="t-node" x="997" y="894">Local answer or</text>
-  <text class="t-node" x="997" y="911">suggested links</text>
+  <text class="t-node" x="997" y="894">本地回答或</text>
+  <text class="t-node" x="997" y="911">推荐链接</text>
 
   <path class="flow" marker-end="url(#arrow)" d="M200,896 H226"/>
   <path class="flow" marker-end="url(#arrow)" d="M448,896 H474"/>
   <path class="flow" marker-end="url(#arrow)" d="M672,896 H698"/>
   <path class="flow" marker-end="url(#arrow)" d="M896,896 H922"/>
 </svg>
+

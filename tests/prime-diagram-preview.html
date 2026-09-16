@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { margin: 24px; font-family: Arial, sans-serif; background: #f7f7f7; }
+    .diagram-card { margin: 0 0 24px; padding: 16px; background: #fff; }
+    svg { display: block; width: 100%; height: auto; }
+  </style>
+  <script src="../scripts/i18n.js"></script>
+</head>
+<body>
+  <main id="preview"></main>
+  <script>
+    fetch('../pages/prime-engine.html')
+      .then(function (response) { return response.text(); })
+      .then(function (html) {
+        var source = new DOMParser().parseFromString(html, 'text/html');
+        var cards = source.querySelectorAll('.diagram-card');
+        var preview = document.getElementById('preview');
+        for (var i = 0; i < cards.length; i++) {
+          preview.appendChild(document.importNode(cards[i], true));
+        }
+        var lang = new URLSearchParams(location.search).get('lang') || 'en';
+        window.YCI18N.set(lang);
+      });
+  </script>
+</body>
+</html>

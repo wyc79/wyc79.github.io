@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" width="1120" height="640" role="img" aria-labelledby="ttl desc" xml:lang="zh-Hans">
+  <title id="ttl">AI 塔罗投射：API 密钥的传输路径</title>
+  <desc id="desc">API 密钥在浏览器的设置面板中输入，并只保留在当前标签页的内存里；只有用户勾选“在本设备上记住”，它才会写入设备。密钥通过 Authorization 请求头传给中继，每份密钥只对应一次请求。请求可以由两个中继中的任意一个处理：用于自托管、约 300 行且仅依赖 Python 标准库的 server/relay.py，或用于托管路径、约 140 行的 Cloudflare Worker。两者都实现 RELAY.md 中的同一份契约，前端无法判断由哪一个应答。密钥在中继内只用于携带它的那一次请求，随后即被丢弃：不写入会话映射、全局变量、文件或数据库；不进入日志；同时按请求头名称和密钥值脱敏，因此即使上游错误信息包含密钥，也会在产生任何输出前被清除；错误响应也绝不会回显密钥。中继不保存会话状态，也不了解塔罗业务。它使用服务商自己的认证请求头把调用转发给模型服务商，回答再流式返回浏览器；对话记录只保存在用户自己的 localStorage 中，不进入任何服务器。一套包含 20 个用例的契约测试会同时验证两个中继，确保它们在每条分支上行为一致，并确认测试密钥不会出现在任何捕获到的输出中，包括所有错误路径；另一项测试还会扫描 Worker 源码，确保其中完全没有日志代码。</desc>
+  <style>
+    text{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;fill:#131313;}
+    .bg{fill:#ffffff;}
+    .t-title{font-size:17px;font-weight:700;}
+    .t-band{font-size:12.5px;font-weight:700;letter-spacing:.05em;fill:#5f6368;}
+    .t-node{font-size:13px;font-weight:600;}
+    .t-sub{font-size:11px;fill:#5f6368;}
+    .t-edge{font-size:10.5px;fill:#5f6368;font-weight:600;text-anchor:middle;}
+    .t-rule{font-size:11.5px;}
+    .t-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;}
+    .lbl-client{fill:#0b57d0;} .lbl-server{fill:#0d9488;} .lbl-ext{fill:#b45309;}
+    .band{fill:#f4f5f7;stroke:#dfe1e5;stroke-width:1.2;}
+    .col-client{fill:rgba(11,87,208,.07);stroke:#0b57d0;stroke-width:1.4;}
+    .col-server{fill:rgba(13,148,136,.07);stroke:#0d9488;stroke-width:1.4;}
+    .col-ext{fill:rgba(180,83,9,.07);stroke:#b45309;stroke-width:1.4;}
+    .node{fill:#ffffff;stroke:#dfe1e5;stroke-width:1.3;}
+    .node-client{fill:#ffffff;stroke:#0b57d0;stroke-width:1.5;}
+    .node-server{fill:#ffffff;stroke:#0d9488;stroke-width:1.5;}
+    .node-ext{fill:#ffffff;stroke:#b45309;stroke-width:1.5;}
+    .group{fill:none;stroke:#0d9488;stroke-width:1.3;stroke-dasharray:6 4;}
+    .flow{stroke:#9aa0a6;stroke-width:2;fill:none;}
+    .arrowhead{fill:#9aa0a6;}
+    .gone{fill:#c0392b;font-weight:700;}
+    @media (prefers-color-scheme: dark){
+      text{fill:#e9e9ea;}
+      .bg{fill:#0c0c0c;}
+      .t-band,.t-sub,.t-edge{fill:#9aa0a6;}
+      .lbl-client{fill:#8ab4f8;} .lbl-server{fill:#5eead4;} .lbl-ext{fill:#fbbf24;}
+      .band{fill:#161616;stroke:#2c2c2c;}
+      .col-client{fill:rgba(138,180,248,.10);stroke:#8ab4f8;}
+      .col-server{fill:rgba(94,234,212,.10);stroke:#5eead4;}
+      .col-ext{fill:rgba(251,191,36,.10);stroke:#fbbf24;}
+      .node{fill:#1b1b1b;stroke:#2c2c2c;}
+      .node-client{fill:#1b1b1b;stroke:#8ab4f8;}
+      .node-server{fill:#1b1b1b;stroke:#5eead4;}
+      .node-ext{fill:#1b1b1b;stroke:#fbbf24;}
+      .group{stroke:#5eead4;}
+      .flow{stroke:#6b7075;}
+      .arrowhead{fill:#6b7075;}
+      .gone{fill:#f87171;}
+    }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="1120" height="640"/>
+  <text class="t-title" x="40" y="34">密钥会去哪里，又会止于何处</text>
+
+  <!-- browser column -->
+  <rect class="col-client" x="40" y="60" width="250" height="360" rx="10"/>
+  <text class="t-band lbl-client" x="56" y="84">你的浏览器</text>
+
+  <rect class="node-client" x="58" y="100" width="214" height="82" rx="8"/>
+  <text class="t-node" x="74" y="126">解读界面</text>
+  <text class="t-sub" x="74" y="146">引擎、界面与对话记录</text>
+  <text class="t-sub" x="74" y="164">均以静态文件提供</text>
+
+  <rect class="node-client" x="58" y="198" width="214" height="112" rx="8"/>
+  <text class="t-node" x="74" y="224">你的 API 密钥</text>
+  <text class="t-sub" x="74" y="244">在“设置”中输入，仅保留在</text>
+  <text class="t-sub" x="74" y="262">当前标签页的内存中；只有</text>
+  <text class="t-sub" x="74" y="280">勾选以下选项才会写入设备：</text>
+  <text class="t-sub" x="74" y="298">“在本设备上记住”</text>
+
+  <rect class="node-client" x="58" y="326" width="214" height="76" rx="8"/>
+  <text class="t-node" x="74" y="352">历史解读</text>
+  <text class="t-sub" x="74" y="372">保存在本设备的 localStorage</text>
+  <text class="t-sub" x="74" y="390">任何中继都不持有这些记录</text>
+
+  <!-- browser to relay -->
+  <path class="flow" d="M290 232 H 356"/>
+  <polygon class="arrowhead" points="368,232 354,226 354,238"/>
+  <text class="t-edge t-mono" x="330" y="216" font-size="9.5">Authorization</text>
+  <text class="t-edge" x="330" y="256">一份密钥</text>
+  <text class="t-edge" x="330" y="270">对应一次请求</text>
+
+  <!-- relay column -->
+  <rect class="col-server" x="376" y="60" width="368" height="360" rx="10"/>
+  <text class="t-band lbl-server" x="392" y="84">任一中继 · 同一份契约 (RELAY.md)</text>
+
+  <rect class="group" x="392" y="96" width="336" height="176" rx="9"/>
+
+  <rect class="node-server" x="408" y="110" width="304" height="70" rx="8"/>
+  <text class="t-node t-mono" x="424" y="134">server/relay.py</text>
+  <text class="t-sub" x="424" y="154">约 300 行 · 仅使用标准库</text>
+  <text class="t-sub" x="424" y="172">用于自托管</text>
+
+  <rect class="node-server" x="408" y="188" width="304" height="70" rx="8"/>
+  <text class="t-node" x="424" y="212">Cloudflare Worker</text>
+  <text class="t-sub" x="424" y="232">约 140 行 · 托管服务 · 无日志路径</text>
+  <text class="t-sub" x="424" y="250">连禁用状态的日志代码也没有</text>
+
+  <text class="t-sub" x="392" y="292">前端无法判断由哪个中继应答；这是一条设计规则。</text>
+
+  <text class="t-rule" x="392" y="320">在任一中继内，密钥都会：</text>
+  <text class="t-rule" x="404" y="342">· 仅用于一次请求，随后<tspan class="gone">彻底丢弃</tspan></text>
+  <text class="t-rule" x="404" y="362">· 不存入会话映射、全局变量、文件或数据库</text>
+  <text class="t-rule" x="404" y="382">· 不进入日志；同时按请求头名称<tspan font-style="italic">和</tspan>密钥值脱敏</text>
+  <text class="t-rule" x="404" y="402">· 不在错误响应中回显</text>
+
+  <!-- relay to provider -->
+  <path class="flow" d="M744 232 H 810"/>
+  <polygon class="arrowhead" points="822,232 808,226 808,238"/>
+  <text class="t-edge" x="784" y="216" font-size="9.5">服务商自己的</text>
+  <text class="t-edge" x="784" y="230" font-size="9.5">认证请求头</text>
+  <text class="t-edge" x="784" y="262" font-size="9.5">仅转发一次</text>
+
+  <!-- provider column -->
+  <rect class="col-ext" x="830" y="60" width="250" height="360" rx="10"/>
+  <text class="t-band lbl-ext" x="846" y="84">模型服务商</text>
+
+  <rect class="node-ext" x="848" y="176" width="214" height="112" rx="8"/>
+  <text class="t-node" x="864" y="202">你的账户</text>
+  <text class="t-sub" x="864" y="222">你选择的服务商</text>
+  <text class="t-sub" x="864" y="240">使用你自己的密钥</text>
+  <text class="t-sub" x="864" y="262">将回答流式返回</text>
+  <text class="t-sub" x="864" y="280">经由中继但不存储</text>
+
+  <!-- test band -->
+  <rect class="band" x="40" y="450" width="1040" height="160" rx="10"/>
+  <text class="t-band" x="60" y="478">经过验证，而非仅凭声称</text>
+  <text class="t-rule" x="60" y="506">一套包含 20 个用例的契约测试会同时验证<tspan font-weight="700">两个</tspan>中继。它们必须在每条分支上保持一致，包括相同的健康检查响应；</text>
+  <text class="t-rule" x="60" y="528">响应不会透露具体实现，错误、转发载荷与数据流也必须一致。</text>
+  <text class="t-rule" x="60" y="578">测试密钥会走遍所有路径，包括错误分支，且不得出现在任何捕获到的输出中。另一项测试</text>
+  <text class="t-rule" x="60" y="600">会扫描 Worker 源码，确保其中始终没有日志代码。</text>
+</svg>
+
