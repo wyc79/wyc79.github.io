@@ -6,6 +6,9 @@
   //              area stays axis-aligned.
   //   shift    - fixed translateY (px) on the visual layer so tabs can overlap
   //              visually without overlapping hitboxes.
+  //   labelZh  - Chinese title, taken from the target page's own page-title
+  //              meta. Items without one (GITHUB) keep their English label in
+  //              both languages.
   //   wedge    - polygon variant params so no two rows share the same silhouette:
   //              baseTop/baseBot set the left base height,
   //              leanBot pushes the bottom-left corner inward (angled left edge),
@@ -13,23 +16,30 @@
   //              backOffX is NEGATIVE so the pink back layer peeks to the LEFT,
   //              backOffY sets its vertical drop.
   var ITEMS = [
-    { id: 'projects',     label: 'PROJECTS',     href: 'pages/projects.html',     fontSize: 96, offsetX: 0,  offsetY: 0, tilt: -3.0, shift:  0,
+    { id: 'projects',     label: 'PROJECTS', labelZh: '项目', href: 'pages/projects.html',     fontSize: 96, offsetX: 0,  offsetY: 0, tilt: -3.0, shift:  0,
       wedge: { baseTop: -0.04, baseBot: 1.00, leanBot: 0.18, tipY: 0.48, tipScale: 1.45, backOffX: -0.045, backOffY: 0.09 } },
-    { id: 'skills',       label: 'SKILLS',       href: 'pages/skills.html',       fontSize: 88, offsetX: 44, offsetY: 0, tilt:  4.0, shift: -4,
+    { id: 'skills',       label: 'SKILLS', labelZh: '技能', href: 'pages/skills.html',       fontSize: 88, offsetX: 44, offsetY: 0, tilt:  4.0, shift: -4,
       wedge: { baseTop: -0.02, baseBot: 0.95, leanBot: 0.22, tipY: 0.40, tipScale: 1.60, backOffX: -0.055, backOffY: 0.07 } },
-    { id: 'education',    label: 'EDUCATION',    href: 'pages/education.html',    fontSize: 76, offsetX: 22, offsetY: 0, tilt: -2.0, shift:  2,
+    { id: 'education',    label: 'EDUCATION', labelZh: '教育背景', href: 'pages/education.html',    fontSize: 76, offsetX: 22, offsetY: 0, tilt: -2.0, shift:  2,
       wedge: { baseTop: -0.06, baseBot: 1.05, leanBot: 0.15, tipY: 0.55, tipScale: 1.30, backOffX: -0.035, backOffY: 0.12 } },
-    { id: 'publications', label: 'PUBLICATIONS', href: 'pages/publications.html', fontSize: 62, offsetX: 60, offsetY: 0, tilt:  5.0, shift: -4,
+    { id: 'publications', label: 'PUBLICATIONS', labelZh: '论文', href: 'pages/publications.html', fontSize: 62, offsetX: 60, offsetY: 0, tilt:  5.0, shift: -4,
       wedge: { baseTop:  0.00, baseBot: 0.98, leanBot: 0.25, tipY: 0.42, tipScale: 1.55, backOffX: -0.050, backOffY: 0.08 } },
-    { id: 'agents',       label: 'AGENTS',       href: 'pages/agents.html',       fontSize: 58, offsetX: 40, offsetY: 0, tilt: -3.5, shift:  1,
+    { id: 'agents',       label: 'AGENTS', labelZh: '智能体', href: 'pages/agents.html',       fontSize: 58, offsetX: 40, offsetY: 0, tilt: -3.5, shift:  1,
       wedge: { baseTop: -0.03, baseBot: 1.00, leanBot: 0.18, tipY: 0.46, tipScale: 1.40, backOffX: -0.040, backOffY: 0.11 } },
-    { id: 'toolbox',      label: 'TOOLBOX',      href: 'pages/toolbox.html',      fontSize: 56, offsetX: 28, offsetY: 0, tilt: -4.0, shift:  3,
+    { id: 'toolbox',      label: 'TOOLBOX', labelZh: '工具箱', href: 'pages/toolbox.html',      fontSize: 56, offsetX: 28, offsetY: 0, tilt: -4.0, shift:  3,
       wedge: { baseTop: -0.05, baseBot: 1.04, leanBot: 0.20, tipY: 0.38, tipScale: 1.35, backOffX: -0.045, backOffY: 0.13 } },
     { id: 'github',       label: 'GITHUB',       href: 'https://github.com/wyc79', fontSize: 50, offsetX: 12, offsetY: 0, tilt:  3.0, shift: -2, external: true,
       wedge: { baseTop: -0.02, baseBot: 0.97, leanBot: 0.16, tipY: 0.52, tipScale: 1.50, backOffX: -0.035, backOffY: 0.10 } }
   ];
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // Label for the active site language. i18n.js owns the language choice;
+  // if it is not loaded, fall back to English.
+  function labelFor(item) {
+    var lang = (window.YCI18N && window.YCI18N.current) ? window.YCI18N.current() : 'en';
+    return (lang === 'zh' && item.labelZh) ? item.labelZh : item.label;
+  }
 
   // Build the highlighted-item SVG composition for one row:
   //   [shadow text][top red wedge][bottom pink wedge][dark base text][bright text, clipped to top wedge]
@@ -38,7 +48,7 @@
   // base fill while the covered portion shows the bright fill - no blend modes.
   function buildHeroSvg(entry) {
     var fs    = entry.item.fontSize;
-    var label = entry.item.label;
+    var label = labelFor(entry.item);
     var w     = entry.item.wedge;
 
     // Use the live label box so the wedge length actually matches the font
@@ -187,7 +197,7 @@
       var label = document.createElement('span');
       label.className = 'p3-label';
       label.style.fontSize = item.fontSize + 'px';
-      label.textContent = item.label;
+      label.textContent = labelFor(item);
 
       // SVG composition wrapper. Filled by buildHeroSvg once the label has
       // been measured (after fonts load).
@@ -214,6 +224,16 @@
         buildHeroSvg(entry);
       });
     }
+
+    // i18n.js dispatches this on toggle. The wedge geometry is measured from
+    // the rendered label, and the Chinese labels are a different width, so
+    // the heroes are rebuilt rather than just re-texted.
+    window.addEventListener('yc-langchange', function () {
+      rows.forEach(function (entry) {
+        entry.label.textContent = labelFor(entry.item);
+      });
+      buildAllHeroes();
+    });
 
     function updateStyles() {
       rows.forEach(function (entry, i) {

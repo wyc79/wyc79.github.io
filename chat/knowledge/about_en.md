@@ -133,8 +133,9 @@ the same third-person action game.
 link: pages/projects.html
 The projects page is split into a games section (Cemented Dreams, Nothing
 Can Go Wrong, Code Breaker, Gyrotris) and an "other related works" section
-covering the chat agent, Prime Engine, physical game prototypes, the 3D
-rendering project, Aegis Sword, and the automatic differentiation toolbox.
+covering AI Tarot Projection, the chat agent, Prime Engine, physical game
+prototypes, the 3D rendering project, Aegis Sword, and the automatic
+differentiation toolbox.
 
 ## Shipped games versus supporting engineering work
 link: pages/projects.html
@@ -387,3 +388,39 @@ at the University of Rochester.
 link: pages/gyrotris.html
 Gyrotris, the puzzle game he built solo, is published and playable on
 itch.io.
+
+## An LLM-guided reflection app he built solo
+link: pages/ai-tarot-projection.html
+AI Tarot Projection is a browser app he designed and built alone in
+Aug-Sep 2026: three tarot cards go face down, the visitor says what they see
+in each one, and an LLM reader hands their own words back in a new order.
+It is a reflection tool, not fortune-telling, and it is live at
+wyc79.github.io/ai-tarot-projection with the source on GitHub.
+
+## Bring-your-own-key privacy as an architectural property
+link: pages/ai-tarot-projection.html
+The tarot app runs entirely in the browser on an API key the user
+supplies: no account, no server-side state, and the key travels in one
+request header, is used for that single request, and is then gone.
+
+## Two interchangeable relays behind the tarot app
+link: pages/ai-tarot-projection.html
+Behind the tarot app are two interchangeable relays, a roughly 300-line
+dependency-free Python server and a roughly 140-line Cloudflare Worker,
+written against a single shared contract so the frontend cannot tell
+which relay is answering.
+
+## Schema-constrained LLM judgements and a question ladder
+link: pages/ai-tarot-projection.html
+In the tarot app an LLM makes three schema-constrained judgements per
+session (the opening, a per-turn flip gate, and a narrative anchor), and
+questions may climb only one rung above the previous answer so a reading
+never becomes an interview.
+
+## Swappable symbol packs on a generic reflection engine
+link: pages/ai-tarot-projection.html
+Tarot is one data-only symbol pack on top of the app's generic reflection
+engine: the deck, per-position meanings, persona, and few-shot examples
+are static files with a schema validator, so changing how the reader
+sounds is a file save rather than a redeploy, and a fork can drop in its
+own deck.

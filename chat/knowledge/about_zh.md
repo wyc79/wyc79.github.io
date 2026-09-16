@@ -238,3 +238,27 @@ link: pages/projects.html
 ## 时间不多该重点看哪些方向
 link: pages/projects.html
 如果时间有限，王元辰的作品跨度可以从三个方向感受：战斗设计与工程并重的 Cemented Dreams、完全独立完成的解谜游戏 Gyrotris，以及体现建模精度的 Aegis Sword 道具复刻。
+
+## AI 塔罗投射是什么
+link: pages/ai-tarot-projection.html
+AI 塔罗投射是王元辰在 2026 年 8 到 9 月独立完成的浏览器应用：三张塔罗牌先扣在桌上，使用者说出自己在牌面上看见了什么，由大模型扮演的读牌人再把这些话按新的顺序讲回去。它是反思工具，不是算命。
+
+## 塔罗应用在哪能试玩
+link: pages/ai-tarot-projection.html
+王元辰的 AI 塔罗投射已经上线在 wyc79.github.io/ai-tarot-projection，可以直接打开使用，源码也放在 GitHub 上；用户需要自带一个大模型 API 密钥，不用注册账号。
+
+## 塔罗应用的隐私和架构
+link: pages/ai-tarot-projection.html
+王元辰把塔罗应用的隐私做成了架构性质：整个应用只跑在浏览器里，服务端不留任何状态，用户的 API 密钥只随一个请求头发出、用在那一次请求上，然后就没了。
+
+## 塔罗应用的两个中继
+link: pages/ai-tarot-projection.html
+AI 塔罗投射的后端是两个可以互换的中继，王元辰按同一份契约写了它们：一个约 300 行、零依赖的 Python 服务，一个约 140 行的 Cloudflare Worker，由同一套测试逐条验证，前端分辨不出是谁在应答。
+
+## 塔罗应用的提示词与协议设计
+link: pages/ai-tarot-projection.html
+AI 塔罗投射里，大模型每局做三类受 schema 约束的判断：开场、每轮是否翻牌、以及叙事锚点；提问深度最多比上一个回答高一级，避免解读变成审问；王元辰还写了一个协议扫描器，按读牌人自己的规矩检查完整对话记录。
+
+## 塔罗应用的符号包可以替换
+link: pages/ai-tarot-projection.html
+王元辰把塔罗做成了通用反思引擎上的一个符号包：牌组、牌位释义、人设和少样本示例都是带 schema 校验的静态数据文件，改一改读牌人的口吻只要存一次文件，fork 之后也能换上自己的牌。

@@ -574,6 +574,18 @@ details > summary::-webkit-details-marker { display: none; }
   background: rgba(0,0,0,0.25);
 }
 
+/* Chinese menu titles: Bebas Neue has no CJK glyphs, so they fall through to
+   the system sans face; bold + wider tracking keeps them as heavy as the
+   Latin display face beside them. */
+html[lang="zh"] .p3-label,
+html[lang="zh"] .p3-hero-text {
+  font-weight: 700;
+  letter-spacing: 6px;
+}
+/* CJK glyphs fill the whole em where Bebas caps stop at ~0.7em, so the
+   0.85 line-height that lets Latin rows nest makes Chinese rows collide. */
+html[lang="zh"] .p3-label { line-height: 1.02; }
+
 /* Responsive scaling - label font-size set inline via JS is treated as px base;
    we scale it down on narrow viewports using transform-origin on the menu. */
 @media (max-width: 760px) {
