@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-en="Agents - Yuanchen Wang" data-zh="智能体 - Yuanchen Wang">Agents - Yuanchen Wang</title>
-  <meta name="description" content="Agent skills for Claude and Cursor by Yuanchen Wang." data-zh="面向 Claude / Cursor 的 Agent 技能合集，从 GitHub 安装后即可在对话中调用：oa-practice 把笔试机考题变成带 Run / Submit 评分的本地练习场，code-winnow 在提交前从 diff 里剔除 AI 生成的冗余代码，cheatsheet-creator 从课件、作业与往年试题生成考试小抄。" />
+  <title data-en="Agents - Yuanchen Wang" data-zh="智能体 - 王元辰">Agents - Yuanchen Wang</title>
+  <meta name="description" content="Agent skills by Yuanchen Wang for coding practice, code cleanup, research visualization, study materials, calendar creation, and task delegation." data-zh="王元辰开发的 Agent 技能合集，涵盖编程测评练习、代码清理、研究数据可视化、复习资料整理、日历生成和任务分发。" />
   <meta name="page-title" content="Agents" data-zh="智能体" />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
@@ -34,8 +34,8 @@
       <section id="agents">
         <h2><span data-lang="en">Agents</span><span data-lang="zh">智能体</span></h2>
         <p class="meta">
-          <span data-lang="en">Agent skills for Claude / Cursor — install from GitHub, then ask the agent to use them. Click a name to open the repo; expand a row for install and details.</span>
-          <span data-lang="zh">面向 Claude / Cursor 的 Agent 技能：从 GitHub 安装后即可在对话中调用。点击名称打开仓库；展开行查看安装命令与说明。</span>
+          <span data-lang="en">Agent skills for Claude and Cursor. Install one from GitHub, then ask your agent to use it. Click a skill name to open its repository, or expand the row for installation instructions and details.</span>
+          <span data-lang="zh">适用于 Claude 和 Cursor 的 Agent 技能。从 GitHub 安装后，即可在对话中让 Agent 调用。点击技能名称可打开仓库，展开条目可查看安装命令和详细说明。</span>
         </p>
 
         <div class="agent-list">
@@ -44,19 +44,19 @@
               <a class="agent-name" href="https://github.com/wyc79/oa-practice-skill" target="_blank" rel="noopener">oa-practice</a>
               <span class="agent-pitch">
                 <span data-lang="en">Turn a coding-assessment problem into a local OA workspace with Run / Submit scoring.</span>
-                <span data-lang="zh">把笔试/机考题变成带 Run / Submit 评分的本地 OA 练习场。</span>
+                <span data-lang="zh">把笔试或机考题变成支持 Run／Submit 评分的本地 OA 练习环境。</span>
               </span>
             </summary>
             <div class="agent-body">
               <p class="agent-highlights">
-                <span class="pill"><span data-lang="en">Harness-oriented</span><span data-lang="zh">评测 harness 导向</span></span>
+                <span class="pill"><span data-lang="en">Harness-oriented</span><span data-lang="zh">围绕评测框架</span></span>
                 <span class="pill"><span data-lang="en">Hidden judge</span><span data-lang="zh">隐藏判题器</span></span>
                 <span class="pill"><span data-lang="en">Complexity profiling</span><span data-lang="zh">复杂度剖析</span></span>
                 <span class="pill"><span data-lang="en">Score-gated practice</span><span data-lang="zh">按分练习</span></span>
               </p>
               <p>
                 <span data-lang="en">Paste a problem statement; the skill scaffolds a workspace with samples wired to a runner and a hidden judge over generated tests. It leaves <code>solve()</code> as a TODO unless you ask otherwise. Use when you want OA practice with a real score, not a solved algorithm handed to you.</span>
-                <span data-lang="zh">粘贴题面后，技能会搭好带样例运行与隐藏评测的工作区，默认不写算法（<code>solve()</code> 留 TODO）。适合想练 OA、看真实分数，而不是直接拿答案的场景。</span>
+                <span data-lang="zh">粘贴题面后，技能会搭好包含样例运行器和隐藏评测的工作区，默认把 <code>solve()</code> 留作 TODO，不直接替你写算法。适合想自己练习 OA、获得真实评分的场景。</span>
               </p>
               <div class="agent-install">
                 <code data-install>npx skills add wyc79/oa-practice-skill</code>
@@ -84,7 +84,7 @@
               </p>
               <p>
                 <span data-lang="en">Reviews only lines the current change added or modified — restated comments, unused bindings, mock-only tests, speculative abstraction, docs the change made false. Not a general code review or security audit. Say “winnow this” before opening a PR on agent-written code.</span>
-                <span data-lang="zh">只审当前改动触及的行：重复注释、无用绑定、只测 mock 的测试、过度抽象、被改动证伪的文档。不是通用 code review 或安全审计。在 agent 写的代码开 PR 前说 “winnow this” 即可。</span>
+                <span data-lang="zh">只检查当前改动触及的行，找出重复注释、无用绑定、只验证 mock 的测试、过度抽象，以及已被改动内容推翻的文档。它不是通用代码审查或安全审计；在 Agent 生成的代码准备开 PR 前说一句 “winnow this” 即可。</span>
               </p>
               <div class="agent-install">
                 <code data-install>npx skills add wyc79/code-winnow-skill</code>
@@ -113,7 +113,7 @@
               </p>
               <p>
                 <span data-lang="en">Uploads course materials (PDF / PPTX / DOCX / notes) and produces a concise cheatsheet plus an expanded version with source refs. Tuned for math/science and CS; self-checks that mined exam problems are solvable from the sheet. Use before a final when you want formulas, caveats, and worked examples in one place.</span>
-                <span data-lang="zh">上传课件（PDF / PPTX / DOCX / 笔记），输出精简版小抄与带出处引用的展开版。面向数理与 CS；会自检往年题能否用小抄解出。适合期末前把公式、坑点与例题收成一页。</span>
+                <span data-lang="zh">上传课件、作业或笔记（PDF／PPTX／DOCX 等），即可生成精简版小抄和带出处的详细版。它针对数理与计算机课程优化，还会检查往年题能否仅凭小抄解出，适合在期末前把公式、易错点和例题整理到一起。</span>
               </p>
               <div class="agent-install">
                 <code data-install>npx skills add wyc79/cheatsheet-creator-skill</code>
@@ -134,13 +134,13 @@
             <div class="agent-body">
               <p class="agent-highlights">
                 <span class="pill"><span data-lang="en">Reproducible pipeline</span><span data-lang="zh">可复现流水线</span></span>
-                <span class="pill"><span data-lang="en">Agent-independent rerun</span><span data-lang="zh">脱离 Agent 可复跑</span></span>
+                <span class="pill"><span data-lang="en">Agent-independent rerun</span><span data-lang="zh">无需 Agent 即可复跑</span></span>
                 <span class="pill"><span data-lang="en">Stats + dashboards</span><span data-lang="zh">统计与仪表盘</span></span>
                 <span class="pill"><span data-lang="en">Domain visualizations</span><span data-lang="zh">领域可视化</span></span>
               </p>
               <p>
                 <span data-lang="en">Point an agent at a <code>data/</code> folder; it builds cleaning, plotting, and optional Streamlit dashboard scripts you can rerun without the agent. Use when you need figures and stats that stay reproducible six months later.</span>
-                <span data-lang="zh">把 agent 指向 <code>data/</code> 文件夹，它会写出清洗、绘图与可选 Streamlit 仪表盘脚本，之后无需 agent 也能复跑。适合要半年后仍可复现的图与统计结果。</span>
+                <span data-lang="zh">让 Agent 读取 <code>data/</code> 文件夹，它会生成数据清洗、绘图和可选的 Streamlit 仪表盘脚本；之后无需 Agent 也能重复运行。适合制作半年后仍可复现的图表和统计结果。</span>
               </p>
               <div class="agent-install">
                 <code data-install>npx skills add wyc79/research-viz-skill</code>
@@ -160,14 +160,14 @@
             </summary>
             <div class="agent-body">
               <p class="agent-highlights">
-                <span class="pill"><span data-lang="en">Deterministic ICS</span><span data-lang="zh">确定性 ICS</span></span>
-                <span class="pill"><span data-lang="en">RRULE + holidays</span><span data-lang="zh">RRULE + 假期排除</span></span>
+                <span class="pill"><span data-lang="en">Deterministic ICS</span><span data-lang="zh">结果稳定一致</span></span>
+                <span class="pill"><span data-lang="en">RRULE + holidays</span><span data-lang="zh">RRULE 与节假日排除</span></span>
                 <span class="pill"><span data-lang="en">Editable JSON spec</span><span data-lang="zh">可编辑 JSON 规格</span></span>
                 <span class="pill"><span data-lang="en">Multimodal extract</span><span data-lang="zh">多模态抽取</span></span>
               </p>
               <p>
                 <span data-lang="en">Feed syllabus PDFs, portal screenshots, and academic-calendar pages; get an <code>.ics</code> plus editable JSON. Recurring classes, holiday exclusions, and reminders are handled for you. Come back later with the JSON to tweak rooms or reminders without re-uploading syllabi.</span>
-                <span data-lang="zh">提供大纲 PDF、选课截图与校历页面，得到 <code>.ics</code> 与可编辑 JSON。循环上课、假期排除与提醒会自动处理。之后只需改 JSON 即可更新教室或提醒，不必重传大纲。</span>
+                <span data-lang="zh">提供课程大纲 PDF、选课截图和校历页面，即可生成 <code>.ics</code> 日历与可编辑的 JSON。重复课程、节假日停课和提醒都会自动处理；以后只需修改 JSON 就能更新教室或提醒，无需重新上传大纲。</span>
               </p>
               <div class="agent-install">
                 <code data-install>npx skills add wyc79/calendar-creator-skill</code>
@@ -182,7 +182,7 @@
               <a class="agent-name" href="https://github.com/wyc79/agent-delegation-skill" target="_blank" rel="noopener">agent-delegation</a>
               <span class="agent-pitch">
                 <span data-lang="en">Run jobs you already decomposed across multiple provider seats, each in its own worktree.</span>
-                <span data-lang="zh">把已拆分好的任务分发到多个提供方席位并行执行，每个任务一个独立 worktree。</span>
+                <span data-lang="zh">把已经拆分好的任务分发给多个模型服务席位并行执行，每项任务使用独立的 worktree。</span>
               </span>
             </summary>
             <div class="agent-body">
@@ -191,15 +191,15 @@
                 <span class="pill"><span data-lang="en">Quota-aware failover</span><span data-lang="zh">配额感知故障转移</span></span>
                 <span class="pill"><span data-lang="en">Isolated worktrees</span><span data-lang="zh">隔离 worktree</span></span>
                 <span class="pill"><span data-lang="en">Scope + cost per job</span><span data-lang="zh">按任务记录范围与开销</span></span>
-                <span class="pill"><span data-lang="en">Wrapper, not workflow</span><span data-lang="zh">只调度，不做工作流</span></span>
+                <span class="pill"><span data-lang="en">Wrapper, not workflow</span><span data-lang="zh">只负责调度</span></span>
               </p>
               <p>
                 <span data-lang="en">A CLI wrapper with no planner and no reviewer: your agent writes the jobs, <code>delegate</code> sends each to a seat that still has quota, runs it in an isolated git worktree, and moves work when one provider hits a wall. Only worth it with more than one provider enrolled — <code>delegate init</code> prints the tier-to-seat table and says so outright. Nothing reviews the result; you get the files each job touched, what the checks said, and what each seat cost.</span>
-                <span data-lang="zh">一个命令行封装：没有规划器，也没有评审器。任务由你的 agent 拆好，<code>delegate</code> 把每个任务分给仍有配额的席位，在隔离的 git worktree 中执行，某个提供方撞上配额墙时自动转移。只有接入多个提供方才值得用——<code>delegate init</code> 会打印 tier 与席位的对应表并直接给出结论。它不评审结果，只告诉你每个任务改了哪些文件、检查输出如何、各席位花了多少。</span>
+                <span data-lang="zh">这是一个不含规划器或评审器的命令行封装。任务由你的 Agent 预先拆分，<code>delegate</code> 再把每项任务分给仍有可用配额的席位，并在隔离的 Git worktree 中执行；某个服务商额度耗尽时，任务会自动转移。它只有在接入多个服务商时才有价值，<code>delegate init</code> 会列出层级与席位的对应关系并明确提示是否值得启用。工具不会评审结果，只会报告每项任务修改了哪些文件、检查结果如何，以及各席位的开销。</span>
               </p>
               <p class="meta">
                 <span data-lang="en">Two halves: clone the repo for the <code>delegate</code> CLI (Python 3.9+, stdlib only), then copy <code>agent-delegation/</code> into your agent's skills directory — the skill alone does nothing.</span>
-                <span data-lang="zh">分两部分：克隆仓库得到 <code>delegate</code> CLI（Python 3.9+，仅标准库），再把 <code>agent-delegation/</code> 复制到 agent 的 skills 目录——只装技能本身不起作用。</span>
+                <span data-lang="zh">安装分为两部分：先克隆仓库获取 <code>delegate</code> CLI（Python 3.9+，仅使用标准库），再把 <code>agent-delegation/</code> 复制到 Agent 的 skills 目录；只安装技能本身无法运行。</span>
               </p>
               <div class="agent-install">
                 <code data-install>git clone https://github.com/wyc79/agent-delegation-skill.git</code>

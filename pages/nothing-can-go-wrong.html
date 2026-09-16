@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-en="Nothing Can Go Wrong - Game Jam Project - Yuanchen Wang" data-zh="Nothing Can Go Wrong - 游戏 jam 项目 - Yuanchen Wang">Nothing Can Go Wrong - Game Jam Project - Yuanchen Wang</title>
-  <meta name="description" content="Nothing Can Go Wrong - fast-paced game jam project built in Godot." data-zh="Nothing Can Go Wrong：一款在游戏 jam 期间用 Godot 4 与 GDScript 制作的快节奏游戏。我担任主程序，负责实现核心玩法系统、玩家操控与游戏逻辑，并整合队友制作的素材，在极短的开发周期内交付了打磨完善的可玩版本。" />
+  <title data-en="Nothing Can Go Wrong - Game Jam Project - Yuanchen Wang" data-zh="Nothing Can Go Wrong - Game Jam 项目 - 王元辰">Nothing Can Go Wrong - Game Jam Project - Yuanchen Wang</title>
+  <meta name="description" content="Nothing Can Go Wrong is a Godot game jam project about indirect control: plan a route, set it in motion, and watch environmental hazards turn it into an unpredictable chain reaction. I served as the primary programmer and helped shape the game systems." data-zh="Nothing Can Go Wrong 是一款使用 Godot 制作的 Game Jam 游戏，核心玩法是间接操控：先规划路线，再启动行动，看场景机关如何把计划演变成意想不到的连锁反应。我担任主程序，并参与玩法系统设计。" />
   <meta name="page-title" content="Nothing Can Go Wrong" data-zh="Nothing Can Go Wrong" />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
@@ -58,28 +58,26 @@
 
 <p class="meta">
 <span data-lang="en">
-Nothing Can Go Wrong is a fast-paced game created during a game jam,
-where the goal was to design and ship a complete playable experience within a very short development cycle.
+Nothing Can Go Wrong is a game jam project about indirect control and planning around consequences.
+Instead of steering the character moment by moment, players plot a route, set it in motion, and watch the plan succeed or unravel as the environment reacts.
 </span><span data-lang="zh">
-Nothing Can Go Wrong 是一款在游戏 jam 期间制作的快节奏游戏，目标是在极短的开发周期内设计并交付一个完整可玩的体验。
+Nothing Can Go Wrong 是一款围绕间接操控和预判后果展开的 Game Jam 游戏。玩家并不实时控制角色，而是先规划路线、再启动行动，看计划如何在场景机关的影响下顺利完成或意外失控。
 </span>
 </p>
 
 <p class="meta">
 <span data-lang="en">
-I served as the primary programmer, responsible for implementing the core gameplay systems,
-player controls, and game logic while integrating assets created by teammates.
+I served as the primary programmer, building the route-planning tools, game-state logic, environmental interactions, and player feedback while integrating assets created by teammates.
 </span><span data-lang="zh">
-我担任主程序，负责实现核心玩法系统、玩家操控与游戏逻辑，并整合队友制作的素材。
+我担任主程序，负责路线规划工具、游戏状态逻辑、场景互动和玩家反馈，并将队友制作的素材整合进游戏。
 </span>
 </p>
 
 <p class="meta">
 <span data-lang="en">
-The project focused on rapid iteration and experimentation while maintaining a stable,
-playable build throughout the jam.
+The challenge was to keep each interaction predictable on its own while allowing trains, whirlpools, spring pads, trapdoors, and other hazards to combine into surprising chain reactions.
 </span><span data-lang="zh">
-项目专注于快速迭代与实验，同时在整个 jam 期间始终保持稳定、可玩的构建版本。
+设计难点在于让火车轨道、漩涡、弹跳板、活板门等机关各自遵循清晰规则，同时又能彼此组合，制造出出人意料的连锁反应。
 </span>
 </p>
 
@@ -92,17 +90,17 @@ playable build throughout the jam.
 
 <ul>
 
-<li data-lang="en">Implemented the core gameplay systems and player control logic.</li>
-<li data-lang="zh">实现了核心玩法系统与玩家操控逻辑。</li>
+<li data-lang="en">Implemented route planning and autonomous playback, turning a player-authored path into a complete run.</li>
+<li data-lang="zh">实现路线规划与自动执行系统，把玩家画出的路径转化为一段完整行动。</li>
 
-<li data-lang="en">Integrated game mechanics, UI feedback, and input systems using Godot.</li>
-<li data-lang="zh">使用 Godot 整合了游戏机制、UI 反馈与输入系统。</li>
+<li data-lang="en">Built reusable environmental interactions for tracks, whirlpools, spring pads, trapdoors, and chain reactions.</li>
+<li data-lang="zh">为轨道、漩涡、弹跳板、活板门和连锁反应搭建可复用的场景互动。</li>
 
-<li data-lang="en">Rapidly iterated on gameplay mechanics under strict time constraints.</li>
-<li data-lang="zh">在严格的时间限制下快速迭代玩法机制。</li>
+<li data-lang="en">Integrated UI, input, feedback animation, and teammate-created art into a readable, cohesive experience.</li>
+<li data-lang="zh">将 UI、输入、反馈动画和队友制作的美术资源整合成清晰一致的体验。</li>
 
-<li data-lang="en">Delivered a polished playable build within the game jam deadline.</li>
-<li data-lang="zh">在游戏 jam 截止前交付了打磨完善的可玩版本。</li>
+<li data-lang="en">Delivered a polished playable build within the jam deadline; the project ranked in the top 20% overall.</li>
+<li data-lang="zh">在 Game Jam 截止前交付了完成度较高的可玩版本，最终总排名进入前 20%。</li>
 
 </ul>
 
@@ -128,27 +126,27 @@ playable build throughout the jam.
 
 <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-<h4 style="margin-top:0;"><span data-lang="en">Rapid Gameplay Implementation</span><span data-lang="zh">快速玩法实现</span></h4>
+<h4 style="margin-top:0;"><span data-lang="en">Building the Planning Loop</span><span data-lang="zh">搭建规划与执行循环</span></h4>
 
 <p class="meta">
 <span data-lang="en">
-Because of the short jam timeline, the main engineering goal was to build
-gameplay systems that were simple, modular, and easy to iterate on.
+Because of the short jam timeline, the engineering goal was to make every environmental effect easy to tune and combine.
+The route planner, game state, and reactive objects were kept separate so the team could add hazards without rewriting the core loop.
 </span><span data-lang="zh">
-由于 jam 时间紧张，主要的工程目标是构建简单、模块化且易于迭代的玩法系统。
+由于 Game Jam 时间紧张，我把工程重点放在可调、可组合的场景效果上。路线规划、游戏状态和互动机关彼此分离，因此团队加入新障碍时不必重写核心循环。
 </span>
 </p>
 
 <ul>
 
-<li data-lang="en">Implemented core gameplay mechanics and player control logic using Godot and GDScript.</li>
-<li data-lang="zh">使用 Godot 与 GDScript 实现了核心玩法机制与玩家操控逻辑。</li>
+<li data-lang="en">Implemented the route-drawing and execution loop in Godot and GDScript.</li>
+<li data-lang="zh">使用 Godot 和 GDScript 实现路线绘制与自动执行循环。</li>
 
-<li data-lang="en">Built systems that connected input handling, game state, and player feedback.</li>
-<li data-lang="zh">构建了将输入处理、游戏状态与玩家反馈串联起来的系统。</li>
+<li data-lang="en">Connected input, game state, collision responses, and feedback animation so cause and effect stayed legible.</li>
+<li data-lang="zh">串联输入、游戏状态、碰撞响应和反馈动画，让玩家能看懂每个结果是如何发生的。</li>
 
-<li data-lang="en">Structured scripts so new mechanics could be quickly added or adjusted during playtesting.</li>
-<li data-lang="zh">合理组织脚本结构，使新机制能在玩法测试中被快速添加或调整。</li>
+<li data-lang="en">Exposed movement speed, impulse strength, and trigger timing for quick tuning during playtests.</li>
+<li data-lang="zh">开放移动速度、冲量强度和触发时序等参数，便于在玩法测试中快速调校。</li>
 
 </ul>
 
@@ -158,24 +156,22 @@ gameplay systems that were simple, modular, and easy to iterate on.
 
 <p class="meta">
 <span data-lang="en">
-Game jams require constant iteration and quick problem solving.
-The development process involved frequent playtesting and adjustment
-to ensure the game remained fun and stable.
+Frequent playtests exposed where surprise became confusion. We tightened interaction rules, strengthened feedback animation, and repeatedly adjusted timing and force values while keeping a stable build available to the team.
 </span><span data-lang="zh">
-游戏 jam 需要不断迭代与快速解决问题。开发过程中包含频繁的玩法测试与调整，以确保游戏始终有趣且稳定。
+频繁的玩法测试帮助我们判断：哪些意外结果有趣，哪些只会让人困惑。我们因此收紧互动规则、强化反馈动画，并反复调整时序和力度参数，同时始终为团队保留稳定可玩的版本。
 </span>
 </p>
 
 <ul>
 
-<li data-lang="en">Iterated on gameplay mechanics based on quick playtest feedback.</li>
-<li data-lang="zh">根据快速玩法测试的反馈迭代玩法机制。</li>
+<li data-lang="en">Used short test-tune-test loops to refine timing, readability, and difficulty.</li>
+<li data-lang="zh">通过短周期的“测试—调参—再测试”循环打磨时序、可读性和难度。</li>
 
-<li data-lang="en">Debugged gameplay issues and optimized scripts to maintain smooth performance.</li>
-<li data-lang="zh">调试玩法问题并优化脚本，以保持流畅的性能。</li>
+<li data-lang="en">Debugged interaction order and edge cases in multi-object chain reactions.</li>
+<li data-lang="zh">排查多个场景物体连锁反应中的触发顺序与边界情况。</li>
 
-<li data-lang="en">Ensured the game remained stable while new features were added rapidly.</li>
-<li data-lang="zh">在快速添加新功能的同时确保游戏保持稳定。</li>
+<li data-lang="en">Kept the playable build stable while mechanics and art were changing rapidly.</li>
+<li data-lang="zh">在机制和美术资源快速变化的同时，持续维护可玩版本的稳定性。</li>
 
 </ul>
 

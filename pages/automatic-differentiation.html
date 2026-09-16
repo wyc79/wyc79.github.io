@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-en="Automatic Differentiation Toolbox - Yuanchen Wang" data-zh="Automatic Differentiation Toolbox - Yuanchen Wang">Automatic Differentiation Toolbox - Yuanchen Wang</title>
-  <meta name="description" content="Automatic Differentiation Toolbox - a Python package for forward-mode automatic differentiation" data-zh="自动微分工具箱：一个由五人团队开发的前向模式自动微分 Python 包，通过在运算符重载与基本函数中传播对偶数，在运行时对普通 Python 代码求出精确导数，避开数值微分的步长权衡与符号微分的表达式膨胀。我负责核心自动微分实现与质量保证。" />
-  <meta name="page-title" content="Automatic Differentiation Toolbox" data-zh="Automatic Differentiation Toolbox" />
+  <title data-en="Automatic Differentiation Toolbox - Yuanchen Wang" data-zh="自动微分工具箱 - 王元辰">Automatic Differentiation Toolbox - Yuanchen Wang</title>
+  <meta name="description" content="A forward-mode automatic differentiation package built by a five-person Python team. I implemented core dual-number operations and led quality assurance." data-zh="自动微分工具箱：由五人团队开发的前向模式自动微分 Python 包，通过运算符重载和对偶数传播，在运行时为普通 Python 代码计算精确导数。我负责核心自动微分功能与质量保证。" />
+  <meta name="page-title" content="Automatic Differentiation Toolbox" data-zh="自动微分工具箱" />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
   <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
@@ -28,9 +28,9 @@
           <h2 class="project-hero__title">Automatic Differentiation (AD) Toolbox</h2>
 
           <div class="project-hero__meta">
-            <div class="project-hero__meta-item"><span data-lang="en">Role: Python Developer &amp; QA Lead</span><span data-lang="zh">职责： Python 开发者 &amp; QA 负责人</span></div>
-            <div class="project-hero__meta-item"><span data-lang="en">Tool: Python, PyPI, GitHub</span><span data-lang="zh">工具： Python、PyPI、GitHub</span></div>
-            <div class="project-hero__meta-item"><span data-lang="en">Duration: Fall 2022 · 1 semester</span><span data-lang="zh">周期： 2022 年秋 · 一学期</span></div>
+          <div class="project-hero__meta-item"><span data-lang="en">Role: Python Developer &amp; QA Lead</span><span data-lang="zh">职责：Python 开发者／QA 负责人</span></div>
+          <div class="project-hero__meta-item"><span data-lang="en">Tools: Python, PyPI, GitHub</span><span data-lang="zh">工具：Python、PyPI、GitHub</span></div>
+          <div class="project-hero__meta-item"><span data-lang="en">Duration: Fall 2022 · 1 semester</span><span data-lang="zh">周期：2022 年秋季 · 1 学期</span></div>
           </div>
         </div>
       </section>
@@ -39,21 +39,21 @@
 
         <p class="meta">
           Python , 
-          <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener"><span data-lang="en">View on test.pypi.org</span><span data-lang="zh">在 test.pypi.org 查看</span></a>
+            <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener"><span data-lang="en">View on TestPyPI</span><span data-lang="zh">在 TestPyPI 上查看</span></a>
         </p>
 
         <section style="margin-top: 1.5rem;">
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
               <h3 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
-              <p class="meta"><span data-lang="en">Derivatives show up everywhere in optimization, ML, and scientific computing, but the common alternatives are frustrating in practice: numerical differentiation can be unstable (step-size tradeoffs), and symbolic differentiation can blow up in expression size.</span><span data-lang="zh">导数在优化、机器学习和科学计算中无处不在，但常见的几种做法在实践中都很别扭：数值微分不够稳定（受步长权衡的影响），符号微分则可能让表达式规模急剧膨胀。</span></p>
-              <p class="meta"><span data-lang="en">We wanted a small, readable tool that computes exact derivatives at runtime, so users can differentiate “normal Python code” without manually applying the chain rule.</span><span data-lang="zh">我们想要一个小巧、易读的工具，能在运行时计算精确的导数，让用户可以对“普通的 Python 代码”求导，而无需手动套用链式法则。</span></p>
+              <p class="meta"><span data-lang="en">Derivatives appear throughout optimization, machine learning, and scientific computing, but the usual alternatives have practical drawbacks: numerical differentiation depends on a delicate step-size choice, while symbolic differentiation can produce unwieldy expressions.</span><span data-lang="zh">优化、机器学习和科学计算都离不开导数，但常见方法各有局限：数值微分依赖难以权衡的步长选择，符号微分则可能生成过于庞大的表达式。</span></p>
+              <p class="meta"><span data-lang="en">We wanted a small, readable tool that computes exact derivatives at runtime, allowing users to differentiate ordinary Python code without applying the chain rule by hand.</span><span data-lang="zh">我们希望做出一个小巧易读、能在运行时计算精确导数的工具，让用户直接对普通 Python 代码求导，无需手动展开链式法则。</span></p>
             </div>
 
             <div>
               <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">A forward-mode automatic differentiation (AD) Python package built by a 5-person team. It evaluates user-defined functions and returns derivatives by propagating dual numbers through operator overloads and elementary functions.</span><span data-lang="zh">一个由 5 人团队开发的前向模式自动微分（AD）Python 包。它对用户自定义的函数求值，并通过在运算符重载和基本函数中传播对偶数来返回导数。</span></p>
-              <p class="meta"><span data-lang="en">The focus was a clean API, strong correctness guarantees, and maintainability through a test-first workflow.</span><span data-lang="zh">开发重点在于简洁的 API、可靠的正确性保证，以及通过测试先行的工作流带来的可维护性。</span></p>
+          <p class="meta"><span data-lang="en">We focused on a clean API, reliable numerical behavior, and maintainability through a test-first workflow.</span><span data-lang="zh">开发重点是简洁的 API、可靠的数值结果，以及由测试先行流程保障的可维护性。</span></p>
               <p style="margin: 0;"><span class="pill">Python</span><span class="pill">Forward-mode AD</span><span class="pill">Dual Numbers</span><span class="pill">Operator Overloading</span><span class="pill">Unit Testing</span><span class="pill">PyPI</span></p>
             </div>
           </div>
@@ -61,7 +61,7 @@
 
         <section style="margin-top: 1.5rem;">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
-          <h4 style="margin-top: 0;"><span data-lang="en">My contributions (Core AD + QA)</span><span data-lang="zh">我的贡献（核心 AD + QA）</span></h4>
+          <h4 style="margin-top: 0;"><span data-lang="en">My contributions (Core AD + QA)</span><span data-lang="zh">我的贡献（核心自动微分与质量保证）</span></h4>
           <p class="meta"><span data-lang="en">I implemented key pieces of the forward-mode engine and led QA to keep the package correct as features expanded.</span><span data-lang="zh">我实现了前向模式引擎的关键部分，并主导 QA 工作，在功能不断扩展的同时确保包的正确性。</span></p>
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
@@ -77,7 +77,7 @@
             <div>
               <ul>
                 <li data-lang="en">QA leadership: Designed and executed comprehensive unit tests (core ops + edge cases) to verify numerical correctness and prevent regressions.</li>
-                <li data-lang="zh">QA 主导：设计并执行了全面的单元测试（核心运算 + 边界情况），以验证数值正确性并防止回归。</li>
+              <li data-lang="zh">质量保证：主导设计并执行覆盖核心运算与边界情况的单元测试，以验证数值正确性并防止回归。</li>
                 <li data-lang="en">Debugging &amp; integration: Coordinated module integration, triaged bugs, and documented design decisions to streamline collaboration.</li>
                 <li data-lang="zh">调试与集成：协调模块集成、分类处理缺陷，并记录设计决策，以让协作更顺畅。</li>
                 <li data-lang="en">Release readiness: Helped ensure stable packaging/behavior for publishing on TestPyPI.</li>

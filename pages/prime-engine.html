@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-en="Prime Engine - Engine Systems Implementation - Yuanchen Wang" data-zh="Prime Engine - 引擎系统实现 - Yuanchen Wang">Prime Engine - Engine Systems Implementation - Yuanchen Wang</title>
-  <meta name="description" content="Prime Engine - Engine Systems Implementation (frustum culling, physics/collision, animation blending, debug visualization)." data-zh="Prime Engine 引擎系统实现：在一个用于玩法与渲染实验的精简 C++ 游戏引擎上扩展多个引擎级系统，包括用于渲染优化的视锥剔除、层级式 BVH 剔除（静态中位数划分树与动态 Morton 编码树）、带重力的移动-滑动碰撞与物理、骨骼动画混合，以及包围体与动画状态的调试可视化工具。" />
+  <title data-en="Prime Engine - Engine Systems Implementation - Yuanchen Wang" data-zh="Prime Engine - 引擎系统实现 - 王元辰">Prime Engine - Engine Systems Implementation - Yuanchen Wang</title>
+  <meta name="description" content="Engine systems implemented in a minimal C++ game engine: view-frustum and hierarchical BVH culling, collision and move-and-slide physics, skeletal-animation blending, and debug visualization." data-zh="Prime Engine 引擎系统实现：在一个精简的 C++ 游戏引擎中扩展视锥剔除、层级式 BVH 剔除、带重力的移动与滑动碰撞、骨骼动画混合，以及包围体和动画状态的调试可视化。" />
   <meta name="page-title" content="Prime Engine" data-zh="Prime Engine" />
   <link rel="icon" type="image/png" href="../images/wyc.png" />
   <link rel="stylesheet" href="../styles.css" />
@@ -25,8 +25,8 @@
         <div class="project-hero__content">
           <h2 class="project-hero__title"><span data-lang="en">Prime Engine - Engine Systems Implementation</span><span data-lang="zh">Prime Engine - 引擎系统实现</span></h2>
           <div class="project-hero__meta">
-            <div class="project-hero__meta-item"><span data-lang="en">Role: Engine Programmer</span><span data-lang="zh">职责： 引擎程序</span></div>
-            <div class="project-hero__meta-item"><span data-lang="en">Tool: C++, Prime Engine</span><span data-lang="zh">工具： C++、Prime Engine</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Role: Engine Programmer</span><span data-lang="zh">职责：引擎程序员</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tools: C++, Prime Engine</span><span data-lang="zh">工具：C++、Prime Engine</span></div>
           </div>
         </div>
       </section>
@@ -36,7 +36,7 @@
           <div class="two-col" style="gap: 1.25rem; align-items: start;">
             <div>
               <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
-              <p class="meta"><span data-lang="en">This project involved modifying and extending Prime Engine, a minimal C++ game engine used for gameplay and rendering experiments.</span><span data-lang="zh">这个项目是在 Prime Engine 上做修改和扩展：这是一个用于玩法与渲染实验的精简 C++ 游戏引擎。</span></p>
+              <p class="meta"><span data-lang="en">In this project, I modified and extended Prime Engine, a minimal C++ game engine used for gameplay and rendering experiments.</span><span data-lang="zh">这个项目围绕 Prime Engine 展开：我在这款用于玩法和渲染实验的精简 C++ 游戏引擎中修改并扩展多项底层系统。</span></p>
               <p class="meta"><span data-lang="en">I implemented several engine-level systems, including:</span><span data-lang="zh">我实现了多个引擎级系统，包括：</span></p>
               <ul>
                 <li data-lang="en">View frustum culling for rendering optimization</li>
@@ -57,7 +57,7 @@
               <h3 style="margin-top: 0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
               <ul>
                 <li data-lang="en">Learned and navigated a large C++ codebase for a minimal custom game engine.</li>
-                <li data-lang="zh">读懂并上手了一个大型 C++ 代码库：一个精简的自研游戏引擎。</li>
+                <li data-lang="zh">快速熟悉并扩展一套规模较大的 C++ 自研游戏引擎代码库。</li>
                 <li data-lang="en">Implemented view frustum culling for rendering optimization.</li>
                 <li data-lang="zh">实现了视锥剔除，用于渲染优化。</li>
                 <li data-lang="en">Built hierarchical BVH culling with static median-split and dynamic Morton-code trees.</li>
@@ -330,7 +330,7 @@
             <li data-lang="en">Dynamic BVH - rebuilt every frame for moving objects (to stress-test it I spawned many small meshes given simple random movement). Centroids are normalized and encoded as 30-bit Morton codes (Z-order), sorted, then split at the midpoint - a linear, cache-friendly construction.</li>
             <li data-lang="zh">动态 BVH：针对运动物体每帧重建（为了给它加压测试，我生成了大量随机运动的小网格）。质心被归一化并编码为 30 位 Morton 码（Z 序），排序后在中点划分：一种线性、对缓存友好的构建方式。</li>
           </ul>
-          <p class="meta"><span data-lang="en">The static tree gives better quality for buildings and terrain, while the Morton-code rebuild is cheap enough to run per frame for many moving units - Z-order keeps spatially close objects adjacent in memory, so the build and traversal access nodes nearly linearly, staying cache-friendly. Both are roughly <em>O(n log n)</em>, dominated by the sort.</span><span data-lang="zh">静态树对建筑与地形能提供更高的质量，而 Morton 码重建足够廉价，可对大量运动单位每帧执行，Z 序使空间上相近的物体在内存中也相邻，因此构建与遍历几乎线性地访问节点，保持缓存友好。两者的复杂度都约为 <em>O(n log n)</em>，主要由排序决定。</span></p>
+          <p class="meta"><span data-lang="en">The static tree produces tighter partitions for buildings and terrain, while the Morton-code rebuild is cheap enough to run every frame for many moving units. Z-order keeps spatially close objects adjacent in memory, allowing both construction and traversal to access nodes almost linearly and remain cache-friendly. Both approaches are roughly <em>O(n log n)</em>, dominated by sorting.</span><span data-lang="zh">静态树能为建筑和地形生成更紧密的空间划分；Morton 码方案的重建成本则足够低，可以为大量运动物体逐帧执行。Z 序让空间上相近的物体在内存中也彼此相邻，使构建和遍历几乎按线性顺序访问节点，更有利于缓存。两种方法的复杂度都约为 <em>O(n log n)</em>，主要开销来自排序。</span></p>
 
           <div class="diagram-card">
             <h3><span data-lang="en">Static vs. Dynamic BVH Construction</span><span data-lang="zh">静态与动态 BVH 的构建对比</span></h3>

@@ -25,7 +25,7 @@
           '<div class="p3-brand-name">YUANCHEN WANG</div>',
           '<div class="p3-brand-sub">',
             '<span data-lang="en">GAME&nbsp;DEVELOPER&nbsp;&middot;&nbsp;USC&nbsp;MSCS</span>',
-            '<span data-lang="zh">游戏开发者&nbsp;&middot;&nbsp;USC&nbsp;计算机硕士</span>',
+            '<span data-lang="zh">游戏开发者&nbsp;&middot;&nbsp;USC&nbsp;计算机科学硕士生</span>',
           '</div>',
         '</div>',
         '<button type="button" id="themeToggle" class="p3-theme-toggle" aria-label="Toggle theme">THEME</button>',
