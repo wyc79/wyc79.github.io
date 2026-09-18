@@ -28,7 +28,7 @@
           <h2 class="project-hero__title"><span data-lang="en">AI Tarot Projection</span><span data-lang="zh">AI 塔罗投射</span></h2>
           <div class="project-hero__meta">
             <div class="project-hero__meta-item"><span data-lang="en">Role: Solo Developer - Engine, Relays &amp; Prompt Design</span><span data-lang="zh">职责：独立开发者 - 引擎、中继与提示词设计</span></div>
-            <div class="project-hero__meta-item"><span data-lang="en">Tools: JavaScript (no framework), Python, Cloudflare Workers, LLMs</span><span data-lang="zh">工具：JavaScript（无框架）、Python、Cloudflare Workers、大模型</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tools: LangGraph, JavaScript (no framework), Python, Cloudflare Workers, LLMs</span><span data-lang="zh">工具：LangGraph、JavaScript（无框架）、Python、Cloudflare Workers、大模型</span></div>
             <div class="project-hero__meta-item"><span data-lang="en">Duration: Aug - Sep 2026</span><span data-lang="zh">周期：2026 年 8 月至 9 月</span></div>
           </div>
         </div>
@@ -38,6 +38,7 @@
 
         <p class="meta">
           <a href="https://wyc79.github.io/ai-tarot-projection/" target="_blank" rel="noopener"><span data-lang="en">Open the app</span><span data-lang="zh">打开应用</span></a> ,
+          <a href="https://wyc79.github.io/ai-tarot-projection/graph.html" target="_blank" rel="noopener"><span data-lang="en">Explore the LangGraph workflow</span><span data-lang="zh">查看 LangGraph 工作流演示</span></a> ,
           <a href="https://github.com/wyc79/ai-tarot-projection" target="_blank" rel="noopener"><span data-lang="en">Source on GitHub</span><span data-lang="zh">在 GitHub 查看源码</span></a>
         </p>
 
@@ -57,6 +58,7 @@
                 <span class="pill">No server-side state</span>
                 <span class="pill">Two relays, one contract</span>
                 <span class="pill">Contract-tested indistinguishability</span>
+                <span class="pill">LangGraph StateGraph</span>
                 <span class="pill">LLM-as-judge</span>
                 <span class="pill">Structured outputs</span>
                 <span class="pill">Protocol scanner</span>
@@ -73,8 +75,8 @@
                 <li data-lang="zh">隐私是架构定下来的，不是写在条款里的：密钥只随一个请求头发出，用在携带它的那一次请求上，然后就没了。</li>
                 <li data-lang="en">Wrote two relays against one contract, a ~300-line dependency-free Python one and a ~140-line Cloudflare Worker, and made their indistinguishability a tested property instead of a claim.</li>
             <li data-lang="zh">按同一份契约实现两个中继：约 300 行、仅使用标准库的 Python 版本，以及约 140 行的 Cloudflare Worker。前端无需知道正在使用哪一个；这一点由测试保证，而不是停留在设计声明上。</li>
-                <li data-lang="en">Built a browser-side session engine in which an LLM makes three kinds of schema-constrained judgements: the opening, a per-turn flip gate that also grades stakes, and a narrative anchor.</li>
-            <li data-lang="zh">在浏览器中构建会话引擎，让大模型完成三类受结构化 schema 约束的判断：开场判断、每轮翻牌门控（同时评估话题的严重程度），以及叙事锚点。</li>
+                <li data-lang="en">Built the browser-side session engine as a LangGraph <code>StateGraph</code>, with an interactive demo generated from the same graph the app runs.</li>
+            <li data-lang="zh">用 LangGraph <code>StateGraph</code> 构建浏览器端会话引擎，并提供由应用实际运行的同一张图生成的交互演示。</li>
                 <li data-lang="en">Kept the reading from turning into an interview by capping question depth at one step above where the person currently stands.</li>
                 <li data-lang="zh">提问深度最多比对方当前的位置高一级，一场解读因此不会变成审问。</li>
                 <li data-lang="en">Wrote a protocol scanner that checks transcripts against the reader&rsquo;s own rules, and shared one definition of a violation between the tests, the seeded fixture, and the debug page.</li>
@@ -114,8 +116,10 @@
             </div>
           </div>
 
-          <h4><span data-lang="en">A conversation engine that judges before it speaks</span><span data-lang="zh">先判断，再开口</span></h4>
-          <p class="meta"><span data-lang="en">The session engine runs in the browser, and an LLM makes three kinds of decisions inside it, each constrained to a schema rather than left to prose. The <strong>opening</strong> reads the first thing you say: did you actually name something to look at, and is a tarot frame the wrong thing to hand this person. The <strong>flip gate</strong> runs on every turn and decides whether a card has earned its turn, weighing how much you disclosed, whether the answer was about your life or about the picture, whether it was hedged, and what the stakes are. Stakes have a crisis level, and it is the one that drops the frame: no cards, no imagery, no closing ritual.</span><span data-lang="zh">会话引擎运行在浏览器中，大模型负责三类判断，每一类都必须遵循指定 schema，而不能自由生成一段文字。<strong>开场判断</strong>会先检查用户是否提出了值得讨论的具体问题，以及塔罗框架是否适合此刻的对话。<strong>翻牌门控</strong>则在每轮运行，综合判断用户透露了多少、回答指向现实生活还是牌面、语气是否有所保留，以及话题有多严肃。最高一级代表危机；一旦触发，系统会完全退出塔罗框架，不再出现牌、意象或结束仪式。</span></p>
+          <h4><span data-lang="en">A LangGraph engine that judges before it speaks</span><span data-lang="zh">一个先判断、再开口的 LangGraph 引擎</span></h4>
+          <p class="meta"><span data-lang="en">The session engine is a LangGraph <code>StateGraph</code> that runs entirely in the browser. Each turn is one traversal of the graph: named nodes handle the possible actions, while conditional edges encode the rules that route the conversation. The LLM judges rather than controls that flow, returning schema-constrained verdicts that the graph turns into deterministic decisions. The <strong>opening</strong> reads the first thing you say: did you actually name something to look at, and is a tarot frame the wrong thing to hand this person. The <strong>flip gate</strong> runs on every turn and decides whether a card has earned its turn, weighing how much you disclosed, whether the answer was about your life or about the picture, whether it was hedged, and what the stakes are. Stakes have a crisis level, and it is the one that drops the frame: no cards, no imagery, no closing ritual.</span><span data-lang="zh">会话引擎是一个完全在浏览器中运行的 LangGraph <code>StateGraph</code>。每一轮对话都是对这张图的一次遍历：具名节点处理可能采取的动作，条件边则把对话的路由规则写进工作流。大模型负责判断，而不直接控制流程；它返回受 schema 约束的判定结果，再由图将结果转成确定性的分支决策。<strong>开场判断</strong>会先检查用户是否提出了值得讨论的具体问题，以及塔罗框架是否适合此刻的对话。<strong>翻牌门控</strong>则在每轮运行，综合判断用户透露了多少、回答指向现实生活还是牌面、语气是否有所保留，以及话题有多严肃。最高一级代表危机；一旦触发，系统会完全退出塔罗框架，不再出现牌、意象或结束仪式。</span></p>
+          <p class="meta"><a href="https://wyc79.github.io/ai-tarot-projection/graph.html" target="_blank" rel="noopener"><span data-lang="en">Open the interactive LangGraph StateGraph demo &rarr;</span><span data-lang="zh">打开交互式 LangGraph StateGraph 演示 &rarr;</span></a></p>
+          <p class="meta"><span data-lang="en">The interactive workflow demo above is a working view of that architecture, not a diagram maintained separately for the portfolio. It compiles the same graph the reading runs and asks it to draw itself. Select any recorded scenario to illuminate the nodes and branches that a real engine turn followed, together with the judge&rsquo;s verdict and the rule that determined the route.</span><span data-lang="zh">上方的交互式工作流演示展示的正是这套可运行的架构，并不是为作品集另画的一张静态图。页面会编译解读实际运行的同一张图，并让它自行生成可视化。选择任意一个已记录的场景，就能点亮一次真实引擎执行所经过的节点与分支，同时查看模型给出的判定，以及最终决定路线的规则。</span></p>
           <p class="meta"><span data-lang="en">The third is the <strong>anchor</strong>, committed once after the first card: what this reading is actually about, in your register rather than as a diagnosis. An anchor phrased as a verdict is the failure mode, because every question after it steers toward confirming the sentence the anchor already wrote. So a beat that asserts a finding is sent back to the judge once, for an open question instead. The cost of being wrong about that is one extra call, which is cheap next to spending two more cards proving something you never said.</span><span data-lang="zh">第三类是<strong>锚点</strong>，在第一张牌之后定下一次：这场解读到底在谈什么，用你的说法讲出来，而不是给一个诊断。锚点最容易出问题的地方，就是被写成一句结论：只要它先下了判断，后面每个问题都会朝着印证那句话去。所以，一旦锚点断言了某个&ldquo;发现&rdquo;，它会被退回去重判一次，改成一个还敞开着的问题。判错的代价不过是多一次调用，比起用剩下两张牌去证明一句你根本没说过的话，这便宜得多。</span></p>
           <p class="meta"><span data-lang="en">Questions climb a ladder: what it is, what happened next, what it is like for you, why it matters to you, what you will do. A question may stand at most one rung above the answer before it, and that cap is what keeps a reading from turning into an interview. A protocol scanner runs rule checks over a finished transcript and reports where the reader broke its own rules. The tests, the seeded fixture, and the debug page all call the same scanner, so there is one definition of a violation rather than three that can drift apart.</span><span data-lang="zh">提问是一级一级往上走的：它是什么、后来怎么了、这对你来说是什么滋味、它为什么要紧、你打算怎么做。一个问题最多只能比上一个回答高一级，正是这条上限，让解读不至于变成审问。协议扫描器会对完成的记录做规则检查，指出读牌人在哪里破了自己的规矩。测试、种子固定的样例会话和调试页调用的是同一个扫描器，所以&ldquo;什么算违规&rdquo;只有一个定义，不会有三份各自漂移的版本。</span></p>
 
@@ -143,7 +147,7 @@
     </main>
 
     <footer>
-      <p><span data-lang="en">© 2025 Yuanchen Wang · HTML portfolio. Last updated 2026-09-01.</span><span data-lang="zh">© 2025 Yuanchen Wang · 网页作品集。最后更新于 2026-09-01。</span></p>
+      <p><span data-lang="en">© 2025 Yuanchen Wang · HTML portfolio. Last updated 2026-09-17.</span><span data-lang="zh">© 2025 Yuanchen Wang · 网页作品集。最后更新于 2026-09-17。</span></p>
     </footer>
   </div>
 </body>
