@@ -488,66 +488,18 @@ main { display: block; padding-top: var(--s8); }
   border: var(--frame-width) solid var(--frame-rule);
 }
 .project-media img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; display: block; }
-/* Authored bleed (scripts/media-bleed.js adds the layers and geometry):
-   where the image leaves the frame unfilled, each gap blends three ways from
-   the seam outward - the image's adjacent edge column (or row) alone,
-   stretched out; then its far end, carried on as if on a scrolling strip;
-   then transparent, so the plate shows - over --media-bleed, eased and
-   blurred so no row or detail reads as a hard strip. The frame clips it when
-   the gap is narrower. Layers start --bleed-tuck under the image, so the
-   blur's own soft edge stays hidden behind it rather than lighting the seam. */
-.project-media { position: relative; isolation: isolate; --bleed-tuck: 8px; }
+/* Authored bleed: where the image leaves the frame unfilled,
+   scripts/media-bleed.js paints a short fade out of its edges on this canvas
+   (the blend is described there; --media-bleed sets its length). */
+.project-media { position: relative; isolation: isolate; }
 .project-media .bleed {
-  display: none;
   position: absolute;
+  inset: 0;
   z-index: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  background-image: var(--bleed-src);
-  background-repeat: no-repeat;
 }
-.bleed-x .bleed,
-.bleed-y .bleed { display: block; }
-.bleed-x .bleed { top: var(--img-top); width: calc(var(--media-bleed) + var(--bleed-tuck)); height: var(--img-h); }
-.bleed-x .bleed--start { left: calc(var(--img-left) - var(--media-bleed)); --bleed-dir: to left; }
-.bleed-x .bleed--end { left: calc(var(--img-left) + var(--img-w) - var(--bleed-tuck)); --bleed-dir: to right; }
-.bleed-y .bleed { left: var(--img-left); width: var(--img-w); height: calc(var(--media-bleed) + var(--bleed-tuck)); }
-.bleed-y .bleed--start { top: calc(var(--img-top) - var(--media-bleed)); --bleed-dir: to top; }
-.bleed-y .bleed--end { top: calc(var(--img-top) + var(--img-h) - var(--bleed-tuck)); --bleed-dir: to bottom; }
-/* Fade stops are measured from the image edge (past the hidden tuck). */
-.project-media .bleed {
-  --t: var(--bleed-tuck);
-  --f: var(--media-bleed);
-}
-/* The adjacent edge alone: one source column (row) scaled across the band, so
-   the seam is continuous; blurred so its rows melt into a gradient. */
-.project-media .bleed--clamp {
-  filter: blur(5px);
-  -webkit-mask-image: linear-gradient(var(--bleed-dir), #000 var(--t), rgba(0, 0, 0, .8) calc(var(--t) + var(--f) * .2),
-    rgba(0, 0, 0, .45) calc(var(--t) + var(--f) * .45), rgba(0, 0, 0, .15) calc(var(--t) + var(--f) * .7), transparent calc(var(--t) + var(--f) * .9));
-  mask-image: linear-gradient(var(--bleed-dir), #000 var(--t), rgba(0, 0, 0, .8) calc(var(--t) + var(--f) * .2),
-    rgba(0, 0, 0, .45) calc(var(--t) + var(--f) * .45), rgba(0, 0, 0, .15) calc(var(--t) + var(--f) * .7), transparent calc(var(--t) + var(--f) * .9));
-}
-.bleed-x .bleed--clamp { background-size: calc(var(--img-nw) * (var(--media-bleed) + var(--bleed-tuck))) var(--img-h); }
-.bleed-x .bleed--clamp.bleed--start { background-position: left top; }
-.bleed-x .bleed--clamp.bleed--end { background-position: right top; }
-.bleed-y .bleed--clamp { background-size: var(--img-w) calc(var(--img-nh) * (var(--media-bleed) + var(--bleed-tuck))); }
-.bleed-y .bleed--clamp.bleed--start { background-position: left top; }
-.bleed-y .bleed--clamp.bleed--end { background-position: left bottom; }
-/* Far end of the image at its own scale - the left gap shows its rightmost
-   columns, the right gap its leftmost (top/bottom likewise) - softened and
-   kept faint, peaking a third of the way out. */
-.project-media .bleed--wrap {
-  background-size: var(--img-w) var(--img-h);
-  filter: blur(2.5px);
-  -webkit-mask-image: linear-gradient(var(--bleed-dir), transparent var(--t), rgba(0, 0, 0, .35) calc(var(--t) + var(--f) * .3),
-    rgba(0, 0, 0, .3) calc(var(--t) + var(--f) * .55), rgba(0, 0, 0, .1) calc(var(--t) + var(--f) * .8), transparent calc(var(--t) + var(--f)));
-  mask-image: linear-gradient(var(--bleed-dir), transparent var(--t), rgba(0, 0, 0, .35) calc(var(--t) + var(--f) * .3),
-    rgba(0, 0, 0, .3) calc(var(--t) + var(--f) * .55), rgba(0, 0, 0, .1) calc(var(--t) + var(--f) * .8), transparent calc(var(--t) + var(--f)));
-}
-.bleed-x .bleed--wrap.bleed--start { background-position: right top; }
-.bleed-x .bleed--wrap.bleed--end { background-position: left top; }
-.bleed-y .bleed--wrap.bleed--start { background-position: left bottom; }
-.bleed-y .bleed--wrap.bleed--end { background-position: left top; }
 .project-card .card-cover { position: absolute; inset: 0; z-index: 2; }
 .project-card .card-cover:focus-visible { outline-offset: 6px; }
 .project-card:hover .pc-title,
