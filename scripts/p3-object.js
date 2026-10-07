@@ -2,10 +2,15 @@
   'use strict';
 
   // The homepage's secondary accent: a small matte form inside one red orbit,
-  // with a marker on the orbit. It does not navigate. p3-menu.js announces
-  // the highlighted row with a `p3-select` event, and each row has a target
-  // pose below; the object eases toward it, so a selection change reads as
-  // the page answering, not as an animation to watch.
+  // with a marker on the orbit. p3-menu.js announces the highlighted row with
+  // a `p3-select` event, and each row has a target pose below; the object
+  // eases toward it, so a selection change reads as the page answering, not
+  // as an animation to watch.
+  //
+  // Dragging the form sideways is a second way to move the selection: it
+  // scrubs through the poses with a detent at each row and asks the menu to
+  // select (`p3-request`). It never navigates; opening a page stays with the
+  // menu's own click and Enter.
 
   var figure = document.querySelector('.p3-object');
   var canvas = figure && figure.querySelector('canvas');
@@ -39,6 +44,7 @@
   // The marker walks the orbit's front arc, left to right, as the selection
   // moves down the menu (deg along the orbit; 90 is nearest the viewer).
   var MARKER_FROM = 150, MARKER_TO = 30;
+  var MARKER_SPAN = MARKER_TO - MARKER_FROM;
 
   var VIEW_HALF  = 2.0;    // world half-extent the canvas shows
   var ORBIT_R    = 1.88;   // orbit radius; the form's radius is ~1
@@ -46,6 +52,20 @@
   var MARKER_PX  = 4.5;    // marker radius, CSS px
   var EASE_S     = 0.13;   // time constant of the pose ease: ~0.6 s to settle
   var SWEEP_S    = 0.75;   // contour sweep after a selection change
+  var NOTCH_PX   = 2;      // resting marks on the orbit, shown on hover/drag
+
+  // Drag scrubbing. Distances are CSS px of pointer travel.
+  var DRAG_START_PX = 9;     // below this a press is a tap, and does nothing
+  var DRAG_INTENT   = 1.25;  // |dx| must be this many times |dy|
+  var STEP_PX       = { mouse: 68, touch: 56 };   // per row
+  var ADVANCE       = 0.55;  // fraction of a step that switches rows...
+  var RETURN        = 0.65;  // ...and that switches back (35% hysteresis)
+  var MAGNET_PX     = 12;    // near a detent, the form lags the pointer...
+  var MAGNET_MIN    = 0.45;  // ...moving at this rate at the detent itself
+  var OVERSCROLL_PX = 20;    // elastic give past the first and last rows
+  var MOMENTUM_S    = 0.11;  // release velocity projected this far ahead
+  var FLICK_MIN     = 1.5;   // rows/s; slower releases keep the highlighted row
+  var SETTLE_S      = 0.22;  // release to rest, no overshoot
 
   // ---------------------------------------------------------------- shaders
   var FORM_VS = [
@@ -129,7 +149,8 @@
   var FLAT_FS = [
     'precision mediump float;',
     'uniform vec3 uColor;',
-    'void main() { gl_FragColor = vec4(uColor, 1.0); }'
+    'uniform float uAlpha;',
+    'void main() { gl_FragColor = vec4(uColor * uAlpha, uAlpha); }'   // premultiplied
   ].join('\n');
 
   function compile(type, src) {
@@ -162,7 +183,7 @@
   var form = program(FORM_VS, FORM_FS, ['aPos'],
     ['uProj', 'uView', 'uModel', 'uWarp', 'uLight', 'uLit', 'uMid', 'uShade', 'uBounce', 'uLine', 'uSweep']);
   var flat = program(FLAT_VS, FLAT_FS, ['aA', 'aB'],
-    ['uProj', 'uView', 'uModel', 'uScale', 'uColor']);
+    ['uProj', 'uView', 'uModel', 'uScale', 'uColor', 'uAlpha']);
   if (!form || !flat) return;
 
   // ---------------------------------------------------------------- meshes
@@ -277,27 +298,66 @@
   new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   // ---------------------------------------------------------------- state
-  var KEYS = ['yaw', 'pitch', 'warp', 'tilt', 'roll', 'light', 'marker'];
-  var current = null, target = null;
-  var sweepStart = -1;
+  // The pose is one number, `pos`: a fractional row index. Whole numbers are
+  // the rows' own poses and fractions blend neighbours, so moving between
+  // rows - eased, dragged or settling - passes through the poses in between.
+  //   ease   - pos follows the menu's row (goalPos)
+  //   drag   - pos follows the pointer, with detents and elastic ends
+  //   settle - pos glides from release to the final row, then eases again
+  var POSE_KEYS = ['yaw', 'pitch', 'warp', 'tilt', 'roll', 'light'];
+  var ids = null;            // row ids in menu order, from p3-menu.js
+  var menuIndex = 0;         // the row the menu has highlighted
+  var pos = 0, goalPos = 0, mode = 'ease', settle = null;
+  var sweepStart = -1, sweptIndex = -1;
+  var hovered = false, notch = 0;
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function still() { return !!(reduceMotion && reduceMotion.matches); }
+  function lastIndex() { return ids ? ids.length - 1 : 0; }
+  function clampIndex(i) { return Math.max(0, Math.min(lastIndex(), i)); }
+
+  function poseAt(p) {
+    var n = ids.length;
+    var i0 = Math.max(0, Math.min(n - 2, Math.floor(p))), f = n > 1 ? p - i0 : 0;
+    var a = STATES[ids[i0]] || STATES.projects, b = STATES[ids[i0 + 1]] || a;
+    var o = {};
+    POSE_KEYS.forEach(function (k) { o[k] = a[k] + (b[k] - a[k]) * f; });
+    o.marker = markerAngle(p);
+    return o;
+  }
+  function markerAngle(p) { var n = lastIndex(); return MARKER_FROM + MARKER_SPAN * (n ? p / n : 0); }
 
   window.addEventListener('p3-select', function (e) {
     var d = e.detail || {};
-    var s = STATES[d.id] || STATES.projects;
-    var t = d.total > 1 ? d.index / (d.total - 1) : 0;
-    var next = { yaw: s.yaw, pitch: s.pitch, warp: s.warp, tilt: s.tilt, roll: s.roll, light: s.light,
-                 marker: MARKER_FROM + (MARKER_TO - MARKER_FROM) * t };
-    var changed = !target || KEYS.some(function (k) { return next[k] !== target[k]; });
-    target = next;
-    if (!current || reduceMotion && reduceMotion.matches) current = Object.assign({}, target);
-    else if (changed && sweepAt(now()) < 0) sweepStart = now();
+    var first = !ids;
+    ids = d.ids || ids || ['projects'];
+    menuIndex = d.index || 0;
+
+    if (d.source !== 'stone' && d.source !== 'lang') {
+      // Keys, focus, clicks and hover win over the stone, mid-drag included.
+      if (drag) endDrag(false, false);
+      mode = 'ease';
+      settle = null;
+      goalPos = menuIndex;
+    }
+    if (first || still() && !drag) { pos = goalPos = menuIndex; mode = 'ease'; }
+
+    // One contour sweep per change, when the interaction comes to rest on
+    // its row - not for every row a hover or drag passes on the way.
+    if (first) sweptIndex = menuIndex;
+    else if (d.settled && menuIndex !== sweptIndex) {
+      sweptIndex = menuIndex;
+      if (!still()) sweepStart = now();
+    }
 
     if (indexEl) indexEl.textContent = d.ordinal ? pad(d.ordinal) + ' / ' + pad(d.sections) : '↗';
     if (nameEl)  nameEl.textContent  = d.label || '';
     requestFrame();
   });
+
+  function request(phase, index) {
+    window.dispatchEvent(new CustomEvent('p3-request', { detail: { phase: phase, index: index } }));
+  }
 
   function now() { return performance.now() / 1000; }
   // Progress of the running sweep in [0, 1), or -1 when none is running.
@@ -306,6 +366,144 @@
     var p = (t - sweepStart) / SWEEP_S;
     return p < 1 ? p : -1;
   }
+
+  // ---------------------------------------------------------------- drag
+  // Press on the canvas, then move sideways: left steps down the menu, right
+  // steps up. Under DRAG_START_PX, or mostly vertical, it is not a drag - a
+  // tap does nothing and a vertical swipe is left to the page (touch-action:
+  // pan-y). Only the first pointer counts.
+  var press = null;   // { id, x, y, type } between pointerdown and drag start
+  var drag = null;    // { id, x0, from, step, raw, sel, dir, samples }
+  var suppressClickUntil = 0;
+
+  function rubber(px) { return OVERSCROLL_PX * (1 - Math.exp(-px / OVERSCROLL_PX)); }
+
+  // Pointer position (in rows) to drawn position: elastic past the ends, and
+  // slowed within MAGNET_PX of a detent so each row feels like it holds.
+  function dragVisual(raw, stepPx) {
+    var max = lastIndex();
+    if (raw < 0)   return -rubber(-raw * stepPx) / stepPx;
+    if (raw > max) return max + rubber((raw - max) * stepPx) / stepPx;
+    var n = Math.round(raw), d = (raw - n) * stepPx, a = Math.abs(d);
+    if (a < MAGNET_PX) d *= MAGNET_MIN + (1 - MAGNET_MIN) * a / MAGNET_PX;
+    return n + d / stepPx;
+  }
+
+  canvas.addEventListener('pointerdown', function (e) {
+    if (press || drag || !e.isPrimary || e.button !== 0 || !ids) return;
+    // Mouse: no text selection or native image drag. Touch keeps its default
+    // so a vertical swipe still scrolls.
+    if (e.pointerType === 'mouse') e.preventDefault();
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY, type: e.pointerType };
+  });
+
+  canvas.addEventListener('pointermove', function (e) {
+    if (drag) {
+      if (e.pointerId === drag.id) moveDrag(e.clientX);
+      return;
+    }
+    if (!press || e.pointerId !== press.id) return;
+    var dx = e.clientX - press.x, dy = e.clientY - press.y;
+    if (Math.hypot(dx, dy) < DRAG_START_PX) return;
+    if (Math.abs(dx) < DRAG_INTENT * Math.abs(dy)) { press = null; return; }   // vertical: not ours
+    startDrag(e);
+  });
+
+  function startDrag(e) {
+    var stepPx = press.type === 'mouse' ? STEP_PX.mouse : STEP_PX.touch;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+    drag = { id: e.pointerId, x0: press.x, from: menuIndex, step: stepPx,
+             raw: menuIndex, sel: menuIndex, dir: 0, samples: [] };
+    press = null;
+    mode = 'drag';
+    settle = null;
+    figure.classList.add('is-dragging');
+    request('start');
+    moveDrag(e.clientX);
+  }
+
+  function moveDrag(x) {
+    var max = lastIndex();
+    drag.raw = drag.from - (x - drag.x0) / drag.step;
+    var t = now();
+    drag.samples.push({ t: t, raw: drag.raw });
+    while (drag.samples.length > 2 && t - drag.samples[0].t > 0.1) drag.samples.shift();
+
+    // Discrete row with hysteresis: switching on in the same direction
+    // takes ADVANCE of a step, turning back takes RETURN.
+    var r = Math.max(0, Math.min(max, drag.raw)), sel = drag.sel;
+    for (;;) {
+      if (sel < max && r >= sel + (drag.dir < 0 ? RETURN : ADVANCE)) { sel++; drag.dir = 1; }
+      else if (sel > 0 && r <= sel - (drag.dir > 0 ? RETURN : ADVANCE)) { sel--; drag.dir = -1; }
+      else break;
+    }
+    if (sel !== drag.sel) { drag.sel = sel; request('move', sel); }
+
+    pos = still() ? drag.sel : dragVisual(drag.raw, drag.step);
+    requestFrame();
+  }
+
+  function velocity(d) {
+    var s = d.samples, a = s[0], b = s[s.length - 1];
+    return s.length > 1 && b.t > a.t ? (b.raw - a.raw) / (b.t - a.t) : 0;
+  }
+
+  // Release: pick the resting row, glide there, and tell the menu. A flick
+  // carries MOMENTUM_S of its speed, but never more than one row past where
+  // the pointer let go; a slow release, or a cancelled pointer, keeps the
+  // row the menu already shows. Nothing navigates.
+  //   release  - false when the menu has already moved on (key, focus)
+  //   momentum - false for pointercancel / lost capture
+  function endDrag(release, momentum) {
+    var d = drag;
+    drag = null;
+    figure.classList.remove('is-dragging');
+    try { canvas.releasePointerCapture(d.id); } catch (err) { /* not captured */ }
+    suppressClickUntil = performance.now() + 400;
+    if (!release) return;   // the menu moved on (key, focus): just let go
+
+    var max = lastIndex(), fin = d.sel, v = momentum && !still() ? velocity(d) : 0;
+    if (Math.abs(v) > FLICK_MIN) {
+      var near = Math.max(0, Math.min(max, Math.round(d.raw)));
+      var proj = Math.round(d.raw + v * MOMENTUM_S);
+      proj = Math.max(near - 1, Math.min(near + 1, proj));
+      if ((proj - d.sel) * v > 0) fin = clampIndex(proj);
+    }
+    startSettle(fin, v);
+    request('end', fin);
+  }
+
+  // Cubic Hermite from (pos, velocity) to the row at rest. The start speed
+  // is capped so the curve never passes the target: no overshoot, no bounce.
+  function startSettle(to, v) {
+    var dist = to - pos;
+    if (still() || Math.abs(dist) < 1e-4) { pos = goalPos = to; mode = 'ease'; settle = null; requestFrame(); return; }
+    var m = v * SETTLE_S / dist;              // start slope, in units of dist
+    m = Math.max(0, Math.min(3, m));
+    settle = { from: pos, to: to, m: m * dist, t0: now() };
+    mode = 'settle';
+    goalPos = to;
+    requestFrame();
+  }
+
+  canvas.addEventListener('pointerup', function (e) {
+    if (drag && e.pointerId === drag.id) endDrag(true, true);
+    else if (press && e.pointerId === press.id) press = null;    // a tap: no-op
+  });
+  function cancel(e) {
+    if (drag && e.pointerId === drag.id) endDrag(true, false);
+    else if (press && e.pointerId === press.id) press = null;
+  }
+  canvas.addEventListener('pointercancel', cancel);
+  canvas.addEventListener('lostpointercapture', cancel);
+
+  // A touch drag can still produce a compatibility click; swallow it.
+  window.addEventListener('click', function (e) {
+    if (performance.now() < suppressClickUntil) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+
+  canvas.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') { hovered = true; requestFrame(); } });
+  canvas.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') { hovered = false; requestFrame(); } });
 
   // ---------------------------------------------------------------- render
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -321,6 +519,8 @@
   else window.addEventListener('resize', resize);
 
   gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.clearColor(0, 0, 0, 0);
 
   var pending = false, lastT = 0;
@@ -332,31 +532,46 @@
 
   function frame(ms) {
     pending = false;
-    if (!current || !colors) return;
+    if (!ids || !colors) return;
     var t = ms / 1000, dt = Math.min(0.1, lastT ? t - lastT : 0);
     lastT = t;
-    var still = reduceMotion && reduceMotion.matches;
+    var calm = still();
 
     var moving = false;
-    var k = still ? 1 : 1 - Math.exp(-dt / EASE_S);
-    KEYS.forEach(function (key) {
-      var diff = target[key] - current[key];
-      if (Math.abs(diff) > 0.01) moving = true;
-      current[key] += diff * k;
-    });
+    if (mode === 'settle') {
+      var u = (now() - settle.t0) / SETTLE_S;
+      if (u >= 1) { pos = settle.to; mode = 'ease'; settle = null; }
+      else {
+        var u2 = u * u, u3 = u2 * u;
+        pos = (2 * u3 - 3 * u2 + 1) * settle.from + (u3 - 2 * u2 + u) * settle.m + (3 * u2 - 2 * u3) * settle.to;
+      }
+      moving = true;
+    } else if (mode === 'ease') {
+      var diff = goalPos - pos;
+      if (Math.abs(diff) > 0.0005) moving = true;
+      pos += calm ? diff : diff * (1 - Math.exp(-dt / EASE_S));
+    }
+
+    // Resting marks fade in while the form is hovered or dragged.
+    var notchGoal = (hovered || drag) ? 1 : 0;
+    if (notch !== notchGoal) {
+      notch = calm ? notchGoal : notch + (notchGoal - notch) * (1 - Math.exp(-dt / 0.06));
+      if (Math.abs(notchGoal - notch) < 0.01) notch = notchGoal;
+      moving = true;
+    }
 
     // Idle: a yaw drift of under two degrees over sixteen seconds.
-    var idle = still ? 0 : 1.6 * Math.sin(now() * Math.PI * 2 / 16);
-    var sweep = still ? -1 : sweepAt(now());
+    var idle = calm ? 0 : 1.6 * Math.sin(now() * Math.PI * 2 / 16);
+    var sweep = calm ? -1 : sweepAt(now());
 
-    draw(current, idle, sweep);
+    draw(poseAt(pos), idle, sweep, notch);
 
     // Reduced motion draws only on change; otherwise the idle drift keeps
     // the loop going (one small canvas, paused by the browser when hidden).
-    if (!still || moving) requestFrame();
+    if (!calm || moving) requestFrame();
   }
 
-  function draw(s, idle, sweep) {
+  function draw(s, idle, sweep, notchAlpha) {
     var worldPerPx = VIEW_HALF * 2 / cssSize;
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -387,11 +602,12 @@
     gl.drawElements(gl.TRIANGLES, formMesh.count, gl.UNSIGNED_SHORT, 0);
     gl.disableVertexAttribArray(form.a.aPos);
 
-    // --- orbit and marker
+    // --- orbit, resting marks and marker
     gl.useProgram(flat.prog);
     gl.uniformMatrix4fv(flat.u.uProj, false, PROJ);
     gl.uniformMatrix4fv(flat.u.uView, false, VIEW);
     gl.uniform3fv(flat.u.uColor, colors.accent);
+    gl.uniform1f(flat.u.uAlpha, 1);
     gl.enableVertexAttribArray(flat.a.aA);
     gl.enableVertexAttribArray(flat.a.aB);
 
@@ -405,15 +621,24 @@
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, orbitMesh.idx);
     gl.drawElements(gl.TRIANGLES, orbitMesh.count, gl.UNSIGNED_SHORT, 0);
 
-    var m = s.marker * Math.PI / 180;
-    var at = apply(orbit, [Math.cos(m) * ORBIT_R, 0, Math.sin(m) * ORBIT_R]);
-    gl.uniformMatrix4fv(flat.u.uModel, false, translate(at[0], at[1], at[2]));
-    gl.uniform2f(flat.u.uScale, MARKER_PX * worldPerPx, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, markerMesh.pos);
     gl.vertexAttribPointer(flat.a.aA, 3, gl.FLOAT, false, 0, 0);
     gl.vertexAttribPointer(flat.a.aB, 3, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, markerMesh.idx);
-    gl.drawElements(gl.TRIANGLES, markerMesh.count, gl.UNSIGNED_SHORT, 0);
+    function dot(angle, radiusPx, alpha) {
+      var m = angle * Math.PI / 180;
+      var at = apply(orbit, [Math.cos(m) * ORBIT_R, 0, Math.sin(m) * ORBIT_R]);
+      gl.uniformMatrix4fv(flat.u.uModel, false, translate(at[0], at[1], at[2]));
+      gl.uniform2f(flat.u.uScale, radiusPx * worldPerPx, 0);
+      gl.uniform1f(flat.u.uAlpha, alpha);
+      gl.drawElements(gl.TRIANGLES, markerMesh.count, gl.UNSIGNED_SHORT, 0);
+    }
+    if (notchAlpha > 0) {
+      gl.depthMask(false);
+      for (var i = 0; i <= lastIndex(); i++) dot(markerAngle(i), NOTCH_PX, 0.85 * notchAlpha);
+      gl.depthMask(true);
+    }
+    dot(s.marker, MARKER_PX, 1);
 
     gl.disableVertexAttribArray(flat.a.aA);
     gl.disableVertexAttribArray(flat.a.aB);

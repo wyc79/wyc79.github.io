@@ -209,11 +209,11 @@
       rot.appendChild(hero);
       a.appendChild(rot);
 
-      // Unified "highlighted index": hover, keyboard focus, click, and arrow
-      // keys all drive the same `active` state.
-      a.addEventListener('mouseenter', function () { setActive(i); });
-      a.addEventListener('focus',      function () { setActive(i); });
-      a.addEventListener('click',      function () { setActive(i); });
+      // Unified "highlighted index": hover, keyboard focus, click, arrow
+      // keys and the homepage object all go through select().
+      a.addEventListener('mouseenter', function () { select(i, 'pointer'); });
+      a.addEventListener('focus',      function () { select(i, 'focus'); });
+      a.addEventListener('click',      function () { select(i, 'click'); });
 
       menu.appendChild(a);
       rows.push({ row: a, rot: rot, highlight: hl, label: label, hero: hero, item: item, heroBuilt: false });
@@ -233,7 +233,7 @@
         entry.label.textContent = labelFor(entry.item);
       });
       buildAllHeroes();
-      announce();
+      announce('lang', true);
     });
 
     function updateStyles() {
@@ -244,28 +244,94 @@
         if (i === active) entry.row.classList.add('active');
         else              entry.row.classList.remove('active');
       });
-      announce();
     }
 
     // Tell the homepage object (p3-object.js) which row is highlighted.
+    //   source  - 'pointer' | 'focus' | 'click' | 'key' | 'stone' | 'lang' | 'init'
+    //   settled - false while a hover traversal or a stone drag is still
+    //             moving, so the object saves its once-per-change effects
+    //             for the row the interaction ends on.
+    //   ids     - the row order, so the object never keeps its own copy.
     // Site sections are numbered 01..06; the external GITHUB row is not.
     var sections = ITEMS.filter(function (item) { return !item.external; }).length;
-    function announce() {
+    var ids = ITEMS.map(function (item) { return item.id; });
+    function announce(source, settled) {
       var item = rows[active].item;
       window.dispatchEvent(new CustomEvent('p3-select', { detail: {
-        id: item.id, index: active, total: rows.length,
+        id: item.id, index: active, total: rows.length, ids: ids,
         ordinal: item.external ? 0 : active + 1, sections: sections,
-        label: labelFor(item)
+        label: labelFor(item), source: source, settled: settled
       } }));
     }
 
-    function setActive(i) {
-      if (i < 0) i = 0;
-      if (i >= rows.length) i = rows.length - 1;
-      if (i === active) return;
+    function show(i, source, settled) {
+      if (i === active && !settled) return;
       active = i;
       updateStyles();
+      announce(source, settled);
     }
+
+    // Hover travels: the highlight steps one row at a time toward the row
+    // under the pointer, so a fast or diagonal sweep reads as one motion
+    // instead of a jump. The first step is immediate. There is no queue -
+    // `goal` is just retargeted, so reversing direction turns the travel
+    // around at once. Far moves step faster so the catch-up stays under
+    // ~0.3 s (PROJECTS to GITHUB: 3 x 52 + 2 x 60 = 276 ms). Steps are timed
+    // against a running schedule, so timer lateness does not add up.
+    var STEP_FAR_MS = 52, STEP_NEAR_MS = 60;
+    var reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+    var goal = 0, stepTimer = null, stepAt = 0, stoneDragging = false;
+
+    function clampIndex(i) { return Math.max(0, Math.min(rows.length - 1, i)); }
+
+    function step() {
+      stepTimer = null;
+      if (active === goal) return;
+      var next = active + (goal > active ? 1 : -1);
+      show(next, 'pointer', next === goal);
+      var left = Math.abs(goal - active);
+      if (!left) return;
+      stepAt += left > 2 ? STEP_FAR_MS : STEP_NEAR_MS;
+      stepTimer = setTimeout(step, Math.max(0, stepAt - performance.now()));
+    }
+
+    function select(i, source) {
+      i = clampIndex(i);
+      if (source === 'pointer') {
+        if (stoneDragging) return;          // the stone owns selection mid-drag
+        goal = i;
+        if (reduceMotion && reduceMotion.matches) {
+          clearTimeout(stepTimer); stepTimer = null;
+          show(i, source, true);
+        } else if (!stepTimer) {
+          stepAt = performance.now();
+          step();
+        }
+        return;
+      }
+      // Keys, focus, clicks and the stone are exact and win at once: any
+      // unfinished hover travel is dropped.
+      clearTimeout(stepTimer); stepTimer = null;
+      goal = i;
+      if (source !== 'stone') stoneDragging = false;
+      show(i, source, !stoneDragging);
+    }
+
+    // Requests from the homepage object's drag. phase: 'start' locks hover
+    // out; 'move' changes the highlight as detents are crossed; 'end' lands
+    // on the final row. Selection only - nothing here ever navigates.
+    window.addEventListener('p3-request', function (e) {
+      var d = e.detail || {};
+      if (d.phase === 'start') {
+        clearTimeout(stepTimer); stepTimer = null;
+        goal = active;
+        stoneDragging = true;
+        return;
+      }
+      if (d.phase === 'end') stoneDragging = false;
+      else if (!stoneDragging) return;      // a key already took over
+      if (typeof d.index === 'number') select(d.index, 'stone');
+    });
 
     function activateCurrent() {
       var entry = rows[active];
@@ -297,12 +363,13 @@
       var heroRect = root.getBoundingClientRect();
       var visible  = heroRect.bottom > 120 && heroRect.top < window.innerHeight * 0.6;
       if (!visible) return;
-      if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(active - 1); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); select(active - 1, 'key'); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); select(active + 1, 'key'); }
       if (e.key === 'Enter')     { e.preventDefault(); activateCurrent(); }
     });
 
     updateStyles();
+    announce('init', true);
 
     // Build SVGs after labels have laid out at least once.
     function whenReady() {
