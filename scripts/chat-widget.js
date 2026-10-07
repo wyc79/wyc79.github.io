@@ -968,7 +968,7 @@
     // Presentation follows the site's Swiss tokens (styles.css); the
     // fallbacks keep it legible on a page that does not load styles.css.
     var INK = 'var(--ink,#111)', PAPER = 'var(--paper,#F2F0E9)', INK2 = 'var(--ink-2,#5C5A55)';
-    var RULE = 'var(--rule-soft,rgba(17,17,17,.18))', RED = 'var(--red,#DA291C)', REDTXT = 'var(--red-text,#C8251A)';
+    var RULE = 'var(--rule-soft,rgba(17,17,17,.18))', ACCENT = 'var(--accent-ui,#A51C30)';
     var FONT = 'var(--font,"Inter","Helvetica Neue",Helvetica,Arial,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif)';
     var LABEL = 'font-weight:700;font-size:11px;line-height:1;letter-spacing:.08em;text-transform:uppercase;';
     var CHIP = 'font:inherit;font-size:.72rem;color:' + INK + ';border:1px solid ' + RULE + ';border-radius:0;' +
@@ -977,8 +977,8 @@
       '.ycchat-btn{position:fixed;left:1.1rem;bottom:1.1rem;z-index:1200;border:1px solid ' + INK + ';',
       ' background:' + INK + ';color:' + PAPER + ';border-radius:0;padding:.75rem 1rem;cursor:pointer;',
       ' font-family:' + FONT + ';' + LABEL + 'box-shadow:none;}',
-      '.ycchat-btn:hover{background:' + RED + ';border-color:' + RED + ';color:#fff;}',
-      '.ycchat-btn:focus-visible,.ycchat-panel :focus-visible{outline:2px solid ' + RED + ';outline-offset:2px;}',
+      '.ycchat-btn:hover{background:' + ACCENT + ';border-color:' + ACCENT + ';color:' + PAPER + ';}',
+      '.ycchat-btn:focus-visible,.ycchat-panel :focus-visible{outline:2px solid ' + ACCENT + ';outline-offset:2px;}',
       '.ycchat-panel{position:fixed;left:1.1rem;bottom:4.4rem;z-index:1200;width:min(400px,calc(100vw - 2rem));',
       ' height:min(560px,calc(100vh - 7rem));display:flex;flex-direction:column;background:' + PAPER + ';',
       ' color:' + INK + ';border:1px solid ' + INK + ';border-radius:0;',
@@ -994,7 +994,7 @@
       '.ycchat-clearchip{margin-left:auto;' + CHIP + 'color:' + INK2 + ';}',
       '.ycchat-clearchip:hover{border-color:' + INK + ';color:' + INK + ';}',
       '.ycchat-x{border:0;background:none;color:' + INK + ';font-size:1rem;cursor:pointer;padding:.2rem .4rem;}',
-      '.ycchat-x:hover{color:' + REDTXT + ';}',
+      '.ycchat-x:hover{color:' + ACCENT + ';}',
       '.ycchat-body{flex:1;overflow-y:auto;padding:.9rem;display:flex;flex-direction:column;gap:.75rem;}',
       '.ycchat-msg{max-width:88%;padding:.55rem .75rem;border-radius:0;white-space:pre-wrap;word-wrap:break-word;}',
       '.ycchat-msg.user{align-self:flex-end;background:' + INK + ';color:' + PAPER + ';}',
@@ -1003,14 +1003,14 @@
       '.ycchat-srcs{align-self:flex-start;display:flex;flex-direction:column;max-width:88%;border-top:1px solid ' + RULE + ';}',
       '.ycchat-src{display:block;text-decoration:none;border:0;border-bottom:1px solid ' + RULE + ';border-radius:0;padding:.45rem 0;',
       ' background:transparent;color:' + INK + ';font-size:.8rem;}',
-      '.ycchat-src:hover b{color:' + REDTXT + ';text-decoration:underline;}',
+      '.ycchat-src:hover b{color:' + ACCENT + ';text-decoration:underline;}',
       '.ycchat-src b{color:' + INK + ';display:block;font-size:.8rem;}',
       '.ycchat-src span{color:' + INK2 + ';display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '.ycchat-roles{display:flex;flex-direction:column;padding:.4rem 0;}',
       '.ycchat-role{border:0;border-top:1px solid ' + INK + ';border-radius:0;background:transparent;color:' + INK + ';',
       ' padding:.6rem 0;cursor:pointer;text-align:left;font:inherit;}',
       '.ycchat-role:last-child{border-bottom:1px solid ' + INK + ';}',
-      '.ycchat-role:hover b{color:' + REDTXT + ';}',
+      '.ycchat-role:hover b{color:' + ACCENT + ';}',
       '.ycchat-role b{display:block;} .ycchat-role span{color:' + INK2 + ';font-size:.78rem;}',
       '.ycchat-starters{display:flex;flex-wrap:wrap;gap:.35rem;}',
       '.ycchat-starter{' + CHIP + 'font-size:.75rem;padding:.3rem .6rem;text-align:left;}',
@@ -1018,10 +1018,10 @@
       '.ycchat-foot{display:flex;padding:.7rem;border-top:1px solid ' + INK + ';}',
       '.ycchat-in{flex:1;min-width:0;border:1px solid ' + INK + ';border-right:0;border-radius:0;padding:.5rem .7rem;font:inherit;',
       ' background:transparent;color:' + INK + ';}',
-      '.ycchat-in:focus-visible{outline:2px solid ' + RED + ';outline-offset:-2px;}',
+      '.ycchat-in:focus-visible{outline:2px solid ' + ACCENT + ';outline-offset:-2px;}',
       '.ycchat-send{border:1px solid ' + INK + ';background:' + INK + ';color:' + PAPER + ';border-radius:0;',
       ' padding:.5rem .9rem;cursor:pointer;font-family:' + FONT + ';' + LABEL + '}',
-      '.ycchat-send:hover:not(:disabled){background:' + RED + ';border-color:' + RED + ';color:#fff;}',
+      '.ycchat-send:hover:not(:disabled){background:' + ACCENT + ';border-color:' + ACCENT + ';color:' + PAPER + ';}',
       '.ycchat-send:disabled{opacity:.4;cursor:default;}',
       '.ycchat-dots::after{content:"…";animation:ycchat-b 1.2s infinite;}',
       '@keyframes ycchat-b{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}',
