@@ -20,9 +20,15 @@
   </div>
 
   <section class="p3-root" aria-label="Landing menu">
-    <canvas id="p3-sphere" class="p3-canvas" aria-hidden="true"></canvas>
-
     <nav class="p3-menu" aria-label="Primary sections"></nav>
+
+    <figure class="p3-object" aria-hidden="true">
+      <canvas></canvas>
+      <figcaption class="p3-object-meta">
+        <span class="p3-object-index"></span>
+        <span class="p3-object-name"></span>
+      </figcaption>
+    </figure>
 
     <div class="p3-hint" aria-hidden="true">
       <div class="p3-hint-row"><span class="p3-hint-key">&uarr;&darr;</span><span data-lang="en">NAVIGATE</span><span data-lang="zh">导航</span></div>
@@ -30,7 +36,7 @@
     </div>
   </section>
 
-  <script src="scripts/p3-sphere.js"></script>
+  <script src="scripts/p3-object.js"></script>
   <script src="scripts/p3-menu.js"></script>
 </body>
 </html>

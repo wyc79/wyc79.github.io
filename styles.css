@@ -1302,11 +1302,12 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
 
 /* =========================================================================
    Homepage (index.html). The page around it is Swiss like every other page:
-   the shared masthead, paper/ink ground, Inter. The P3 navigator itself -
-   sphere, tilted menu, wedges, Bebas labels, animations - is kept as built.
+   the shared masthead, paper/ink ground, Inter, the 1280px grid. The P3
+   navigator itself - tilted menu, wedges, Bebas labels, animations - is kept
+   as built and leads; a small rendered object (p3-object.js) sits in the
+   right-hand columns as a secondary accent that follows the selection.
    ========================================================================= */
-/* The masthead floats over the full-viewport stage, so the sphere keeps the
-   whole window it was designed for. */
+/* The masthead floats over the full-viewport stage. */
 .home-head {
   position: absolute;
   top: 0;
@@ -1316,6 +1317,8 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
 }
 /* ---------- Persona 3 style landing menu ---------- */
 .p3-root {
+  /* The page grid's outer edge: the same margin and 1280px cap as .wrap. */
+  --edge: max(var(--margin), calc((100% - var(--maxw)) / 2));
   position: relative;
   width: 100%;
   min-height: 100svh;
@@ -1323,19 +1326,14 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
   overflow: hidden;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-inline: var(--edge);
   font-family: 'Bebas Neue', 'Oswald', 'Arial Narrow', sans-serif;
 }
-.p3-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-  display: block;
-}
 .p3-menu {
+  /* Starts on the grid's second column, leaving the right-hand columns to
+     the object. */
+  margin-left: calc(100% / 12);
   position: relative;
   z-index: 20;
   display: flex;
@@ -1495,10 +1493,79 @@ html[lang="zh"] .p3-hero-text {
    0.85 line-height that lets Latin rows nest makes Chinese rows collide. */
 html[lang="zh"] .p3-label { line-height: 1.02; }
 
+/* ---------- Homepage object ----------
+   Columns 9-11 of the grid, a little below centre, capped at 300px so wide
+   screens get more margin rather than a bigger object. The canvas is square
+   and transparent; the form fills its middle half, the orbit nearly all. */
+.p3-object {
+  position: absolute;
+  z-index: 10;
+  top: 54%;
+  right: calc(var(--edge) + (100% - 2 * var(--edge)) / 12);
+  width: clamp(150px, 18vw, 300px);
+  margin: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.9s ease 0.6s;
+}
+.p3-object.is-ready { visibility: visible; opacity: 1; }
+.p3-object canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+/* Which section the selection is on: a thin rule, the section number in the
+   accent, its name in secondary ink. Set like every other piece of metadata
+   on the site. */
+.p3-object-meta {
+  display: flex;
+  gap: var(--s3);
+  /* Up into the square canvas's empty lower band, under the orbit. */
+  margin: -14% 0 0;
+  padding-top: var(--s2);
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--font);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  letter-spacing: var(--track-meta);
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.p3-object-index {
+  color: var(--accent-ui);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .p3-object { transition: none; }
+}
+/* Portrait tablets: the active wedge reaches the right-hand columns, so the
+   object drops into the empty band under the menu. */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .p3-object { top: auto; bottom: calc(var(--s5) + 96px); transform: none; }
+}
+
 /* Responsive scaling - label font-size set inline via JS is treated as px base;
    we scale it down on narrow viewports using transform-origin on the menu. */
 @media (max-width: 760px) {
-  .p3-menu { padding: 24px; transform: scale(0.72); transform-origin: center center; }
+  .p3-root { justify-content: center; }
+  .p3-menu { margin-left: 0; padding: 24px; transform: scale(0.72); transform-origin: center center; }
+  /* Below the menu, right-aligned, with the label beside it. */
+  .p3-object {
+    top: auto;
+    bottom: calc(var(--s5) + 76px);
+    right: var(--edge);
+    width: auto;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: flex-end;
+    gap: var(--s3);
+    transform: none;
+  }
+  .p3-object canvas { width: clamp(110px, 30vw, 150px); }
+  .p3-object-meta { flex-direction: column; gap: 0; margin: 0 0 22%; text-align: right; }
 }
 @media (max-width: 480px) {
   .p3-menu { transform: scale(0.52); }
@@ -1514,7 +1581,5 @@ html[data-theme="light"] .p3-row.active .p3-label {
   color: #14151a;
 }
 
-/* Homepage ground: the same paper / ink as every page. The WebGL canvas
-   clears to this colour (p3-sphere.js reads it), and it shows on its own
-   before the canvas inits or when WebGL is unavailable. */
+/* Homepage ground: the same paper / ink as every page. */
 .p3-body { background: var(--paper); color: var(--ink); }

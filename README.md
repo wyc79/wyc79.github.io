@@ -14,7 +14,7 @@ Personal portfolio of **Yuanchen Wang** (王元辰) — game developer and USC M
 
 | Area | Description |
 |------|-------------|
-| **Landing** (`index.html`) | Interactive sphere menu into Projects, Skills, Education, Publications, Agents, Toolbox |
+| **Landing** (`index.html`) | P3-style menu into Projects, Skills, Education, Publications, Agents, Toolbox, with a small real-time object that follows the selection |
 | **Projects** | Game work (Cemented Dreams, Nothing Can Go Wrong, Code Breaker, Gyrotris) plus engine / rendering / CAD / AD tooling |
 | **Skills / Education / Publications** | Background, coursework, and research |
 | **Agents** | Notes on agent skills used with this site |
@@ -60,7 +60,7 @@ Full pipeline, eval, and deploy notes: [`chat/README.md`](chat/README.md).
 
 | 区域 | 说明 |
 |------|------|
-| **首页**（`index.html`） | 交互式球体菜单，进入项目、技能、教育、论文、智能体、工具箱 |
+| **首页**（`index.html`） | P3 风格菜单，进入项目、技能、教育、论文、智能体、工具箱；旁边的小型实时渲染物体随选中项变化 |
 | **项目** | 游戏作品（Cemented Dreams、Nothing Can Go Wrong、Code Breaker、Gyrotris）及引擎 / 渲染 / CAD / 自动微分等工程项目 |
 | **技能 / 教育 / 论文** | 背景、课程与科研经历 |
 | **智能体** | 与本站相关的 Agent 技能说明 |

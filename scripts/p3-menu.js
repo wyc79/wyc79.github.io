@@ -233,6 +233,7 @@
         entry.label.textContent = labelFor(entry.item);
       });
       buildAllHeroes();
+      announce();
     });
 
     function updateStyles() {
@@ -243,6 +244,19 @@
         if (i === active) entry.row.classList.add('active');
         else              entry.row.classList.remove('active');
       });
+      announce();
+    }
+
+    // Tell the homepage object (p3-object.js) which row is highlighted.
+    // Site sections are numbered 01..06; the external GITHUB row is not.
+    var sections = ITEMS.filter(function (item) { return !item.external; }).length;
+    function announce() {
+      var item = rows[active].item;
+      window.dispatchEvent(new CustomEvent('p3-select', { detail: {
+        id: item.id, index: active, total: rows.length,
+        ordinal: item.external ? 0 : active + 1, sections: sections,
+        label: labelFor(item)
+      } }));
     }
 
     function setActive(i) {
