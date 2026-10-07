@@ -1,7 +1,8 @@
 // Projects page: where a whole snapshot (object-fit: contain) leaves its frame
 // unfilled, hand the frame the image's rendered geometry so styles.css can
-// mirror the image's edge outward and fade it into the plate over --media-bleed
-// (see .project-media). Purely presentational: without it the plate shows.
+// carry the image on past its edges, scroll-style (the left gap shows its right
+// end and vice versa), fading into the plate over --media-bleed (see
+// .project-media). Purely presentational: without it the plate shows.
 (function () {
   'use strict';
 

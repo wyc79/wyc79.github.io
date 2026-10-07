@@ -61,7 +61,7 @@
   --frame: color-mix(in srgb, var(--ink) 6%, var(--paper));
   --frame-rule: color-mix(in srgb, var(--accent-ui) 45%, var(--paper));
   --frame-width: 2px;
-  /* How far a snapshot's mirrored edge fades out into an unfilled frame. */
+  /* How far a snapshot carries on, fading, into an unfilled frame. */
   --media-bleed: 40px;
   color-scheme: light;
 
@@ -489,9 +489,10 @@ main { display: block; padding-top: var(--s8); }
 }
 .project-media img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; display: block; }
 /* Authored bleed (scripts/media-bleed.js sets the geometry): where the image
-   leaves the frame unfilled, its edge is mirrored outward - continuous at the
-   seam - and fades into the plate over --media-bleed. The frame clips it when
-   the gap is narrower than that. Each band tucks 1px under the image so a
+   leaves the frame unfilled it carries on as if on a scrolling strip - the
+   left gap shows its rightmost columns, the right gap its leftmost (top and
+   bottom likewise) - fading into the plate over --media-bleed. The frame clips
+   it when the gap is narrower. Each band tucks 1px under the image so a
    fractional image edge never shows a hairline of plate. */
 .project-media { position: relative; isolation: isolate; }
 .project-media.bleed-x::before,
@@ -511,38 +512,36 @@ main { display: block; padding-top: var(--s8); }
   top: var(--img-top);
   width: calc(var(--media-bleed) + 1px);
   height: var(--img-h);
-  transform: scaleX(-1);
 }
 .project-media.bleed-x::before {
   left: calc(var(--img-left) - var(--media-bleed));
-  background-position: left top;
-  -webkit-mask-image: linear-gradient(to right, #000, rgba(0, 0, 0, .45) 45%, transparent);
-  mask-image: linear-gradient(to right, #000, rgba(0, 0, 0, .45) 45%, transparent);
-}
-.project-media.bleed-x::after {
-  left: calc(var(--img-left) + var(--img-w) - 1px);
   background-position: right top;
   -webkit-mask-image: linear-gradient(to left, #000, rgba(0, 0, 0, .45) 45%, transparent);
   mask-image: linear-gradient(to left, #000, rgba(0, 0, 0, .45) 45%, transparent);
+}
+.project-media.bleed-x::after {
+  left: calc(var(--img-left) + var(--img-w) - 1px);
+  background-position: left top;
+  -webkit-mask-image: linear-gradient(to right, #000, rgba(0, 0, 0, .45) 45%, transparent);
+  mask-image: linear-gradient(to right, #000, rgba(0, 0, 0, .45) 45%, transparent);
 }
 .project-media.bleed-y::before,
 .project-media.bleed-y::after {
   left: var(--img-left);
   width: var(--img-w);
   height: calc(var(--media-bleed) + 1px);
-  transform: scaleY(-1);
 }
 .project-media.bleed-y::before {
   top: calc(var(--img-top) - var(--media-bleed));
-  background-position: left top;
-  -webkit-mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, .45) 45%, transparent);
-  mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, .45) 45%, transparent);
-}
-.project-media.bleed-y::after {
-  top: calc(var(--img-top) + var(--img-h) - 1px);
   background-position: left bottom;
   -webkit-mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, .45) 45%, transparent);
   mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, .45) 45%, transparent);
+}
+.project-media.bleed-y::after {
+  top: calc(var(--img-top) + var(--img-h) - 1px);
+  background-position: left top;
+  -webkit-mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, .45) 45%, transparent);
+  mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, .45) 45%, transparent);
 }
 .project-card .card-cover { position: absolute; inset: 0; z-index: 2; }
 .project-card .card-cover:focus-visible { outline-offset: 6px; }
