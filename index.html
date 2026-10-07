@@ -12,6 +12,7 @@
   <script src="scripts/page-header.js"></script>
   <script src="scripts/i18n.js"></script>
   <script src="scripts/theme.js"></script>
+  <script src="scripts/stone-renderer.js" defer></script>
   <script src="scripts/chat-widget.js" defer></script>
 </head>
 <body id="top" class="p3-body">
@@ -22,9 +23,12 @@
   <section class="p3-root" aria-label="Landing menu">
     <nav class="p3-menu" aria-label="Primary sections"></nav>
 
-    <figure class="p3-object" aria-hidden="true">
-      <canvas></canvas>
-      <figcaption class="p3-object-meta">
+    <figure class="p3-object">
+      <button type="button" class="p3-stone" data-ycchat-launcher data-ycchat-side="right">
+        <canvas aria-hidden="true"></canvas>
+        <span class="p3-stone-label"><span data-lang="en">ASK AI</span><span data-lang="zh">问 AI</span></span>
+      </button>
+      <figcaption class="p3-object-meta" aria-hidden="true">
         <span class="p3-object-index"></span>
         <span class="p3-object-name"></span>
       </figcaption>
@@ -36,7 +40,7 @@
     </div>
   </section>
 
-  <script src="scripts/p3-object.js"></script>
-  <script src="scripts/p3-menu.js"></script>
+  <script src="scripts/p3-object.js" defer></script>
+  <script src="scripts/p3-menu.js" defer></script>
 </body>
 </html>

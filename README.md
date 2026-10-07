@@ -14,7 +14,7 @@ Personal portfolio of **Yuanchen Wang** (王元辰) — game developer and USC M
 
 | Area | Description |
 |------|-------------|
-| **Landing** (`index.html`) | P3-style menu into Projects, Skills, Education, Publications, Agents, Toolbox, with a small real-time object that follows the selection |
+| **Landing** (`index.html`) | P3-style menu into Projects, Skills, Education, Publications, Agents, Toolbox, with a small real-time stone that follows the selection and opens Ask AI (the same stone is the chat launcher on every page) |
 | **Projects** | Game work (Cemented Dreams, Nothing Can Go Wrong, Code Breaker, Gyrotris) plus engine / rendering / CAD / AD tooling |
 | **Skills / Education / Publications** | Background, coursework, and research |
 | **Agents** | Notes on agent skills used with this site |
@@ -24,7 +24,7 @@ Personal portfolio of **Yuanchen Wang** (王元辰) — game developer and USC M
 ### Stack
 
 - Static **HTML / CSS / vanilla JS** (no site framework)
-- Client scripts: theme, i18n, page header, landing canvas/menu, chat widget
+- Client scripts: theme, i18n, page header, landing menu, shared stone renderer (`stone-renderer.js`), chat widget
 - Optional chat backend: Tencent SCF + DeepSeek (API key never in the repo)
 - Chat index pipeline: Python package under `chat/`
 
@@ -60,7 +60,7 @@ Full pipeline, eval, and deploy notes: [`chat/README.md`](chat/README.md).
 
 | 区域 | 说明 |
 |------|------|
-| **首页**（`index.html`） | P3 风格菜单，进入项目、技能、教育、论文、智能体、工具箱；旁边的小型实时渲染物体随选中项变化 |
+| **首页**（`index.html`） | P3 风格菜单，进入项目、技能、教育、论文、智能体、工具箱；旁边的小型实时渲染石头随选中项变化，点击即可打开“问 AI”（每个页面的聊天入口都是这块石头） |
 | **项目** | 游戏作品（Cemented Dreams、Nothing Can Go Wrong、Code Breaker、Gyrotris）及引擎 / 渲染 / CAD / 自动微分等工程项目 |
 | **技能 / 教育 / 论文** | 背景、课程与科研经历 |
 | **智能体** | 与本站相关的 Agent 技能说明 |
@@ -70,7 +70,7 @@ Full pipeline, eval, and deploy notes: [`chat/README.md`](chat/README.md).
 ### 技术栈
 
 - 静态 **HTML / CSS / 原生 JS**（站点无前端框架）
-- 客户端脚本：主题、中英文、页头、首页画布与菜单、聊天组件
+- 客户端脚本：主题、中英文、页头、首页菜单、共享石头渲染器（`stone-renderer.js`）、聊天组件
 - 可选聊天后端：腾讯云 SCF + DeepSeek（密钥不进仓库）
 - 索引构建：`chat/` 下的 Python 包
 

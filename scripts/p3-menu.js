@@ -251,6 +251,9 @@
     //   settled - false while a hover traversal or a stone drag is still
     //             moving, so the object saves its once-per-change effects
     //             for the row the interaction ends on.
+    //   goal    - where a hover traversal is heading (the row under the
+    //             pointer); equal to index for every other source. The stone
+    //             aims straight for it while the titles step there.
     //   ids     - the row order, so the object never keeps its own copy.
     // Site sections are numbered 01..06; the external GITHUB row is not.
     var sections = ITEMS.filter(function (item) { return !item.external; }).length;
@@ -258,7 +261,7 @@
     function announce(source, settled) {
       var item = rows[active].item;
       window.dispatchEvent(new CustomEvent('p3-select', { detail: {
-        id: item.id, index: active, total: rows.length, ids: ids,
+        id: item.id, index: active, goal: goal, total: rows.length, ids: ids,
         ordinal: item.external ? 0 : active + 1, sections: sections,
         label: labelFor(item), source: source, settled: settled
       } }));

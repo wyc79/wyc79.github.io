@@ -1512,7 +1512,9 @@ html[lang="zh"] .p3-label { line-height: 1.02; }
    Columns 9-11 of the grid (the last three from 1200px), a little below
    centre, capped at 300px so wide screens get more margin rather than a
    bigger object. The canvas is square and transparent; the form fills its
-   middle half, the orbit nearly all. */
+   middle half, the orbit nearly all. The stone is also the Ask AI launcher
+   (a real button, adopted by chat-widget.js); without WebGL it falls back
+   to the plain text button (.no-stone). */
 .p3-object {
   position: absolute;
   z-index: 10;
@@ -1522,29 +1524,81 @@ html[lang="zh"] .p3-label { line-height: 1.02; }
   margin: 0;
   transform: translateY(-50%);
   pointer-events: none;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 0.9s ease 0.6s;
+  animation: p3-object-in 0.9s ease 0.6s both;
 }
-.p3-object.is-ready { visibility: visible; opacity: 1; }
+@keyframes p3-object-in { from { opacity: 0; } to { opacity: 1; } }
+/* The launcher button is only a frame: the stone and its label take the
+   clicks, the empty corners of the canvas do not. */
+.p3-stone {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .p3-object canvas {
   display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
   /* The canvas is the drag surface (p3-object.js): sideways drags scrub the
-     selection, vertical swipes stay with the page. The clip trims the empty
-     bands above the orbit and under it - where the label sits - out of the
-     hit area without touching anything drawn. */
+     selection, a tap opens Ask AI, vertical swipes stay with the page. The
+     clip trims the empty bands above the orbit and under it - where the
+     metadata sits - out of the hit area without touching anything drawn. */
   pointer-events: auto;
   touch-action: pan-y;
   cursor: grab;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
   clip-path: inset(12% 0 15% 0);
 }
 .p3-object.is-dragging canvas { cursor: grabbing; }
+/* What the stone does, said plainly: a quiet label in the canvas's empty
+   top band, set like the site's other metadata - not like a menu row. */
+.p3-stone-label {
+  position: absolute;
+  top: 12%;
+  left: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: var(--track-meta);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.p3-stone:hover .p3-stone-label {
+  text-decoration: underline;
+  text-decoration-color: var(--accent-ui);
+  text-underline-offset: .35em;
+}
+.p3-stone:focus-visible { outline: none; }
+.p3-stone:focus-visible .p3-stone-label { outline: 2px solid var(--accent-ui); outline-offset: 3px; }
+/* No WebGL: the label becomes the site's usual text button, and the
+   metadata drops back under it. */
+.p3-object.no-stone canvas { display: none; }
+.p3-object.no-stone .p3-stone { width: auto; display: inline-block; }
+.p3-object.no-stone .p3-stone-label {
+  position: static;
+  display: inline-block;
+  padding: .75rem 1rem;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+}
+.p3-object.no-stone .p3-stone-label::before { content: "\2726\00a0"; }
+.p3-object.no-stone .p3-stone:hover .p3-stone-label { background: var(--accent-ui); border-color: var(--accent-ui); }
+.p3-object.no-stone .p3-object-meta { margin-top: var(--s4); }
 /* Which section the selection is on: a thin rule, the section number in the
    accent, its name in secondary ink. Set like every other piece of metadata
    on the site. */
@@ -1568,7 +1622,7 @@ html[lang="zh"] .p3-label { line-height: 1.02; }
   font-variant-numeric: tabular-nums;
 }
 @media (prefers-reduced-motion: reduce) {
-  .p3-object { transition: none; }
+  .p3-object { animation: none; }
 }
 /* Wide screens: the titles' centre moves in to ~40% of the grid (the menu
    box is centred at 41%; its padding and row offsets put the text ~1% left
@@ -1602,6 +1656,7 @@ html[lang="zh"] .p3-label { line-height: 1.02; }
     gap: var(--s3);
     transform: none;
   }
+  .p3-stone { width: auto; }
   .p3-object canvas { width: clamp(110px, 30vw, 150px); }
   .p3-object-meta { flex-direction: column; gap: 0; margin: 0 0 22%; text-align: right; }
   .p3-object canvas { clip-path: inset(12% 0); }

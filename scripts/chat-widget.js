@@ -41,6 +41,10 @@
 (function () {
   'use strict';
 
+  // Loaded twice (or re-run), the widget would add a second launcher and a
+  // second panel; the first copy owns the page.
+  if (window.YCChat) return;
+
   // ── Config ────────────────────────────────────────────────────────────
   // Backend base URL (Tencent SCF 函数URL). Set it here
   // after deploying — see chat/functions/tencent/DEPLOY.md. A page may also
@@ -200,7 +204,8 @@
   var STR = {
     en: {
       askBtn: '✦ ASK AI',
-      openAria: 'Open AI chat about YC',
+      askLabel: 'ASK AI',
+      openAria: 'Ask AI about YC',
       panelAria: 'Chat with an AI about YC',
       header: 'Ask about YC',
       chooseRole: 'choose role',
@@ -251,7 +256,8 @@
     },
     zh: {
       askBtn: '✦ 问 AI',
-      openAria: '打开关于王元辰的 AI 聊天',
+      askLabel: '问 AI',
+      openAria: '问 AI：关于王元辰',
       panelAria: '与 AI 聊王元辰的作品集',
       header: '问问王元辰',
       chooseRole: '选择身份',
@@ -979,6 +985,20 @@
       ' font-family:' + FONT + ';' + LABEL + 'box-shadow:none;}',
       '.ycchat-btn:hover{background:' + ACCENT + ';border-color:' + ACCENT + ';color:' + PAPER + ';}',
       '.ycchat-btn:focus-visible,.ycchat-panel :focus-visible{outline:2px solid ' + ACCENT + ';outline-offset:2px;}',
+      // The stone launcher (YCStone.ambient, stone-renderer.js). Until the
+      // stone has drawn - or if it never can - the button above is what
+      // shows. Only the stone itself and the label take clicks: the empty
+      // corners of the canvas stay with the page underneath.
+      '.ycchat-btn canvas{display:none;}',
+      '.ycchat-btn.is-stone{left:calc(.5rem + env(safe-area-inset-left,0px));bottom:calc(.25rem + env(safe-area-inset-bottom,0px));',
+      ' display:flex;align-items:center;padding:0;border:0;background:transparent;color:' + INK + ';pointer-events:none;}',
+      '.ycchat-btn.is-stone:hover{background:transparent;color:' + INK + ';}',
+      '.ycchat-btn.is-stone canvas{display:block;width:84px;height:84px;clip-path:inset(17% 0);pointer-events:auto;cursor:pointer;}',
+      '.ycchat-btn.is-stone .ycchat-btn-label{pointer-events:auto;cursor:pointer;margin-left:-.35rem;padding:.3rem .4rem;background:' + PAPER + ';}',
+      '.ycchat-btn.is-stone:hover .ycchat-btn-label{text-decoration:underline;text-decoration-color:' + ACCENT + ';text-underline-offset:.35em;}',
+      '.ycchat-btn.is-stone:focus-visible{outline:none;}',
+      '.ycchat-btn.is-stone:focus-visible .ycchat-btn-label{outline:2px solid ' + ACCENT + ';outline-offset:2px;}',
+      '@media (max-width:640px){.ycchat-btn.is-stone canvas{width:68px;height:68px;clip-path:inset(14% 0);}}',
       '.ycchat-panel{position:fixed;left:1.1rem;bottom:4.4rem;z-index:1200;width:min(400px,calc(100vw - 2rem));',
       ' height:min(560px,calc(100vh - 7rem));display:flex;flex-direction:column;background:' + PAPER + ';',
       ' color:' + INK + ';border:1px solid ' + INK + ';border-radius:0;',
@@ -1407,6 +1427,7 @@
 
   function buildPanel() {
     els.panel = h('div', 'ycchat-panel');
+    els.panel.id = 'ycchat-panel';
     els.panel.setAttribute('role', 'dialog');
     els.panel.setAttribute('aria-label', t('panelAria'));
 
@@ -1422,7 +1443,7 @@
     els.closeBtn = x;
     x.type = 'button';
     x.setAttribute('aria-label', t('closeAria'));
-    x.addEventListener('click', toggle);
+    x.addEventListener('click', function () { setOpen(false); });
     head.appendChild(x);
 
     // Second row: the actions. Kept OUT of the starters row on purpose --
@@ -1469,14 +1490,15 @@
     // Keys typed inside the chat belong to the chat: stop them from reaching
     // page-level shortcuts (the landing page navigates on Enter / arrows).
     els.panel.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') toggle();
+      if (e.key === 'Escape') setOpen(false);
       e.stopPropagation();
     });
 
     document.body.appendChild(els.panel);
+    els.btn.setAttribute('aria-controls', els.panel.id);
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && state.open) toggle();
+      if (e.key === 'Escape' && state.open) setOpen(false);
     });
   }
 
@@ -1497,12 +1519,55 @@
     } catch (e) { /* prewarming must never break the chat */ }
   }
 
-  function toggle() {
+  // The panel opens beside the control that opened it. Homepage
+  // (data-ycchat-side="right"): just left of the large stone, level with it,
+  // so the stone stays in view and a second tap on it closes the chat; only
+  // when there is no room there does it sit over the stone. Everywhere else:
+  // above the lower-left launcher. Narrow screens get a full-width panel
+  // above the launcher whatever the side.
+  function positionPanel() {
+    if (!els.panel || !els.btn) return;
+    var EDGE = 16, GAP = 8;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var r = els.btn.getBoundingClientRect();
+    var w = Math.min(400, vw - 2 * EDGE), h, bottom, ps = els.panel.style;
+    if (els.side === 'right' && vw >= 700) {
+      ps.left = 'auto';
+      h = Math.min(560, vh - 2 * EDGE);
+      if (r.left - GAP - w >= EDGE) {
+        ps.right = Math.round(vw - r.left + GAP) + 'px';
+        var top = Math.max(EDGE, Math.min(vh - h - EDGE, r.top + r.height / 2 - h / 2));
+        bottom = Math.round(vh - top - h);
+      } else {
+        ps.right = Math.max(EDGE, Math.round(vw - r.right)) + 'px';
+        bottom = EDGE;
+      }
+    } else {
+      ps.right = 'auto';
+      ps.left = (vw < 560 ? EDGE : Math.max(EDGE, Math.min(Math.round(r.left), vw - w - EDGE))) + 'px';
+      bottom = r.height ? Math.round(vh - r.top + GAP) : 70;
+      bottom = Math.min(bottom, vh - 240 - EDGE);
+      h = Math.max(240, Math.min(560, vh - bottom - EDGE));
+    }
+    ps.bottom = bottom + 'px';
+    ps.height = h + 'px';
+  }
+
+  // The one place the panel opens or closes. Every control - the launcher,
+  // the panel's close button, Escape, window.YCChat - comes through here, so
+  // the launcher's aria-expanded and the 'ycchat-change' event never
+  // disagree with what is on screen.
+  function setOpen(open) {
+    open = !!open;
+    if (open === state.open || !els.btn) return;
     if (!els.panel) buildPanel();
-    state.open = !state.open;
-    els.panel.style.display = state.open ? 'flex' : 'none';
-    els.btn.setAttribute('aria-expanded', String(state.open));
-    if (!state.open) return;
+    state.open = open;
+    els.panel.style.display = open ? 'flex' : 'none';
+    els.btn.setAttribute('aria-expanded', String(open));
+    if (open) positionPanel();
+    else if (els.panel.contains(document.activeElement)) els.btn.focus({ preventScroll: true });
+    window.dispatchEvent(new CustomEvent('ycchat-change', { detail: { open: open } }));
+    if (!open) return;
     prewarm();
 
     if (!state.roles) {
@@ -1536,11 +1601,11 @@
   // Re-localize every already-rendered piece of chrome when the site toggle
   // fires. Live conversation messages keep their original language; only the
   // role picker (if that's the current view) re-renders.
+  function toggle() { setOpen(!state.open); }
+
   function applyLang() {
-    if (els.btn) {
-      els.btn.textContent = t('askBtn');
-      els.btn.setAttribute('aria-label', t('openAria'));
-    }
+    if (els.btn) els.btn.setAttribute('aria-label', t('openAria'));
+    if (els.btnLabel) els.btnLabel.textContent = t(els.stone ? 'askLabel' : 'askBtn');
     if (!els.panel) return;
     els.panel.setAttribute('aria-label', t('panelAria'));
     if (els.header) els.header.textContent = t('header');
@@ -1560,17 +1625,61 @@
     if (state.open && state.roles && !state.role) showRolePicker();
   }
 
+  // The launcher on pages without one of their own: the small stone with an
+  // ASK AI label, lower left. It starts as the plain text button and turns
+  // into the stone only once the stone has actually initialised, so a page
+  // without WebGL (or without stone-renderer.js) keeps a working button.
+  function buildLauncher() {
+    var btn = h('button', 'ycchat-btn');
+    btn.type = 'button';
+    var canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-hidden', 'true');
+    els.btnLabel = h('span', 'ycchat-btn-label', t('askBtn'));
+    btn.appendChild(canvas);
+    btn.appendChild(els.btnLabel);
+    document.body.appendChild(btn);
+    els.btn = btn;
+    els.side = 'left';
+    var toText = function () {
+      if (els.stone) { els.stone.destroy(); els.stone = null; }
+      btn.classList.remove('is-stone');
+      els.btnLabel.textContent = t('askBtn');
+    };
+    els.stone = window.YCStone ? window.YCStone.ambient(canvas, { hoverTarget: btn, onLost: toText }) : null;
+    if (els.stone) {
+      btn.classList.add('is-stone');
+      els.btnLabel.textContent = t('askLabel');
+    }
+  }
+
   function init() {
     loadSession(); // TODO#3: restore per-role transcripts + session id for this tab
     injectStyles();
-    els.btn = h('button', 'ycchat-btn', t('askBtn'));
-    els.btn.type = 'button';
+    // A page can bring its own launcher (the homepage stone); otherwise the
+    // widget adds one. Either way there is exactly one.
+    var own = document.querySelector('[data-ycchat-launcher]');
+    if (own) {
+      els.btn = own;
+      els.side = own.getAttribute('data-ycchat-side') || 'left';
+    } else {
+      buildLauncher();
+    }
     els.btn.setAttribute('aria-expanded', 'false');
+    els.btn.setAttribute('aria-haspopup', 'dialog');
     els.btn.setAttribute('aria-label', t('openAria'));
     els.btn.addEventListener('click', toggle);
-    document.body.appendChild(els.btn);
     window.addEventListener('yc-langchange', applyLang);
+    window.addEventListener('resize', function () { if (state.open) positionPanel(); });
   }
+
+  // The supported way for the rest of the site to drive the chat. State
+  // changes are announced as a 'ycchat-change' event ({ open }).
+  window.YCChat = {
+    open: function () { setOpen(true); },
+    close: function () { setOpen(false); },
+    toggle: toggle,
+    isOpen: function () { return !!state.open; }
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
