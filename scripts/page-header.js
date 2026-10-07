@@ -1,6 +1,7 @@
-// Shared masthead for every inner page - injects the brand, the numbered
+// Shared masthead for every page - injects the brand, the numbered
 // section index, contact links and the language / theme toggles into
-// <header class="page-head" data-page-header></header>.
+// <header class="page-head" data-page-header></header>. A host marked
+// data-no-nav gets no section index (the landing page's P3 menu is that index).
 // Must load BEFORE theme.js so its DOMContentLoaded handler registers first and
 // the #themeToggle button exists when theme.js wires it up. Load i18n.js AFTER
 // this file so the injected header (with its data-lang spans) is present when
@@ -34,6 +35,7 @@
     var file = window.location.pathname.split('/').pop() || 'index.html';
     var inProject = !!document.querySelector('.project-hero');
 
+    var withNav = !host.hasAttribute('data-no-nav');
     var nav = SECTIONS.map(function (s, i) {
       var current = s.file === file ? ' aria-current="page"'
         : (inProject && s.file === 'projects.html' ? ' aria-current="true"' : '');
@@ -44,7 +46,7 @@
     }).join('');
 
     host.innerHTML = [
-      '<div class="mast">',
+      '<div class="mast', withNav ? '' : ' mast--no-nav', '">',
         '<a class="mast-brand" href="', prefix, 'index.html" aria-label="Back to landing page">',
           '<img class="mast-logo" src="', prefix, 'images/wyc.png" alt="Yuanchen Wang logo" />',
           '<span>',
@@ -55,7 +57,7 @@
             '</span>',
           '</span>',
         '</a>',
-        '<nav class="mast-nav" aria-label="Sections"><ol>', nav, '</ol></nav>',
+        withNav ? '<nav class="mast-nav" aria-label="Sections"><ol>' + nav + '</ol></nav>' : '',
         '<div class="mast-links">',
           '<a href="mailto:ywang217@usc.edu">EMAIL</a>',
           '<a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LINKEDIN</a>',

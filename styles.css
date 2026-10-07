@@ -326,6 +326,14 @@ html[data-theme="dark"] #themeToggle [data-opt="dark"] {
   .mast-links { grid-row: 3; }
   .mast-utils { grid-column: 1 / -1; grid-row: 4; }
 }
+/* Landing page: no section index row (the P3 menu is the index), so the
+   rows below it move up. */
+@media (max-width: 1023px) {
+  .mast--no-nav .mast-links { grid-row: 2; }
+}
+@media (max-width: 639px) {
+  .mast--no-nav .mast-utils { grid-row: 3; }
+}
 
 /* ---------- Page sections and editorial intros ---------- */
 main { display: block; padding-top: var(--s8); }
