@@ -22,7 +22,7 @@
 
     <main>
       <!-- HERO -->
-      <section class="project-hero" style="background-image: url('../images/ai_tarot.jpg');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="A Smith-Waite tarot spread: The Moon face up beside three cards still face down."></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title"><span data-lang="en">AI Tarot Projection</span><span data-lang="zh">AI 塔罗投射</span></h2>
@@ -32,6 +32,7 @@
             <div class="project-hero__meta-item"><span data-lang="en">Duration: Aug - Sep 2026</span><span data-lang="zh">周期：2026 年 8 月至 9 月</span></div>
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/ai_tarot.jpg" alt="" /></figure>
       </section>
 
       <section class="project-body">
@@ -43,16 +44,16 @@
         </p>
 
         <!-- TOP: What | Main Achievements + Highlights -->
-        <section style="margin-top: 1.5rem;">
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+        <section class="project-block">
+          <div class="two-col">
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">For people who don&rsquo;t believe in tarot but believe in thinking out loud. Three cards go face down on the table before anything is said. You are asked what you <em>see</em> in the one in front of you, not what it means, and it turns over when the conversation has somewhere to go.</span><span data-lang="zh">写给不信塔罗、却相信把话说出口的人。开口之前，三张牌先扣在桌上。它问你：眼前这张牌，你<em>看见</em>了什么？不是它意味着什么，就是你看见了什么。等对话真有了去处，牌才翻开。</span></p>
               <p class="meta"><span data-lang="en">Nothing here predicts anything. The deck is a projective surface: something specific and strange to point at, so the thing you actually wanted to say has an easier route out than &ldquo;I&rsquo;ve been a bit off lately.&rdquo; The reader&rsquo;s job is to hand your own words back to you in an order you hadn&rsquo;t tried.</span><span data-lang="zh">这里不预测任何事。牌只是一个供人投射的东西：具体、古怪，可以伸手去指。有了它，你真正想说的那句话，就比&ldquo;我最近状态不太好&rdquo;更容易出口。读牌人要做的，是把你说过的话重新排一个顺序，再还给你。</span></p>
               <p class="meta"><span data-lang="en">It runs entirely in the browser against an API key you supply. No account, no server that remembers you, and nothing of yours at rest anywhere but your own device.</span><span data-lang="zh">整个应用只跑在浏览器里，用你自己提供的 API 密钥。没有账号，没有会记住你的服务器；你的东西除了留在自己的设备上，别处都不留。</span></p>
 
-              <h3 style="margin-top: 1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
-              <p style="margin: 0;">
+              <h3><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
+              <p class="pill-list">
                 <span class="pill">Browser-only</span>
                 <span class="pill">Bring your own key</span>
                 <span class="pill">No server-side state</span>
@@ -69,7 +70,7 @@
               </p>
             </div>
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
+              <h3><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
               <ul>
                 <li data-lang="en">Made privacy an architectural property rather than a policy: the key travels in one header, is used inside the single request that carried it, and is gone.</li>
                 <li data-lang="zh">隐私是架构定下来的，不是写在条款里的：密钥只随一个请求头发出，用在携带它的那一次请求上，然后就没了。</li>
@@ -89,18 +90,18 @@
         </section>
 
         <!-- WHAT THIS IS NOT -->
-        <div style="background: rgba(127,127,127,.08); padding: 0.85rem 1rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 1.5rem;">
-          <p style="margin: 0;" class="meta"><strong><span data-lang="en">What this is not.</span><span data-lang="zh">这不是什么。</span></strong>
+        <div class="callout">
+          <p class="meta"><strong><span data-lang="en">What this is not.</span><span data-lang="zh">这不是什么。</span></strong>
             <span data-lang="en">A space for reflection, not therapy or crisis support. The app says so on its own first screen. If a conversation goes somewhere the cards have no business being, the reader drops the tarot frame entirely, says so plainly, and points at real help: <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> lists people who can actually do something.</span>
             <span data-lang="zh">这是一个用来反思的空间，不是心理治疗，也不是危机干预。应用第一屏就把这句话写在那里。万一聊到了牌不该插手的地方，读牌人会完全跳出塔罗的框架，把话直说，并指向真正能帮上忙的地方：<a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a> 上有能真正做点什么的人。</span>
           </p>
         </div>
 
         <!-- HOW -->
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-          <h4 style="margin-top: 0;"><span data-lang="en">Privacy as architecture, not policy</span><span data-lang="zh">隐私靠架构，不靠承诺</span></h4>
+          <h4><span data-lang="en">Privacy as architecture, not policy</span><span data-lang="zh">隐私靠架构，不靠承诺</span></h4>
           <p class="meta"><span data-lang="en">The honest answer to &ldquo;why should I trust this with my key&rdquo; is that you shouldn&rsquo;t have to. You should be able to read it. So the whole path a key takes is short enough to read in one sitting, and there are three of them to choose from: straight to the provider with nothing of mine in between, where that provider&rsquo;s CORS policy allows it; through a relay you run yourself; or through the hosted one, for when you just want to open a URL on your phone.</span><span data-lang="zh">对&ldquo;我凭什么把密钥交给它&rdquo;这个问题，诚实的回答是：你不必信任它，你可以直接把它读完。所以密钥要走的整条路都短到能一口气读下来，而且有三条可选：直连服务商，中间没有任何属于我的东西（前提是对方的 CORS 策略允许）；走你自己跑起来的那个中继；或者走托管的那一个，适合你只想在手机上打开一个网址的时候。</span></p>
           <p class="meta"><span data-lang="en">Whichever path it takes, the rules are the same. The key arrives in an <code>Authorization</code> header, is used inside the single request that carried it, and then it is gone: never written to a session map, a global, a file, or a database. It is never logged. Redaction goes by header name <em>and</em> by value, so a key that turns up inside an upstream error message is scrubbed before it reaches any output, and it is never echoed back in an error response either. Neither relay knows what tarot is, holds session state, or keeps any of the conversation. Your transcripts live in your own browser storage and nowhere else.</span><span data-lang="zh">无论走哪条路，规矩都一样。密钥放在 <code>Authorization</code> 请求头里发出，用在携带它的那一次请求上，然后就没了：不写进会话表，不写进全局变量，不写进文件，也不写进数据库。它不会进日志。脱敏既按请求头的名字，<em>也</em>按它的值，所以哪怕某个密钥出现在上游的报错信息里，都会在进入任何输出之前被擦掉，更不会被原样写回错误响应。两个中继都不知道塔罗是什么，不保存会话状态，也不留下任何对话。你的记录只在你自己的浏览器里。</span></p>
 
@@ -108,11 +109,11 @@
           <p class="meta"><span data-lang="en">The self-hosted option uses a roughly 300-line Python relay with no dependencies beyond the standard library; the hosted option uses a roughly 140-line Cloudflare Worker. Both implement the contract documented in <code>RELAY.md</code>, and the frontend cannot tell which one is responding. Tests enforce that indistinguishability as a design rule: a 20-test contract suite runs against <em>both</em> relays and requires them to agree on every branch, including a health response that does not reveal which implementation handled the request.</span><span data-lang="zh">自托管用的是一个约 300 行的 Python 中继，除标准库外没有任何依赖；托管路径用的是一个约 140 行的 Cloudflare Worker。两者实现同一份契约（写在 <code>RELAY.md</code> 里），前端分不出应答的是哪一个。分不出来这件事本身就是一条设计规则，所以它靠测试，而不是靠声称：一套二十个用例的契约测试对<em>两个</em>中继各跑一遍，要求它们在每条分支上结果一致，连健康检查的响应也不能透露你连到的是谁。</span></p>
           <p class="meta"><span data-lang="en">The same suite sends a canary key through every path, including error paths, and fails if that string appears anywhere in the captured output. The relays differ in one deliberate respect: the Python relay has a development logging flag, disabled by default, for users who choose to record their own conversations on their own machines. The Worker contains no logging path at all—not disabled code or even commented-out code—and a source-scanning test keeps it that way.</span><span data-lang="zh">同一套测试会把测试用密钥送入每条路径，包括各种错误分支；只要这串字符出现在捕获到的任何输出中，测试就会失败。两个中继只保留一项刻意设计的差异：Python 版本提供默认关闭的开发日志开关，供用户在自己的电脑上记录自己的对话；Worker 则完全不包含日志代码，无论启用、禁用还是注释形式都不允许存在，并由源码扫描测试持续检查。</span></p>
 
-          <div style="margin-top: 1rem;">
-            <img data-lang="en" src="../images/ai-tarot/key-path.svg" alt="Diagram tracing an API key from the browser through either interchangeable relay to the model provider, including the privacy rules and contract tests applied to both relays." style="width: 100%; border-radius: var(--radius-lg);" />
-            <img data-lang="zh" src="../images/ai-tarot/key-path-zh.svg" alt="API 密钥传输路径图：密钥从浏览器经由两个可互换中继中的任意一个到达模型服务商，并展示适用于两个中继的隐私规则与契约测试。" style="width: 100%; border-radius: var(--radius-lg);" />
-            <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-              <p style="margin: 0;" class="meta"><span data-lang="en">The key&rsquo;s complete lifecycle. You enter it in the settings panel, where it remains in memory for the current tab. It is written to the device only if you select &ldquo;remember on this device.&rdquo; The browser then sends it in an <code>Authorization</code> header to the configured relay. Either relay uses it once and discards it: the key is never stored, logged, or echoed. Past readings remain in your browser storage, and neither relay retains them. The band at the bottom verifies the claims made in the middle column: 20 contract tests run against both implementations, a canary key must remain absent from captured output on every branch, and a source scan checks the Worker for logging code.</span><span data-lang="zh">密钥走过的整条路。你把它填进设置面板，它只存在当前标签页的内存里；只有你勾选&ldquo;在本设备上记住&rdquo;，它才会写到设备上。随后它随一个 <code>Authorization</code> 请求头发往所配置的中继，在里面用一次就丢：不存、不记、不回显。以前的解读记录留在你自己的浏览器里，任何中继都不持有。图最下面那一条，是让中间这一栏站得住脚的东西：二十个契约测试同时跑在两个实现上，一个&ldquo;金丝雀&rdquo;密钥在任何分支的输出里都不许出现，还有一次 grep，检查 Worker 源码里有没有写日志的代码。</span></p>
+          <div class="figure">
+            <img data-lang="en" src="../images/ai-tarot/key-path.svg" alt="Diagram tracing an API key from the browser through either interchangeable relay to the model provider, including the privacy rules and contract tests applied to both relays." />
+            <img data-lang="zh" src="../images/ai-tarot/key-path-zh.svg" alt="API 密钥传输路径图：密钥从浏览器经由两个可互换中继中的任意一个到达模型服务商，并展示适用于两个中继的隐私规则与契约测试。" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">The key&rsquo;s complete lifecycle. You enter it in the settings panel, where it remains in memory for the current tab. It is written to the device only if you select &ldquo;remember on this device.&rdquo; The browser then sends it in an <code>Authorization</code> header to the configured relay. Either relay uses it once and discards it: the key is never stored, logged, or echoed. Past readings remain in your browser storage, and neither relay retains them. The band at the bottom verifies the claims made in the middle column: 20 contract tests run against both implementations, a canary key must remain absent from captured output on every branch, and a source scan checks the Worker for logging code.</span><span data-lang="zh">密钥走过的整条路。你把它填进设置面板，它只存在当前标签页的内存里；只有你勾选&ldquo;在本设备上记住&rdquo;，它才会写到设备上。随后它随一个 <code>Authorization</code> 请求头发往所配置的中继，在里面用一次就丢：不存、不记、不回显。以前的解读记录留在你自己的浏览器里，任何中继都不持有。图最下面那一条，是让中间这一栏站得住脚的东西：二十个契约测试同时跑在两个实现上，一个&ldquo;金丝雀&rdquo;密钥在任何分支的输出里都不许出现，还有一次 grep，检查 Worker 源码里有没有写日志的代码。</span></p>
             </div>
           </div>
 
@@ -129,10 +130,10 @@
           <h4><span data-lang="en">Forkable symbol packs</span><span data-lang="zh">可派生的符号包</span></h4>
           <p class="meta"><span data-lang="en">Tarot is one symbol pack on top of a generic reflection engine, and a pack is just a directory: the cards and their per-position meanings, the persona that says how the reader talks, the few-shot examples of what good looks like, and the images. All of them are static files the frontend fetches, which is the point. Changing how the reader sounds is a file save, never a redeploy. A validator checks any pack directory against the schema, not just the one that ships, because &ldquo;fork it, drop in your own deck&rdquo; only means anything if a fork can check itself.</span><span data-lang="zh">塔罗只是通用反思引擎上的一个符号包，而一个包本质上就是一个目录：其中包含牌面、不同牌位下的释义、规定读牌人口吻的人设、展示理想回答的少样本示例，以及图片。前端直接读取这些静态文件，因此改变读牌人的口吻只需保存文件，无需重新部署。校验脚本可以按照 schema 检查任意符号包，而不只检查仓库自带的版本；只有派生版本也能自行验证，“复制项目并换上自己的牌组”才真正可行。</span></p>
 
-          <div style="margin-top: 1rem;">
-            <img src="../images/ai-tarot/pack-browser.png" alt="The pack browser page showing The Fool: its imagery line, a reader-only list of what is in the picture, and separate meanings for the situation, obstacle and advice positions, above a relay health check reporting its available providers." style="width: 100%; border-radius: var(--radius-lg); border: 1px solid var(--border);" />
-            <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-              <p style="margin: 0;" class="meta"><span data-lang="en">The pack browser, which needs no key at all and so is the cheapest way to confirm a relay is up: the green line is a live health check naming the providers it can reach. Below it, one card as the engine sees it: an imagery line, a reader-only description of what is literally in the picture, and a separate meaning per position (situation, obstacle, advice). All of it is text in a data file, editable without touching a line of code.</span><span data-lang="zh">符号包浏览器。它一点密钥都不需要，因此是确认中继是否在线最省事的办法：绿色那行是实时的健康检查，列出它能连到的服务商。下面是引擎眼里的一张牌：一句意象描述、一段只给读牌人看的&ldquo;画面上到底有什么&rdquo;，以及处境、阻碍、建议三个牌位各自的释义。这些都是数据文件里的文字，不碰一行代码就能改。</span></p>
+          <div class="figure">
+            <img src="../images/ai-tarot/pack-browser.png" alt="The pack browser page showing The Fool: its imagery line, a reader-only list of what is in the picture, and separate meanings for the situation, obstacle and advice positions, above a relay health check reporting its available providers." class="framed" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">The pack browser, which needs no key at all and so is the cheapest way to confirm a relay is up: the green line is a live health check naming the providers it can reach. Below it, one card as the engine sees it: an imagery line, a reader-only description of what is literally in the picture, and a separate meaning per position (situation, obstacle, advice). All of it is text in a data file, editable without touching a line of code.</span><span data-lang="zh">符号包浏览器。它一点密钥都不需要，因此是确认中继是否在线最省事的办法：绿色那行是实时的健康检查，列出它能连到的服务商。下面是引擎眼里的一张牌：一句意象描述、一段只给读牌人看的&ldquo;画面上到底有什么&rdquo;，以及处境、阻碍、建议三个牌位各自的释义。这些都是数据文件里的文字，不碰一行代码就能改。</span></p>
             </div>
           </div>
 
@@ -140,7 +141,7 @@
           <p class="meta"><span data-lang="en">The 78 card images are scans of the Smith-Waite deck first published in 1909 and illustrated by Pamela Colman Smith, which is in the public domain. The card back is not a scan and is not old: it was drawn by luciellaes and released under CC0, which asks for no credit. It is given here because the work was worth the ask. The code is MIT.</span><span data-lang="zh">78 张牌面是 Smith-Waite 牌组的扫描件，该牌组 1909 年首版，由 Pamela Colman Smith 绘制，已进入公有领域。牌背不是扫描件，年代也不久远：它由 luciellaes 绘制，以 CC0 发布。CC0 并不要求署名，这里仍然写上，是因为这份工作值得。代码采用 MIT 许可。</span></p>
         </section>
 
-        <p style="margin-top: 1.5rem;">
+        <p class="page-links">
           <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
         </p>
       </section>

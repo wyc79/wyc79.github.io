@@ -175,8 +175,17 @@
     0.925, 0.685, 0.710,   // c5 soft pink highlight
     0.995, 0.955, 0.945    // c6 brightest - warm near-white
   ]);
+  // Fallbacks only: the stage clears to the page colour from styles.css
+  // (paper / ink), so the sphere sits on the same ground as the masthead.
   var DARK_CLEAR  = [0.0, 0.0, 0.0];
   var LIGHT_CLEAR = [1.0, 1.0, 1.0];
+
+  function pageRGB(fallback) {
+    var bg = getComputedStyle(document.body || document.documentElement).backgroundColor;
+    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(bg || '');
+    if (!m || m[4] === '0') return fallback;
+    return [m[1] / 255, m[2] / 255, m[3] / 255];
+  }
 
   var bands = DARK_BANDS;
   var clearRGB = DARK_CLEAR;
@@ -189,10 +198,10 @@
   function applyTheme() {
     if (resolvedTheme() === 'light') {
       bands = LIGHT_BANDS;
-      clearRGB = LIGHT_CLEAR;
+      clearRGB = pageRGB(LIGHT_CLEAR);
     } else {
       bands = DARK_BANDS;
-      clearRGB = DARK_CLEAR;
+      clearRGB = pageRGB(DARK_CLEAR);
     }
   }
   applyTheme();

@@ -77,9 +77,11 @@
       als[m].setAttribute('aria-label', als[m].getAttribute('data-al-' + lang));
     }
 
-    // 5. Language toggle button shows the language you'd switch TO.
+    // 5. Language toggle button shows the language you'd switch TO - unless it
+    //    carries data-fixed-label (the inner-page masthead shows "EN / 中文"
+    //    and marks the active one in CSS).
     var btn = document.getElementById('languageToggle');
-    if (btn) btn.textContent = (lang === 'en') ? '中文' : 'EN';
+    if (btn && !btn.hasAttribute('data-fixed-label')) btn.textContent = (lang === 'en') ? '中文' : 'EN';
   }
 
   function set(lang) {

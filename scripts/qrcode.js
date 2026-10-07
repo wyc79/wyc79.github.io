@@ -97,7 +97,7 @@
     }
 
     function showMessage(message) {
-      qr.output.innerHTML = `<p class="meta" style="text-align:center;">${message}</p>`;
+      qr.output.innerHTML = `<p class="meta">${message}</p>`;
       qr.download.disabled = true;
     }
 

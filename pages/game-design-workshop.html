@@ -14,186 +14,41 @@
   <script src="../scripts/project-hero.js"></script>
   <script src="../scripts/theme.js"></script>
   <script src="../scripts/chat-widget.js" defer></script>
-  <style>
-    .slideshow-section {
-      margin: 2rem 0;
-      background: var(--card);
-      padding: 1.5rem;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border);
-    }
-    .slideshow-section h3 {
-      margin-top: 0;
-      margin-bottom: 1.5rem;
-    }
-    /* Slideshow container */
-    .slideshow-container {
-      max-width: 100%;
-      position: relative;
-      margin: auto;
-      border-radius: var(--radius);
-      overflow: hidden;
-      background: var(--bg);
-      aspect-ratio: 16 / 9;
-      min-height: 400px;
-    }
-    /* Hide the images by default */
-    .mySlides {
-      display: none;
-      width: 100%;
-      height: 100%;
-      position: relative;
-    }
-    .mySlides img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
-      background: var(--bg);
-    }
-    /* Next & previous buttons */
-    .prev, .next {
-      cursor: pointer;
-      position: absolute;
-      top: 50%;
-      width: auto;
-      margin-top: -22px;
-      padding: 16px;
-      color: white;
-      font-weight: bold;
-      font-size: 18px;
-      transition: 0.6s ease;
-      border-radius: 0 3px 3px 0;
-      user-select: none;
-      background-color: rgba(0, 0, 0, 0.5);
-    }
-    /* Position the "next button" to the right */
-    .next {
-      right: 0;
-      border-radius: 3px 0 0 3px;
-    }
-    /* On hover, add a darker background color */
-    .prev:hover, .next:hover {
-      background-color: rgba(0, 0, 0, 0.8);
-    }
-    /* Number text (1/4 etc) */
-    .numbertext {
-      color: #f2f2f2;
-      font-size: 12px;
-      padding: 8px 12px;
-      position: absolute;
-      top: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      border-radius: 0 0 3px 0;
-    }
-    /* The dots/bullets/indicators */
-    .dots-container {
-      text-align: center;
-      padding: 1rem 0;
-    }
-    .dot {
-      cursor: pointer;
-      height: 15px;
-      width: 15px;
-      margin: 0 2px;
-      background-color: var(--muted);
-      border-radius: 50%;
-      display: inline-block;
-      transition: background-color 0.6s ease;
-    }
-    .active, .dot:hover {
-      background-color: var(--accent);
-    }
-    /* Fading animation */
-    .fade {
-      animation-name: fade;
-      animation-duration: 1.5s;
-    }
-    @keyframes fade {
-      from {opacity: .4}
-      to {opacity: 1}
-    }
-
-    /* Tabs (lightweight W3CSS-style) */
-    .tabs {
-      display: flex;
-      gap: .5rem;
-      flex-wrap: wrap;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: .75rem;
-    }
-    .tablink {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-      padding: .55rem .85rem;
-      border-radius: 999px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: transform .05s ease, background .2s ease, border-color .2s ease;
-    }
-    .tablink:hover { transform: translateY(-1px); }
-    .tablink.active {
-      background: var(--accent);
-      color: white;
-      border-color: transparent;
-    }
-    .tabcontent { margin-top: 1rem; }
-    .tabcard {
-      /* Match the "3d-rendering" aesthetics: no inner white card; let the parent section styling show through */
-      background: transparent;
-      padding: 0;
-      border-radius: 0;
-      border: 0;
-      margin-bottom: 1.25rem;
-    }
-    .grid2 {
-      display: grid;
-      grid-template-columns: 1.1fr .9fr;
-      gap: 1.25rem;
-    }
-    @media (max-width: 860px) {
-      .grid2 { grid-template-columns: 1fr; }
-    }
-    .bullets { margin: .5rem 0 0 1.1rem; }
-    .mini { margin-top: .75rem; color: var(--muted); font-size: .95rem; }
-
-  </style>
 </head>
 <body>
   <div class="wrap">
     <header class="page-head" data-page-header></header>
 
     <main>
-      <section class="project-hero" style="background-image: url('../images/ctin488.png');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="Game Design Workshop"></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title"><span data-lang="en">Game Design Workshop</span><span data-lang="zh">游戏设计工作坊</span></h2>
           <div class="project-hero__meta">
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/ctin488.png" alt="" /></figure>
       </section>
 
 
       <section class="project-body">
 
-        <article class="card" style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-          <h3 style="margin-top:0;"><span data-lang="en">CTIN 488 - Game Design Workshop (Fall 2025)</span><span data-lang="zh">CTIN 488：游戏设计工作坊（2025 秋季）</span></h3>
+        <article class="card">
+          <h3><span data-lang="en">CTIN 488 - Game Design Workshop (Fall 2025)</span><span data-lang="zh">CTIN 488：游戏设计工作坊（2025 秋季）</span></h3>
           <p>
             <span data-lang="en">This page documents my work across three studio projects in CTIN 488, a playcentric design course focused on
             rapid prototyping, playtesting, and iteration toward a clear player experience goal.
             The semester included an <em>Up the River</em> game mod/variation, a focused <em>Mechanics</em> project, and a
             team <em>Final Project</em>.</span><span data-lang="zh">本页记录了我在 CTIN 488 中完成的三个工作室项目。这门课程以玩家体验为中心，强调快速原型、玩法测试，以及围绕明确体验目标持续迭代。本学期的项目包括一次 <em>Up the River</em> 规则改编、一个聚焦单一机制的 <em>Mechanics</em> 原型，以及一个团队 <em>Final Project</em>。</span>
           </p>
-          <p style="margin:0;">
+          <p>
             <span data-lang="en">Use the tabs below to see why we made each project, what we decided to build,
             and how it evolved through design photo journals.</span><span data-lang="zh">切换下方标签页，可以查看每个项目的设计目标、最终方案，以及设计过程如何在图文日志中逐步演变。</span>
           </p>
         </article>
 
         <!-- Tabs -->
-        <div class="tabs" role="tablist" aria-label="CTIN 488 projects" style="margin-top: 1.25rem;">
+        <div class="tabs" role="tablist" aria-label="CTIN 488 projects">
           <button class="tablink active" role="tab" aria-selected="true" aria-controls="tab-upriver" id="btn-upriver" onclick="openTab(event,'tab-upriver')">Up the River</button>
           <button class="tablink" role="tab" aria-selected="false" aria-controls="tab-mechanics" id="btn-mechanics" onclick="openTab(event,'tab-mechanics')">Mechanics</button>
           <button class="tablink" role="tab" aria-selected="false" aria-controls="tab-final" id="btn-final" onclick="openTab(event,'tab-final')">Final Project</button>
@@ -202,12 +57,12 @@
         <!-- Up the River Tab -->
         <section id="tab-upriver" class="tabcontent" role="tabpanel" aria-labelledby="btn-upriver" style="display:block;">
           <div class="tabcard">
-            <h3 style="margin-top:0;"><span data-lang="en">Up the River: Variation / Game Mod</span><span data-lang="zh">Up the River：变体／游戏 Mod</span></h3>
+            <h3><span data-lang="en">Up the River: Variation / Game Mod</span><span data-lang="zh">Up the River：变体／游戏 Mod</span></h3>
 
             <!-- Why + What (same row, 2 columns) -->
-            <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div class="two-col">
               <div>
-                <h4 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
+                <h4><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
                 <p class="meta">
                   <span data-lang="en">Build a variation on a shared base game (Up the River) by changing constraints and mechanics,
                   then iterate through structured playtests while keeping a specific experience goal in focus.</span><span data-lang="zh">以共同的基础游戏 Up the River 为起点，改变其中的约束和机制，再通过结构化玩法测试反复迭代，同时始终围绕一个明确的体验目标。</span>
@@ -215,7 +70,7 @@
               </div>
 
               <div>
-                <h4 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
+                <h4><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
                 <p class="meta">
                   <span data-lang="en">Our variation reworked the original linear track into a circular race-to-treasure loop with
                   environmental tiles (Wave/Reef), Pirate hazards, and a card system that lets players speed up
@@ -226,8 +81,8 @@
             </div>
 
             <!-- How (separate section) -->
-            <div style="margin-top: 1.25rem;">
-              <h4 style="margin-top: 0;"><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
+            <div class="tab-section">
+              <h4><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
               <div class="weekblocks">
                 <div class="weekblock">
                   <h5><span data-lang="en">Week 1 - Core loop and first balance pass (9/21-9/23)</span><span data-lang="zh">第 1 周：核心循环与首轮平衡调整（9/21-9/23）</span></h5>
@@ -268,12 +123,12 @@
         <!-- Mechanics Tab -->
         <section id="tab-mechanics" class="tabcontent" role="tabpanel" aria-labelledby="btn-mechanics" style="display:none;">
           <div class="tabcard">
-            <h3 style="margin-top:0;"><span data-lang="en">Mechanics Project: Focused Mechanic Exploration</span><span data-lang="zh">Mechanics 项目：聚焦机制的探索</span></h3>
+            <h3><span data-lang="en">Mechanics Project: Focused Mechanic Exploration</span><span data-lang="zh">Mechanics 项目：聚焦机制的探索</span></h3>
 
             <!-- Why + What (same row, 2 columns) -->
-            <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div class="two-col">
               <div>
-                <h4 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
+                <h4><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
                 <p class="meta">
                   <span data-lang="en">Practice mechanics-first design: choose a core interaction, prototype fast, and use formal feedback to
                   refine clarity, pacing, and player interpretation.</span><span data-lang="zh">练习机制优先的设计：选定一个核心交互，快速制作原型，并借助正式反馈来打磨清晰度、节奏和玩家的理解。</span>
@@ -282,27 +137,27 @@
                   <span data-lang="en">This project started from randomly drawn prompts. Our team selected four keywords —
                   auction, versus, romance, and solution-finding — and our goal was to turn them into a playable game.</span><span data-lang="zh">这个项目从随机抽取的主题开始。我们团队选定了四个关键词：拍卖、对抗、浪漫与寻找解法，目标是把它们变成一款可玩的游戏。</span>
                 </p>
-                <p class="meta" style="margin-bottom: 0;">
+                <p class="meta">
                   <span data-lang="en">We specifically wanted to explore how auctions can function as both a competitive system and a narrative device, letting emotional stakes emerge from mechanical choices
                   (instead of scripted story beats).</span><span data-lang="zh">我们尤其想探索拍卖如何既能作为一套竞争系统，又能作为一种叙事手段，让情感张力从机制选择中自然浮现，而不是依赖预设的剧情节点。</span>
                 </p>
               </div>
 
               <div>
-                <h4 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
+                <h4><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
                 <p class="meta">
                   <span data-lang="en">Too Bird To Handle is a silent-coordination bidding game about birds courting.
                   Players work together without speaking, reading one another&rsquo;s intentions and managing risk through a “give or take” action loop.</span><span data-lang="zh">Too Bird To Handle 是一款以鸟类求偶为主题的无声协作竞价游戏。玩家不能交谈，只能从彼此的行动中判断意图，并在“给予或拿取”的循环中共同管理风险。</span>
                 </p>
-                <p class="meta" style="margin-bottom: 0;">
+                <p class="meta">
                   <span data-lang="en">Built around an auction-style interaction, the experience emphasizes reading intent, managing risk, and negotiating value under social pressure.</span><span data-lang="zh">整个体验围绕拍卖式的交互构建，强调在社交压力下解读意图、管理风险并权衡价值。</span>
                 </p>
               </div>
             </div>
 
             <!-- How (separate section) -->
-            <div style="margin-top: 1.25rem;">
-              <h4 style="margin-top: 0;"><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
+            <div class="tab-section">
+              <h4><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
               <div class="weekblocks">
                 <div class="weekblock">
                   <h5><span data-lang="en">Week 1 - From prompt to playable prototype and first external tests (Week 9)</span><span data-lang="zh">第 1 周：从命题到可玩原型，并完成首次外部测试（第 9 周）</span></h5>
@@ -350,12 +205,12 @@
         <!-- Final Project Tab -->
         <section id="tab-final" class="tabcontent" role="tabpanel" aria-labelledby="btn-final" style="display:none;">
           <div class="tabcard">
-            <h3 style="margin-top:0;"><span data-lang="en">Final Project: Original Team Game; Role: Producer</span><span data-lang="zh">Final Project：原创团队游戏；职责：制作人</span></h3>
+            <h3><span data-lang="en">Final Project: Original Team Game; Role: Producer</span><span data-lang="zh">Final Project：原创团队游戏；职责：制作人</span></h3>
 
             <!-- Why + What (same row, 2 columns) -->
-            <div class="two-col" style="gap: 1.25rem; align-items: start;">
+            <div class="two-col">
               <div>
-                <h4 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
+                <h4><span data-lang="en">Why</span><span data-lang="zh">为什么</span></h4>
                 <p class="meta">
                   <span data-lang="en">The final project was open-ended: define an original experience goal, build a complete prototype,
                   and demonstrate several weeks of playcentric iteration across rules, components, balance, and presentation.</span><span data-lang="zh">期末项目采用开放命题：团队需要确定原创的体验目标，制作完整原型，并在数周内通过规则、组件、平衡和展示的持续调整，体现以玩家体验为核心的设计过程。</span>
@@ -363,7 +218,7 @@
               </div>
 
               <div>
-                <h4 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
+                <h4><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h4>
                 <p class="meta">
                   <span data-lang="en">Our team built a competitive survival game centered on social hierarchy. Players take on different roles
                   (upper- to lower-class) and must meet role-specific needs inspired by Maslow’s hierarchy while dealing with threats,
@@ -373,8 +228,8 @@
             </div>
 
             <!-- How (separate section) -->
-            <div style="margin-top: 1.25rem;">
-              <h4 style="margin-top: 0;"><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
+            <div class="tab-section">
+              <h4><span data-lang="en">How (weekly iteration)</span><span data-lang="zh">如何实现（每周迭代）</span></h4>
               <ul class="bullets">
                 <li data-lang="en">
                   Week 1 - Core loop + first playable:
@@ -433,7 +288,7 @@
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
+        <p class="page-links"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
       </section>
 
     </main>

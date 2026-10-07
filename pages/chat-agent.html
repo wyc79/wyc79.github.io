@@ -21,7 +21,7 @@
 
     <main>
       <!-- HERO -->
-      <section class="project-hero" style="background-image: url('../images/chat_agent.png');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="Portfolio Chat Agent, a role-aware RAG assistant"></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title"><span data-lang="en">Portfolio Chat Agent: Role-Aware RAG</span><span data-lang="zh">作品集聊天助手：角色感知 RAG</span></h2>
@@ -31,6 +31,7 @@
             <div class="project-hero__meta-item"><span data-lang="en">Duration: 2026 · this site</span><span data-lang="zh">周期：2026 年 · 本站</span></div>
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/chat_agent.png" alt="" /></figure>
       </section>
 
       <section class="project-body">
@@ -41,15 +42,15 @@
         </p>
 
         <!-- TOP: What | Main Achievements + Highlights -->
-        <section style="margin-top: 1.5rem;">
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+        <section class="project-block">
+          <div class="two-col">
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">A role-aware Retrieval-Augmented Generation (RAG) chat widget embedded in the site. A visitor just asks, and it answers from what I have actually written: grounded, bilingual, and resistant to prompt-injection and off-topic abuse.</span><span data-lang="zh">这是一个嵌入本站、能够识别访客角色的检索增强生成（RAG）聊天组件。访客直接提问，它便根据我亲自写下的资料作答：回答有据可查、支持双语，也能抵御提示注入和跑题滥用。</span></p>
               <p class="meta"><span data-lang="en">Retrieval runs server-side over a prebuilt index: a small Python function embeds the query, runs a relevance gate, retrieves the matching passages, and calls the LLM — the browser never holds the index, so an off-topic message stops after one cheap call.</span><span data-lang="zh">检索在服务端基于预构建索引进行：一个小巧的 Python 函数负责嵌入查询、运行相关性门控、检索匹配段落并调用大模型——浏览器从不持有索引，因此跑题消息在一次廉价调用后即被拦下。</span></p>
 
-              <h3 style="margin-top: 1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
-              <p style="margin: 0;">
+              <h3><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
+              <p class="pill-list">
                 <span class="pill">RAG</span>
                 <span class="pill">Semantic search</span>
                 <span class="pill">e5 / MiniLM / bge-zh</span>
@@ -64,7 +65,7 @@
               </p>
             </div>
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
+              <h3><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
               <ul>
                 <li data-lang="en">Designed and shipped a live, bilingual RAG assistant grounded in my own content.</li>
                 <li data-lang="zh">设计并上线了一个可用的双语 RAG 助手，回答均以我自己的内容为依据。</li>
@@ -84,17 +85,17 @@
         </section>
 
         <!-- HOW -->
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-          <h4 style="margin-top: 0;"><span data-lang="en">Thin client: retrieval and relevance decisions stay on the server</span><span data-lang="zh">薄客户端：检索与判断都在服务端</span></h4>
+          <h4><span data-lang="en">Thin client: retrieval and relevance decisions stay on the server</span><span data-lang="zh">薄客户端：检索与判断都在服务端</span></h4>
           <p class="meta"><span data-lang="en">The retrieval corpus is bundled with the cloud function as a static JSON file, so nearest-neighbor search across the portfolio runs entirely on the server. On each turn, <strong>/embed</strong> evaluates the query&rsquo;s relevance. Only a passing query prompts the browser to call <strong>/chat</strong>, which embeds the question, searches the corpus, and calls the LLM. An off-topic request stops after the first embedding call, limiting both cost and exposure to abuse.</span><span data-lang="zh">检索语料以静态 JSON 文件随云函数打包，因此针对站内内容的最近邻搜索完全在服务端进行。每一轮中，<strong>/embed</strong> 先对查询执行相关性门控；只有通过后，浏览器才调用 <strong>/chat</strong>，由函数嵌入问题、检索内容并调用大模型。跑题消息在第一次嵌入调用后就会终止，从而控制成本并缩小可被滥用的范围。</span></p>
 
-          <div style="margin-top: 1rem;">
-            <img data-lang="en" src="../images/chat-agent/flow.svg" alt="Information-flow diagram for the portfolio chat agent, covering build-time embeddings, the per-turn browser and serverless path, and the offline fallback." style="width: 100%; border-radius: var(--radius-lg);" />
-            <img data-lang="zh" src="../images/chat-agent/flow-zh.svg" alt="作品集聊天智能体的信息流图，展示构建阶段的嵌入流程、每轮的浏览器与无服务器函数路径，以及离线回退方案。" style="width: 100%; border-radius: var(--radius-lg);" />
-            <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-              <p style="margin: 0;" class="meta"><span data-lang="en">End-to-end flow. <strong>At build time,</strong> three encoders—e5, MiniLM, and bge-small-zh—produce four static files: e5&rsquo;s retrieval corpus, MiniLM&rsquo;s English gate and offline corpus, and bge-small-zh&rsquo;s Chinese gate. Both gates use only the curated <code>about_en.md</code> and <code>about_zh.md</code> sections; page content feeds retrieval, not gating. Otherwise, as the site grows, off-topic queries gain more opportunities for a spurious match while on-topic performance has little room to improve. The browser fetches only the MiniLM gate, the offline corpus, and a small <code>meta.json</code>. The Chinese gate remains inside the function, and the function alone reads the e5 corpus. <strong>For each turn,</strong> ① the browser sends the name-normalized query to <code>/embed</code>; ② the endpoint runs the relevance gate—MiniLM for English and bge-small-zh for Chinese. Off-topic queries stop here after one call, without retrieval or an LLM request. ③ After a pass, the browser calls <code>/chat</code> with the question and the URL of the current page. ④ The function embeds the question with e5 and searches its bundled <code>chunks_e5.json</code>. ⑤ It adds the top-k passages and the current page&rsquo;s labeled chunks to the role prompt, then calls the LLM. ⑥ The answer returns with the chunks used to populate the source cards. If the function is unavailable, a consent-gated, in-browser MiniLM performs local English retrieval over <code>chunks_en_minilm.json</code>.</span><span data-lang="zh">端到端流程。<strong>构建时：</strong>三个编码器——e5、MiniLM、bge-small-zh——写出四份静态文件：e5 的检索语料、MiniLM 的英文门控与离线语料，以及 bge-small-zh 的中文门控。两个门控都只用人工整理的 <code>about_en.md</code> / <code>about_zh.md</code> 段落构建——页面正文只进入检索：门控语料若随站点一起变大，只会给跑题查询越来越多蒙对的机会，而切题问题本就已接近上限。只有 MiniLM 门控、离线语料与一份很小的 <code>meta.json</code> 会被浏览器获取；中文门控只存在于函数内部，而 e5 语料虽与它们一同提交在仓库中，却只由函数自身的检索读取。<strong>每一轮：</strong>① 浏览器把姓名归一化后的查询发往 <code>/embed</code>，② 由其运行相关性门控——英文用 MiniLM，中文用 bge-small-zh（跑题问题到此即止，既不检索也不调用大模型）；③ 通过后浏览器带着问题本身与当前所读页面的 URL 调用 <code>/chat</code>；④ 函数用 e5 嵌入该问题，在自己打包的 <code>chunks_e5.json</code> 上做相似度检索；⑤ 把 top-k 段落——以及该页面自身的段落，并加上标签供模型区分二者——注入角色提示词并调用大模型；⑥ 答案与用作来源卡片的段落一并返回。若函数不可用，则由需经同意的浏览器内 MiniLM 在本地完成检索，语料为 <code>chunks_en_minilm.json</code>（仅限英文）。</span></p>
+          <div class="figure">
+            <img data-lang="en" src="../images/chat-agent/flow.svg" alt="Information-flow diagram for the portfolio chat agent, covering build-time embeddings, the per-turn browser and serverless path, and the offline fallback." />
+            <img data-lang="zh" src="../images/chat-agent/flow-zh.svg" alt="作品集聊天智能体的信息流图，展示构建阶段的嵌入流程、每轮的浏览器与无服务器函数路径，以及离线回退方案。" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">End-to-end flow. <strong>At build time,</strong> three encoders—e5, MiniLM, and bge-small-zh—produce four static files: e5&rsquo;s retrieval corpus, MiniLM&rsquo;s English gate and offline corpus, and bge-small-zh&rsquo;s Chinese gate. Both gates use only the curated <code>about_en.md</code> and <code>about_zh.md</code> sections; page content feeds retrieval, not gating. Otherwise, as the site grows, off-topic queries gain more opportunities for a spurious match while on-topic performance has little room to improve. The browser fetches only the MiniLM gate, the offline corpus, and a small <code>meta.json</code>. The Chinese gate remains inside the function, and the function alone reads the e5 corpus. <strong>For each turn,</strong> ① the browser sends the name-normalized query to <code>/embed</code>; ② the endpoint runs the relevance gate—MiniLM for English and bge-small-zh for Chinese. Off-topic queries stop here after one call, without retrieval or an LLM request. ③ After a pass, the browser calls <code>/chat</code> with the question and the URL of the current page. ④ The function embeds the question with e5 and searches its bundled <code>chunks_e5.json</code>. ⑤ It adds the top-k passages and the current page&rsquo;s labeled chunks to the role prompt, then calls the LLM. ⑥ The answer returns with the chunks used to populate the source cards. If the function is unavailable, a consent-gated, in-browser MiniLM performs local English retrieval over <code>chunks_en_minilm.json</code>.</span><span data-lang="zh">端到端流程。<strong>构建时：</strong>三个编码器——e5、MiniLM、bge-small-zh——写出四份静态文件：e5 的检索语料、MiniLM 的英文门控与离线语料，以及 bge-small-zh 的中文门控。两个门控都只用人工整理的 <code>about_en.md</code> / <code>about_zh.md</code> 段落构建——页面正文只进入检索：门控语料若随站点一起变大，只会给跑题查询越来越多蒙对的机会，而切题问题本就已接近上限。只有 MiniLM 门控、离线语料与一份很小的 <code>meta.json</code> 会被浏览器获取；中文门控只存在于函数内部，而 e5 语料虽与它们一同提交在仓库中，却只由函数自身的检索读取。<strong>每一轮：</strong>① 浏览器把姓名归一化后的查询发往 <code>/embed</code>，② 由其运行相关性门控——英文用 MiniLM，中文用 bge-small-zh（跑题问题到此即止，既不检索也不调用大模型）；③ 通过后浏览器带着问题本身与当前所读页面的 URL 调用 <code>/chat</code>；④ 函数用 e5 嵌入该问题，在自己打包的 <code>chunks_e5.json</code> 上做相似度检索；⑤ 把 top-k 段落——以及该页面自身的段落，并加上标签供模型区分二者——注入角色提示词并调用大模型；⑥ 答案与用作来源卡片的段落一并返回。若函数不可用，则由需经同意的浏览器内 MiniLM 在本地完成检索，语料为 <code>chunks_en_minilm.json</code>（仅限英文）。</span></p>
             </div>
           </div>
 
@@ -113,15 +114,15 @@
           <h4><span data-lang="en">Observable by turn</span><span data-lang="zh">逐轮可观测</span></h4>
           <p class="meta"><span data-lang="en">Every turn carries a request ID and a hashed session ID. On a passing turn the server logs the gate verdict, the retrieved passages with similarity scores, and the LLM input and output, never the raw query vector. The gate decision is written as one flat token — <code>pass</code>, <code>block</code>, <code>cjk_bypass</code> — because the log console filters on substrings, and a verdict nested inside a JSON object cannot be filtered for at all; the <code>/chat</code> line echoes the ID of the <code>/embed</code> call that gated it, so one search joins a gate decision to the answer it produced. The widget captures the same IDs, so a conversation can be traced end to end when I am debugging retrieval quality.</span><span data-lang="zh">每一轮都带有请求 ID 和经过哈希处理的会话 ID。对于通过门控的请求，服务端会记录判定结果、带相似度分数的检索段落，以及大模型的输入和输出，但绝不保存原始查询向量。门控结果以独立文本标记写入——<code>pass</code>、<code>block</code> 或 <code>cjk_bypass</code>——便于按子串筛选日志；<code>/chat</code> 日志还会记录对应的 <code>/embed</code> 调用 ID，因此一次搜索就能串起门控判定及其最终回答。聊天组件也会保留相同的 ID，方便我在排查检索质量时端到端追踪整段对话。</span></p>
 
-          <div style="margin-top: 1rem;">
-            <img src="../images/chat-agent/logs.png" alt="Cloud function log console showing a per-turn request ID, cold-start timing, and structured JSON log lines for embedder and EN/ZH gate loading with their thresholds." style="width: 100%; border-radius: var(--radius-lg); border: 1px solid var(--border);" />
-            <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-              <p style="margin: 0;" class="meta"><span data-lang="en">Function logs for a single turn: a request ID, cold-start and memory report, and structured JSON lines recording the embedder load and each language gate (EN threshold 0.2296, ZH threshold 0.4919), enough to trace a conversation and audit gate behaviour without ever storing a raw query vector.</span><span data-lang="zh">单轮的函数日志：请求 ID、冷启动与内存报告，以及记录嵌入器加载和各语言门控（英文阈值 0.2296、中文阈值 0.4919）的结构化 JSON 行，足以追踪一段对话并审计门控行为，且从不存储原始查询向量。</span></p>
+          <div class="figure">
+            <img src="../images/chat-agent/logs.png" alt="Cloud function log console showing a per-turn request ID, cold-start timing, and structured JSON log lines for embedder and EN/ZH gate loading with their thresholds." class="framed" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">Function logs for a single turn: a request ID, cold-start and memory report, and structured JSON lines recording the embedder load and each language gate (EN threshold 0.2296, ZH threshold 0.4919), enough to trace a conversation and audit gate behaviour without ever storing a raw query vector.</span><span data-lang="zh">单轮的函数日志：请求 ID、冷启动与内存报告，以及记录嵌入器加载和各语言门控（英文阈值 0.2296、中文阈值 0.4919）的结构化 JSON 行，足以追踪一段对话并审计门控行为，且从不存储原始查询向量。</span></p>
             </div>
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;">
+        <p class="page-links">
           <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
         </p>
       </section>

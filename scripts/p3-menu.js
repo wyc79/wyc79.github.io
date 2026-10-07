@@ -277,6 +277,9 @@
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable ||
                 (t.closest && t.closest('.ycchat-panel')))) return;
+      // A focused masthead link or toggle owns Enter (and Space); only the
+      // menu's own rows, or no focus at all, drive the menu.
+      if (e.key === 'Enter' && t && t.closest && t.closest('a, button') && !t.closest('.p3-menu')) return;
       var heroRect = root.getBoundingClientRect();
       var visible  = heroRect.bottom > 120 && heroRect.top < window.innerHeight * 0.6;
       if (!visible) return;
@@ -305,10 +308,6 @@
         }, i * 80);
       });
       if (hint) hint.classList.add('mounted');
-      var brand = document.querySelector('.p3-brand');
-      if (brand) brand.classList.add('mounted');
-      var brandLinks = document.querySelector('.p3-brand-links');
-      if (brandLinks) brandLinks.classList.add('mounted');
     }, 80);
   }
 

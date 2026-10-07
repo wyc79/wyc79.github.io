@@ -22,7 +22,7 @@
 
     <main>
       <!-- HERO -->
-      <section class="project-hero" style="background-image: url('../images/AD.png');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="Automatic Differentiation Toolbox graphic from test.pypi.org."></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title">Automatic Differentiation (AD) Toolbox</h2>
@@ -33,6 +33,7 @@
           <div class="project-hero__meta-item"><span data-lang="en">Duration: Fall 2022 · 1 semester</span><span data-lang="zh">周期：2022 年秋季 · 1 学期</span></div>
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/AD.png" alt="" /></figure>
       </section>
 
       <section class="project-body">
@@ -42,28 +43,28 @@
             <a href="https://test.pypi.org/project/cs107-fall2022-team10-ad/" target="_blank" rel="noopener"><span data-lang="en">View on TestPyPI</span><span data-lang="zh">在 TestPyPI 上查看</span></a>
         </p>
 
-        <section style="margin-top: 1.5rem;">
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+        <section class="project-block">
+          <div class="two-col">
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
+              <h3><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
               <p class="meta"><span data-lang="en">Derivatives appear throughout optimization, machine learning, and scientific computing, but the usual alternatives have practical drawbacks: numerical differentiation depends on a delicate step-size choice, while symbolic differentiation can produce unwieldy expressions.</span><span data-lang="zh">优化、机器学习和科学计算都离不开导数，但常见方法各有局限：数值微分依赖难以权衡的步长选择，符号微分则可能生成过于庞大的表达式。</span></p>
               <p class="meta"><span data-lang="en">We wanted a small, readable tool that computes exact derivatives at runtime, allowing users to differentiate ordinary Python code without applying the chain rule by hand.</span><span data-lang="zh">我们希望做出一个小巧易读、能在运行时计算精确导数的工具，让用户直接对普通 Python 代码求导，无需手动展开链式法则。</span></p>
             </div>
 
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">A forward-mode automatic differentiation (AD) Python package built by a 5-person team. It evaluates user-defined functions and returns derivatives by propagating dual numbers through operator overloads and elementary functions.</span><span data-lang="zh">一个由 5 人团队开发的前向模式自动微分（AD）Python 包。它对用户自定义的函数求值，并通过在运算符重载和基本函数中传播对偶数来返回导数。</span></p>
           <p class="meta"><span data-lang="en">We focused on a clean API, reliable numerical behavior, and maintainability through a test-first workflow.</span><span data-lang="zh">开发重点是简洁的 API、可靠的数值结果，以及由测试先行流程保障的可维护性。</span></p>
-              <p style="margin: 0;"><span class="pill">Python</span><span class="pill">Forward-mode AD</span><span class="pill">Dual Numbers</span><span class="pill">Operator Overloading</span><span class="pill">Unit Testing</span><span class="pill">PyPI</span></p>
+              <p class="pill-list"><span class="pill">Python</span><span class="pill">Forward-mode AD</span><span class="pill">Dual Numbers</span><span class="pill">Operator Overloading</span><span class="pill">Unit Testing</span><span class="pill">PyPI</span></p>
             </div>
           </div>
         </section>
 
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
-          <h4 style="margin-top: 0;"><span data-lang="en">My contributions (Core AD + QA)</span><span data-lang="zh">我的贡献（核心自动微分与质量保证）</span></h4>
+          <h4><span data-lang="en">My contributions (Core AD + QA)</span><span data-lang="zh">我的贡献（核心自动微分与质量保证）</span></h4>
           <p class="meta"><span data-lang="en">I implemented key pieces of the forward-mode engine and led QA to keep the package correct as features expanded.</span><span data-lang="zh">我实现了前向模式引擎的关键部分，并主导 QA 工作，在功能不断扩展的同时确保包的正确性。</span></p>
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+          <div class="two-col">
             <div>
               <ul>
                 <li data-lang="en">Forward-mode engine: Implemented dual number arithmetic and operator overloading to propagate derivatives through composed expressions.</li>
@@ -87,7 +88,7 @@
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;">
+        <p class="page-links">
           <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
         </p>
       </section>

@@ -20,7 +20,7 @@
     <header class="page-head" data-page-header></header>
 
     <main>
-      <section class="project-hero" style="background-image: url('../images/sword.png');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="Render of the Aegis Sword from Xenoblade Chronicles 2."></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title">Aegis Sword</h2>
@@ -30,32 +30,33 @@
             <div class="project-hero__meta-item"><span data-lang="en">Duration: Spring 2021 · 4 weeks</span><span data-lang="zh">周期：2021 年春季 · 4 周</span></div>
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/sword.png" alt="" /></figure>
       </section>
 
       <section class="project-body">
         <p class="meta">Onshape CAD - <a href="https://cad.onshape.com/documents/74c0e76c7760005685df1fb7/w/e1ca5cfdabd938be66e7b6f5/e/4b0a61c968b572caa0fdde4e?renderMode=0" target="_blank" rel="noopener"><span data-lang="en">View on Onshape CAD</span><span data-lang="zh">在 Onshape CAD 中查看</span></a></p>
 
-        <section style="margin-top: 1.5rem;">
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+        <section class="project-block">
+          <div class="two-col">
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
+              <h3><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
               <p class="meta"><span data-lang="en">I wanted to translate a stylized game prop into a clean, manufacturable CAD model, with particular attention to asymmetry, layered details, and accurate proportions.</span><span data-lang="zh">我想把一个风格化的游戏道具转化为结构清晰、可制造的 CAD 模型，重点练习不对称造型、层叠细节和比例还原。</span></p>
               <p class="meta"><span data-lang="en">This was my final project for EAS 143: Introduction to Solid Modeling (University of Rochester, Spring 2021), where the goal was to build accurate parts and assemblies using parametric workflows.</span><span data-lang="zh">这是我在 EAS 143：实体建模导论（罗切斯特大学，2021 年春季）的期末项目，目标是运用参数化工作流构建精确的零件与装配体。</span></p>
             </div>
 
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">A detailed 3D CAD replication of the Aegis Sword from <em>Xenoblade Chronicles 2</em>, modeled in Onshape with an emphasis on readable silhouette, precise detailing, and assembly-ready structure.</span><span data-lang="zh">这是对 <em>Xenoblade Chronicles 2</em> 中 Aegis Sword 的一次精细三维 CAD 复刻，在 Onshape 中建模，注重清晰的剪影轮廓、精准的细节刻画，以及便于装配的结构。</span></p>
-              <p style="margin: 0;"><span class="pill">Onshape CAD</span><span class="pill">Parametric Modeling</span><span class="pill">Assembly</span><span class="pill">Surface Detailing</span><span class="pill">Reference Matching</span></p>
+              <p class="pill-list"><span class="pill">Onshape CAD</span><span class="pill">Parametric Modeling</span><span class="pill">Assembly</span><span class="pill">Surface Detailing</span><span class="pill">Reference Matching</span></p>
             </div>
           </div>
         </section>
 
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+          <div class="two-col">
             <div>
-              <h4 style="margin-top: 0;"><span data-lang="en">Workflow</span><span data-lang="zh">工作流程</span></h4>
+              <h4><span data-lang="en">Workflow</span><span data-lang="zh">工作流程</span></h4>
               <ul>
                 <li data-lang="en">Reference breakdown: Collected screenshots from near-orthographic angles, then identified key proportions (blade length, guard width, and handle thickness) to establish the silhouette early.</li>
                 <li data-lang="zh">参考图拆解：收集接近正交视角的截图，提取剑身长度、护手宽度和剑柄粗细等关键比例，尽早确定整体轮廓。</li>
@@ -67,7 +68,7 @@
             </div>
 
             <div>
-              <h4 style="margin-top: 0;"><span data-lang="en">Design &amp; detailing</span><span data-lang="zh">设计与细节</span></h4>
+              <h4><span data-lang="en">Design &amp; detailing</span><span data-lang="zh">设计与细节</span></h4>
               <ul>
                 <li data-lang="en">Asymmetry handling: Established a consistent datum setup and only mirrored where the design truly repeats; the rest was modeled intentionally off-axis to match the original.</li>
                 <li data-lang="zh">处理不对称：建立一套统一的基准，仅在设计确实重复之处使用镜像；其余部分刻意偏离轴线建模，以贴合原作。</li>
@@ -79,13 +80,13 @@
             </div>
           </div>
 
-          <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-top: 1.25rem;">
-            <h4 style="margin-top: 0;"><span data-lang="en">Result</span><span data-lang="zh">成果</span></h4>
-            <p class="meta" style="margin-bottom: 0;"><span data-lang="en">The final model reproduces the sword’s layered structure and distinctive asymmetry, and the modular setup made it straightforward to refine proportions and surface details late in the process.</span><span data-lang="zh">最终模型还原了这把剑的层叠结构与鲜明的不对称感，而模块化的搭建方式让我在流程后期也能轻松打磨比例与表面细节。</span></p>
+          <div class="panel">
+            <h4><span data-lang="en">Result</span><span data-lang="zh">成果</span></h4>
+            <p class="meta"><span data-lang="en">The final model reproduces the sword’s layered structure and distinctive asymmetry, and the modular setup made it straightforward to refine proportions and surface details late in the process.</span><span data-lang="zh">最终模型还原了这把剑的层叠结构与鲜明的不对称感，而模块化的搭建方式让我在流程后期也能轻松打磨比例与表面细节。</span></p>
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
+        <p class="page-links"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
       </section>
     </main>
 

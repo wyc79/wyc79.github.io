@@ -20,7 +20,7 @@
     <header class="page-head" data-page-header></header>
 
     <main>
-      <section class="project-hero" style="background-image: url('../images/prime_engine.png');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="Prime Engine - Engine Systems Implementation"></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title"><span data-lang="en">Prime Engine - Engine Systems Implementation</span><span data-lang="zh">Prime Engine - 引擎系统实现</span></h2>
@@ -29,13 +29,14 @@
             <div class="project-hero__meta-item"><span data-lang="en">Tools: C++, Prime Engine</span><span data-lang="zh">工具：C++、Prime Engine</span></div>
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/prime_engine.png" alt="" /></figure>
       </section>
 
       <section class="project-body">
-        <section style="margin-top: 1.5rem;">
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+        <section class="project-block">
+          <div class="two-col">
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">I modified and extended Prime Engine, a compact C++ game engine designed for gameplay and rendering experiments.</span><span data-lang="zh">这个项目围绕 Prime Engine 展开：我在这款用于玩法和渲染实验的精简 C++ 游戏引擎中修改并扩展多项底层系统。</span></p>
               <p class="meta"><span data-lang="en">I implemented several engine-level systems, including:</span><span data-lang="zh">我实现了多个引擎级系统，包括：</span></p>
               <ul>
@@ -54,7 +55,7 @@
             </div>
 
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
+              <h3><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
               <ul>
                 <li data-lang="en">Learned and extended a substantial C++ codebase for a custom game engine.</li>
                 <li data-lang="zh">快速熟悉并扩展一套规模较大的 C++ 自研游戏引擎代码库。</li>
@@ -68,8 +69,8 @@
                 <li data-lang="zh">构建了骨骼动画混合系统，支持全身、局部与叠加混合。</li>
               </ul>
 
-              <h3 style="margin-top: 1rem;"><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
-              <p style="margin: 0;">
+              <h3><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
+              <p class="pill-list">
                 <span class="pill">Frustum culling</span>
                 <span class="pill">BVH culling</span>
                 <span class="pill">Morton codes</span>
@@ -84,10 +85,10 @@
           </div>
         </section>
 
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
 
-          <h4 style="margin-top: 0;"><span data-lang="en">Frustum Culling</span><span data-lang="zh">视锥剔除</span></h4>
+          <h4><span data-lang="en">Frustum Culling</span><span data-lang="zh">视锥剔除</span></h4>
           <p class="meta"><span data-lang="en">To reduce unnecessary rendering work, I implemented view frustum culling using bounding boxes.</span><span data-lang="zh">为减少不必要的渲染开销，我使用包围盒实现了视锥剔除。</span></p>
           <p class="meta"><span data-lang="en">Pipeline:</span><span data-lang="zh">步骤：</span></p>
           <ul>
@@ -164,14 +165,13 @@
             </svg>
           </div>
 
-          <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <article class="media-block">
             <iframe
               src="https://drive.google.com/file/d/1o4g69Rd9gCBT53ukR5wB5XppZknEPFap/preview"
               class="embed-frame"
               allowfullscreen
               loading="lazy"
-              title="Frustum culling demo"
-              style="border-radius: var(--radius);">
+              title="Frustum culling demo">
             </iframe>
           </article>
 
@@ -272,14 +272,13 @@
             </svg>
           </div>
 
-          <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <article class="media-block">
             <iframe
               src="https://drive.google.com/file/d/1QkewL6zE7OKMXuDi66uD4CKJyC7uZUs-/preview"
               class="embed-frame"
               allowfullscreen
               loading="lazy"
-              title="Physics move-and-slide demo"
-              style="border-radius: var(--radius);">
+              title="Physics move-and-slide demo">
             </iframe>
           </article>
 
@@ -349,14 +348,13 @@
             </svg>
           </div>
 
-          <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <article class="media-block">
             <iframe
               src="https://drive.google.com/file/d/1pDR-E51-nmlVNFSYHVQqY08jF-Ondc-i/preview"
               class="embed-frame"
               allowfullscreen
               loading="lazy"
-              title="Animation blending demo"
-              style="border-radius: var(--radius);">
+              title="Animation blending demo">
             </iframe>
           </article>
 
@@ -423,33 +421,31 @@
             </svg>
           </div>
 
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
-            <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <div class="two-col">
+            <article class="media-block">
               <iframe
                 src="https://drive.google.com/file/d/1rbXzQFXgfYWXn0ZlS2JHHfOdQQ4NcLFt/preview"
-                class="embed-frame"
+                class="embed-frame embed-frame--4x3"
                 allowfullscreen
                 loading="lazy"
-                title="Static BVH debug demo"
-                style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
+                title="Static BVH debug demo">
               </iframe>
-              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Static BVH—rainbow-colored bounds from the root (red) to the leaves (purple).</span><span data-lang="zh">静态 BVH：从根节点（红色）到叶节点（紫色）的彩虹色包围盒。</span></p>
+              <p class="meta"><span data-lang="en">Static BVH—rainbow-colored bounds from the root (red) to the leaves (purple).</span><span data-lang="zh">静态 BVH：从根节点（红色）到叶节点（紫色）的彩虹色包围盒。</span></p>
             </article>
-            <article style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+            <article class="media-block">
               <iframe
                 src="https://drive.google.com/file/d/1TWLfY1hcDGbvflQvAJeAwzv6WJ20s_Te/preview"
-                class="embed-frame"
+                class="embed-frame embed-frame--4x3"
                 allowfullscreen
                 loading="lazy"
-                title="Dynamic BVH debug demo"
-                style="border-radius: var(--radius); aspect-ratio: 4 / 3;">
+                title="Dynamic BVH debug demo">
               </iframe>
-              <p class="meta" style="margin: 0.5rem 0 0;"><span data-lang="en">Dynamic BVH—white bounds around randomly moving meshes, with leaves shown as dots.</span><span data-lang="zh">动态 BVH：覆盖在随机运动网格上的白色包围盒，叶节点以圆点表示。</span></p>
+              <p class="meta"><span data-lang="en">Dynamic BVH—white bounds around randomly moving meshes, with leaves shown as dots.</span><span data-lang="zh">动态 BVH：覆盖在随机运动网格上的白色包围盒，叶节点以圆点表示。</span></p>
             </article>
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
+        <p class="page-links"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
       </section>
     </main>
 

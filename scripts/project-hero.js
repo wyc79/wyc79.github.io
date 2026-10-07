@@ -1,9 +1,9 @@
 // Project detail banner enhancements, shared by every page that has a
 // <section class="project-hero">:
-//   1. Injects a round "back to projects" button (‹) on the LEFT of the banner.
+//   1. Injects a "← 01 Projects" back link above the title.
 //   2. Builds a compact sticky bar that freezes to the top of the viewport once
-//      the big banner scrolls out of view - back button on the left, and
-//      "GameName - role · role · role" on the right. Bilingual: it clones the
+//      the big banner scrolls out of view - a back arrow, then
+//      "GameName - role · role · role". Bilingual: it clones the
 //      title + first meta-item (the Role/职责 line) in both languages and lets
 //      i18n.js show the active one.
 // Load AFTER i18n.js so window.YCI18N exists when we re-apply the language.
@@ -11,7 +11,7 @@
   'use strict';
 
   var BACK_HREF = 'projects.html';   // pages live in /pages/, so relative is fine
-  var ANGLE = '‹';              // ‹  single left-pointing angle
+  var ARROW = '←';
 
   function langText(el, lang) {
     if (!el) return '';
@@ -43,14 +43,17 @@
     var titleEl = hero.querySelector('.project-hero__title');
     var roleEl = hero.querySelector('.project-hero__meta-item'); // first = Role/职责
 
-    // 1. Back button inside the expanded banner (left side).
+    // 1. Back link above the title, numbered like the masthead's section index.
     if (!hero.querySelector('.project-hero__back')) {
       var back = document.createElement('a');
       back.className = 'project-hero__back';
       back.href = BACK_HREF;
       back.setAttribute('aria-label', 'Back to Projects');
       back.setAttribute('title', 'Back to Projects');
-      back.innerHTML = ANGLE;
+      back.innerHTML =
+        '<span aria-hidden="true">' + ARROW + '</span>' +
+        '<span class="project-hero__back-num">01</span>' +
+        '<span class="project-hero__back-label"><span data-lang="en">Projects</span><span data-lang="zh">项目</span></span>';
       hero.appendChild(back);
     }
 
@@ -65,7 +68,7 @@
     var bar = document.createElement('div');
     bar.className = 'project-hero-bar';
     bar.innerHTML =
-      '<a class="project-hero-bar__back" href="' + BACK_HREF + '" aria-label="Back to Projects" title="Back to Projects">' + ANGLE + '</a>' +
+      '<a class="project-hero-bar__back" href="' + BACK_HREF + '" aria-label="Back to Projects" title="Back to Projects">' + ARROW + '</a>' +
       '<div class="project-hero-bar__label">' +
         '<span data-lang="en">' + esc(compact.en) + '</span>' +
         '<span data-lang="zh">' + esc(compact.zh) + '</span>' +

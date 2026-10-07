@@ -20,7 +20,7 @@
     <header class="page-head" data-page-header></header>
 
     <main>
-      <section class="project-hero" style="background-image: url('../images/3Drendering.png');">
+      <section class="project-hero">
         <span class="sr-only" role="img" aria-label="3D Rendering Project"></span>
         <div class="project-hero__content">
           <h2 class="project-hero__title"><span data-lang="en">3D Rendering Project</span><span data-lang="zh">3D 渲染项目</span></h2>
@@ -30,6 +30,7 @@
             <div class="project-hero__meta-item"><span data-lang="en">Duration: Fall 2025 · 1 semester</span><span data-lang="zh">周期：2025 年秋季 · 1 学期</span></div>
           </div>
         </div>
+        <figure class="project-hero__media"><img src="../images/3Drendering.png" alt="" /></figure>
       </section>
 
       <section class="project-body">
@@ -38,27 +39,27 @@
           <a href="https://github.com/wyc79/580Project" target="_blank" rel="noopener"><span data-lang="en">View on GitHub</span><span data-lang="zh">在 GitHub 上查看</span></a>
         </p>
 
-        <section style="margin-top: 1.5rem;">
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+        <section class="project-block">
+          <div class="two-col">
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
+              <h3><span data-lang="en">Why</span><span data-lang="zh">为什么做</span></h3>
               <p class="meta"><span data-lang="en">I wanted to get hands-on with real-time rendering beyond "using shaders" - specifically: how procedural textures, custom shading, and world-space masks can be composed into a readable VFX sequence.</span><span data-lang="zh">我想真正上手实时渲染，而不只是停留在“会用着色器”的层面：具体来说，就是如何把程序化纹理、自定义着色与世界空间遮罩组合成一段清晰可读的视觉特效序列。</span></p>
               <p class="meta"><span data-lang="en">This was my final project for CSCI 580: 3D Graphics and Rendering (USC, Fall 2025), where we explored offline and real-time rendering techniques including rasterization, shading, procedural noise, and graphics-pipeline concepts.</span><span data-lang="zh">这是南加州大学 CSCI 580“三维图形与渲染”课程（2025 年秋季）的期末项目。课程涵盖离线与实时渲染技术，包括光栅化、着色、程序化噪声和图形管线。</span></p>
             </div>
 
             <div>
-              <h3 style="margin-top: 0;"><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
               <p class="meta"><span data-lang="en">A real-time asteroid impact sequence in Unity URP: a procedural asteroid falls onto a terrain, an "impact frame" post-process sells the moment of collision, and an expanding shockwave reveals molten cracks across the ground.</span><span data-lang="zh">一段在 Unity URP 中实现的实时小行星撞击序列：一颗程序化生成的小行星坠向地形，一个“撞击帧”后处理强化了碰撞瞬间的冲击感，随后不断扩张的冲击波在地面上揭示出熔融的裂缝。</span></p>
-              <p style="margin: 0;"><span class="pill">Unity URP</span><span class="pill">HLSL</span><span class="pill">C#</span><span class="pill">Procedural Noise</span><span class="pill">World-space Masks</span></p>
+              <p class="pill-list"><span class="pill">Unity URP</span><span class="pill">HLSL</span><span class="pill">C#</span><span class="pill">Procedural Noise</span><span class="pill">World-space Masks</span></p>
             </div>
           </div>
         </section>
 
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
-          <h4 style="margin-top: 0;"><span data-lang="en">My contributions (Terrain Transformation)</span><span data-lang="zh">我的贡献（地形变换）</span></h4>
+          <h4><span data-lang="en">My contributions (Terrain Transformation)</span><span data-lang="zh">我的贡献（地形变换）</span></h4>
           <p class="meta"><span data-lang="en">I owned the terrain transformation system - the lava/crack look and the reveal/fade logic that makes the shockwave "paint" the ground as it expands.</span><span data-lang="zh">我负责整个地形变换系统：熔岩/裂缝的外观，以及让冲击波在扩张时“绘制”地面的显现/淡出逻辑。</span></p>
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
+          <div class="two-col">
             <div>
               <ul>
                 <li data-lang="en">Procedural lava &amp; cracks shader (HLSL): Built a terrain material that blends from normal ground to molten lava using 3D Worley noise for organic crack boundaries.</li>
@@ -68,10 +69,10 @@
                 <li data-lang="en">Surface micro-detail: Added controllable normal perturbation (Worley + Perlin-style noise) to avoid a flat/plastic feel and improve lighting response.</li>
                 <li data-lang="zh">表面微观细节：加入可控的法线扰动（Worley 与 Perlin 风格噪声），避免材质显得扁平或像塑料，并改善光照响应。</li>
               </ul>
-              <div style="margin-top: 1rem;">
-                <img src="../images/3Drendering_lava.png" alt="Lava rendering" style="width: 100%; border-radius: var(--radius-lg);" />
-                <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-                  <p style="margin: 0;" class="meta"><span data-lang="en">Corner rounding and normal shading in the lava shader.
+              <div class="figure">
+                <img src="../images/3Drendering_lava.png" alt="Lava rendering" />
+                <div class="figure-caption">
+                  <p class="meta"><span data-lang="en">Corner rounding and normal shading in the lava shader.
                   <br>(Left: sharp junctions; middle: rounded junctions; right: added normal detail.)</span><span data-lang="zh">熔岩着色器的交界圆角与法线细节对比。
                   <br>（左：尖锐交界；中：圆角交界；右：加入法线细节。）</span></p>
                 </div>
@@ -87,21 +88,21 @@
                 <li data-lang="en">Fade-out variant: Implemented a complementary transparent fade shader using the same world-space mask logic (useful for "clearing" geometry inside the shockwave region).</li>
                 <li data-lang="zh">淡出变体：使用相同的世界空间遮罩逻辑实现了一个互补的透明淡出着色器（可用于“清除”冲击波范围内的几何体）。</li>
               </ul>
-              <div style="margin-top: 1rem;">
-                <img src="../images/3Drendering_controlMask.gif" alt="Control mask progression" style="width: 100%; border-radius: var(--radius-lg);" />
-                <div style="background: rgba(127,127,127,.08); padding: 0.6rem; border-radius: var(--radius-lg); border: 1px dashed var(--border); margin-top: 0.05rem;">
-                  <p style="margin: 0;" class="meta"><span data-lang="en">Controlled reveal and fade-out shader effects.</span><span data-lang="zh">熔岩显现与几何淡出效果的控制演示。</span></p>
+              <div class="figure">
+                <img src="../images/3Drendering_controlMask.gif" alt="Control mask progression" />
+                <div class="figure-caption">
+                  <p class="meta"><span data-lang="en">Controlled reveal and fade-out shader effects.</span><span data-lang="zh">熔岩显现与几何淡出效果的控制演示。</span></p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section style="margin-top: 1.5rem;">
+        <section class="project-block">
           <h3><span data-lang="en">Outcomes</span><span data-lang="zh">成果</span></h3>
 
-          <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); margin-bottom: 1.5rem;">
-            <h4 style="margin-top: 0;"><span data-lang="en">Team system context</span><span data-lang="zh">团队系统背景</span></h4>
+          <div class="panel">
+            <h4><span data-lang="en">Team system context</span><span data-lang="zh">团队系统背景</span></h4>
             <p class="meta"><span data-lang="en">This was a 4-person project. While I focused on terrain transformation, the full sequence also includes:</span><span data-lang="zh">这是一个 4 人项目。在我专注于地形变换的同时，整个序列还包括：</span></p>
             <ul>
               <li data-lang="en">Procedural asteroid generation (vertex displacement + heightfield-driven normals)</li>
@@ -116,23 +117,23 @@
 
           </div>
 
-          <article style="background: var(--bg); padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+          <article class="media-block">
             <iframe
               src="https://drive.google.com/file/d/1E8jcsfaWMn5RO8kw6s2tnNYQdFKJUnFa/preview"
+              class="embed-frame"
               width="100%"
               height="480"
               frameborder="0"
-              allowfullscreen
-              style="border-radius: var(--radius);">
+              allowfullscreen>
             </iframe>
           </article>
 
           <br>
 
-          <div class="two-col" style="gap: 1.25rem; align-items: start;">
-            <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-              <h4 style="margin-top: 0;"><span data-lang="en">What worked well</span><span data-lang="zh">做得好的地方</span></h4>
-              <ul style="margin-bottom: 0;">
+          <div class="two-col">
+            <div class="panel">
+              <h4><span data-lang="en">What worked well</span><span data-lang="zh">做得好的地方</span></h4>
+              <ul>
                 <li data-lang="en">Readable, stylized “lava reveal”: The world-space mask + Worley cracks made the shockwave feel like it physically alters the terrain.</li>
                 <li data-lang="zh">清晰而风格化的“熔岩显现”：世界空间遮罩配合 Worley 裂缝，让冲击波看起来确实改变了地形。</li>
                 <li data-lang="en">More natural crack topology: Corner rounding reduced sharp triangular junctions common in basic Worley borders.</li>
@@ -142,9 +143,9 @@
               </ul>
             </div>
 
-            <div style="background: var(--bg); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-              <h4 style="margin-top: 0;"><span data-lang="en">Limitations &amp; next steps</span><span data-lang="zh">局限与后续计划</span></h4>
-              <ul style="margin-bottom: 0;">
+            <div class="panel">
+              <h4><span data-lang="en">Limitations &amp; next steps</span><span data-lang="zh">局限与后续计划</span></h4>
+              <ul>
                 <li data-lang="en">The micro-normal detail was tricky to balance; in the final render we reduced the detail scale to avoid noisy lighting. Next, I’d tune a sharper normal pattern that still reads cleanly in motion.</li>
                 <li data-lang="zh">微观法线细节很难平衡；最终渲染中，我们降低了细节强度，以免光照显得杂乱。下一步我会尝试更清晰锐利、在运动中依然易读的法线图案。</li>
                 <li data-lang="en">I’d also like to expose a small “art direction” panel (crack width, junction rounding strength, lava pulse speed) for faster iteration.</li>
@@ -154,7 +155,7 @@
           </div>
         </section>
 
-        <p style="margin-top: 1.5rem;"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
+        <p class="page-links"><a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a></p>
       </section>
     </main>
 
