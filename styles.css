@@ -60,6 +60,9 @@
   /* Media frame: a muted plate behind the asset and a thin accent hairline. */
   --frame: color-mix(in srgb, var(--ink) 6%, var(--paper));
   --frame-rule: color-mix(in srgb, var(--accent-ui) 45%, var(--paper));
+  --frame-width: 2px;
+  /* How far a snapshot's mirrored edge fades out into an unfilled frame. */
+  --media-bleed: 40px;
   color-scheme: light;
 
   /* Older names still read by inline styles, the chat widget and the tools. */
@@ -475,15 +478,72 @@ main { display: block; padding-top: var(--s8); }
   color: var(--ink-2);
 }
 .project-card .meta { margin: var(--s4) 0 0; color: var(--ink); max-width: 34em; }
-/* List cards crop to a common frame (cover); detail pages never crop. */
+/* Project images are shown whole (contain) on a common 16:9 frame; the
+   theme's plate fills whatever the image's own proportions leave. */
 .project-media {
   margin: 0;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--frame);
-  border: 1px solid var(--frame-rule);
+  border: var(--frame-width) solid var(--frame-rule);
 }
-.project-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.project-media img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; display: block; }
+/* Authored bleed (scripts/media-bleed.js sets the geometry): where the image
+   leaves the frame unfilled, its edge is mirrored outward - continuous at the
+   seam - and fades into the plate over --media-bleed. The frame clips it when
+   the gap is narrower than that. Each band tucks 1px under the image so a
+   fractional image edge never shows a hairline of plate. */
+.project-media { position: relative; isolation: isolate; }
+.project-media.bleed-x::before,
+.project-media.bleed-x::after,
+.project-media.bleed-y::before,
+.project-media.bleed-y::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--bleed-src);
+  background-repeat: no-repeat;
+  background-size: var(--img-w) var(--img-h);
+}
+.project-media.bleed-x::before,
+.project-media.bleed-x::after {
+  top: var(--img-top);
+  width: calc(var(--media-bleed) + 1px);
+  height: var(--img-h);
+  transform: scaleX(-1);
+}
+.project-media.bleed-x::before {
+  left: calc(var(--img-left) - var(--media-bleed));
+  background-position: left top;
+  -webkit-mask-image: linear-gradient(to right, #000, rgba(0, 0, 0, .45) 45%, transparent);
+  mask-image: linear-gradient(to right, #000, rgba(0, 0, 0, .45) 45%, transparent);
+}
+.project-media.bleed-x::after {
+  left: calc(var(--img-left) + var(--img-w) - 1px);
+  background-position: right top;
+  -webkit-mask-image: linear-gradient(to left, #000, rgba(0, 0, 0, .45) 45%, transparent);
+  mask-image: linear-gradient(to left, #000, rgba(0, 0, 0, .45) 45%, transparent);
+}
+.project-media.bleed-y::before,
+.project-media.bleed-y::after {
+  left: var(--img-left);
+  width: var(--img-w);
+  height: calc(var(--media-bleed) + 1px);
+  transform: scaleY(-1);
+}
+.project-media.bleed-y::before {
+  top: calc(var(--img-top) - var(--media-bleed));
+  background-position: left top;
+  -webkit-mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, .45) 45%, transparent);
+  mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, .45) 45%, transparent);
+}
+.project-media.bleed-y::after {
+  top: calc(var(--img-top) + var(--img-h) - 1px);
+  background-position: left bottom;
+  -webkit-mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, .45) 45%, transparent);
+  mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, .45) 45%, transparent);
+}
 .project-card .card-cover { position: absolute; inset: 0; z-index: 2; }
 .project-card .card-cover:focus-visible { outline-offset: 6px; }
 .project-card:hover .pc-title,
@@ -553,8 +613,26 @@ main { display: block; padding-top: var(--s8); }
   .projects-grid--secondary .project-card:not(.project-card--2x2) { grid-column: span 2; }
 }
 
+/* Wide landscape screens: two majors and four minors per row. Every entry
+   then stacks the same way (number, image, title + role, description); the
+   cells a short row leaves empty belong to the grid, not to a gap. Portrait
+   screens of any width keep the rows above. */
+@media (min-width: 1024px) and (orientation: landscape) {
+  .projects-grid .project-card { display: flex; flex-direction: column; gap: var(--s3); }
+  .projects-grid .project-card .project-media { order: 1; }
+  .projects-grid .project-card h3 { order: 2; }
+  .projects-grid .project-card .meta { order: 3; margin-top: var(--s1); }
+  .projects-grid .project-card--2x2 { grid-column: span 6; }
+  .projects-grid .project-card:not(.project-card--2x2) { grid-column: span 3; }
+  /* Minors start their own row rather than filling in beside a lone major. */
+  .projects-grid .project-card--2x2 + .project-card:not(.project-card--2x2) { grid-column: 1 / span 3; }
+  .projects-grid--primary .project-card:not(.project-card--2x2) .pc-title,
+  .projects-grid--secondary .project-card--2x2 .pc-title { font-size: var(--fs-h3); }
+}
+
 /* ---------- Flip card minigame ---------- */
 #flip-game {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
   column-gap: var(--gap);
@@ -1010,7 +1088,7 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--frame);
-  border: 1px solid var(--frame-rule);
+  border: var(--frame-width) solid var(--frame-rule);
 }
 .project-hero__media img { width: 100%; height: 100%; object-fit: contain; display: block; }
 @media (max-width: 1023px) {
@@ -1108,7 +1186,7 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
   vertical-align: top;
   padding: var(--s3);
   background: var(--frame);
-  border: 1px solid var(--frame-rule);
+  border: var(--frame-width) solid var(--frame-rule);
 }
 .figure-caption { padding-top: var(--s2); }
 .figure-caption .meta { margin: 0; font-size: var(--fs-small); color: var(--ink-2); }
@@ -1127,7 +1205,7 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
   width: 100%;
   aspect-ratio: 16 / 9;
   height: auto;
-  border: 1px solid var(--frame-rule);
+  border: var(--frame-width) solid var(--frame-rule);
   background: var(--frame);
 }
 .embed-frame--4x3 { aspect-ratio: 4 / 3; }
@@ -1159,7 +1237,7 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
   letter-spacing: var(--track-meta);
   text-transform: uppercase;
 }
-.diagram-card svg { display: block; width: 100%; height: auto; border: 1px solid var(--frame-rule); }
+.diagram-card svg { display: block; width: 100%; height: auto; border: var(--frame-width) solid var(--frame-rule); }
 .diagram-card svg > rect:first-of-type { rx: 0; }
 
 /* ---------- Game Design Workshop ---------- */
@@ -1182,7 +1260,7 @@ html[lang="zh"] #education h3 > [data-lang="zh"] {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--frame);
-  border: 1px solid var(--frame-rule);
+  border: var(--frame-width) solid var(--frame-rule);
 }
 .mySlides { display: none; width: 100%; height: 100%; position: relative; }
 .mySlides img { width: 100%; height: 100%; object-fit: contain; display: block; }
