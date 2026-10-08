@@ -3,7 +3,8 @@
 // elements marked data-lang="en" / data-lang="zh" (the engine shows the active
 // one and hides the other). A few single-element cases (the <title>, form
 // placeholders, button labels) use data-en / data-zh (and data-ph-en /
-// data-ph-zh, data-al-en / data-al-zh) attribute pairs instead.
+// data-ph-zh, data-al-en / data-al-zh, data-src-en / data-src-zh) attribute
+// pairs instead.
 //
 // Driven by the existing #languageToggle button. Choice is persisted in
 // localStorage under 'yc-lang'. Default language is English.
@@ -77,7 +78,17 @@
       als[m].setAttribute('aria-label', als[m].getAttribute('data-al-' + lang));
     }
 
-    // 5. Language toggle button shows the language you'd switch TO - unless it
+    // 5. Embed source swaps: data-src-en / data-src-zh. Videos are on Google
+    //    Drive for en and on Bilibili for zh (Drive is unreachable from
+    //    mainland China). The HTML carries no src, so the other language's
+    //    player is never requested; the guard keeps a re-apply from reloading.
+    var srcs = document.querySelectorAll('[data-src-en][data-src-zh]');
+    for (var n = 0; n < srcs.length; n++) {
+      var src = srcs[n].getAttribute('data-src-' + lang);
+      if (srcs[n].getAttribute('src') !== src) srcs[n].setAttribute('src', src);
+    }
+
+    // 6. Language toggle button shows the language you'd switch TO - unless it
     //    carries data-fixed-label (the inner-page masthead shows "EN / 中文"
     //    and marks the active one in CSS).
     var btn = document.getElementById('languageToggle');
