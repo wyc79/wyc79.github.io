@@ -570,8 +570,11 @@
   // The content-page launcher: the neutral pose, a slow orbiting dot that
   // quickens a little on hover / focus, and a dot that glides to the front
   // and stops while the chat is open (and carries on from there when it
-  // closes). Reduced motion: one fixed dot, no drift.
+  // closes). Reduced motion: no orbit or drift - the dot sits at HOME while
+  // the chat is closed and at the front while it is open, and steps between
+  // the two.
   var AMBIENT_PERIOD_S = 10;
+  var HOME = 125;   // front-left: where the dot starts, and rests under reduced motion
 
   function ambient(canvas, opts) {
     opts = opts || {};
@@ -581,14 +584,19 @@
     var open = !!(window.YCChat && window.YCChat.isOpen());
     function apply() {
       if (open) { stone.rest(FRONT); stone.drift(false); }
+      else if (stone.reducedMotion()) { stone.rest(HOME); stone.drift(false); }
       else { stone.orbit(AMBIENT_PERIOD_S); stone.drift(true); }
     }
-    stone.place(125);   // where the dot starts, front-left
+    stone.place(HOME);
     apply();
     window.addEventListener('ycchat-change', function (e) {
       open = !!(e.detail && e.detail.open);
       apply();
     });
+    // The OS setting can change while the page is open.
+    var mq = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+    if (mq && mq.addEventListener) mq.addEventListener('change', apply);
+    else if (mq && mq.addListener) mq.addListener(apply);
     var host = opts.hoverTarget;
     if (host) {
       var hovered = false, focused = false;
