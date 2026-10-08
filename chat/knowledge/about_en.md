@@ -132,10 +132,10 @@ the same third-person action game.
 ## How the projects page is organized
 link: pages/projects.html
 The projects page is split into a games section (Cemented Dreams, Nothing
-Can Go Wrong, Code Breaker, Gyrotris) and an "other related works" section
-covering AI Tarot Projection, the chat agent, Prime Engine, physical game
-prototypes, the 3D rendering project, Aegis Sword, and the automatic
-differentiation toolbox.
+Can Go Wrong, Code Breaker, Gyrotris), an agentic AI section (AI Tarot
+Projection and the chat agent), and an "other game related works" section
+covering Prime Engine, physical game prototypes, the 3D rendering project,
+Aegis Sword, and the automatic differentiation toolbox.
 
 ## Shipped games versus supporting engineering work
 link: pages/projects.html

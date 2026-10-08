@@ -106,7 +106,11 @@
 
   --cols: 12;
   --gap: clamp(12px, 1.3vw, 24px);
-  --margin: clamp(20px, 4vw, 72px);
+  --margin-base: clamp(20px, 4vw, 72px);
+  --margin: var(--margin-base);
+  /* The Ask AI stone's footprint, lower left on inner pages: its inset and
+     84px canvas (chat-widget.js, .ycchat-btn.is-stone) plus one gutter. */
+  --stone-reserve: calc(.5rem + 84px + var(--gap));
   /* Content never grows past this; wide screens get margin, not bigger type
      and media. */
   --maxw: 1280px;
@@ -133,6 +137,13 @@
 }
 @media (max-width: 1023px) { :root { --cols: 6; } }
 @media (max-width: 639px)  { :root { --cols: 4; } }
+/* Wide landscape screens: the page margin clears the fixed stone, and the
+   right margin matches so the column stays centred. Where the 1280px cap
+   already leaves that much room, the column does not move. Portrait and
+   square screens keep the plain margin. The homepage lays out its own. */
+@media (min-width: 1024px) and (orientation: landscape) {
+  body:not(.p3-body) { --margin: max(var(--margin-base), var(--stone-reserve)); }
+}
 
 /* Chinese: no tracking on CJK, and more leading than Latin needs. */
 html[lang="zh"] {
@@ -419,7 +430,9 @@ main { display: block; padding-top: var(--s8); }
 }
 
 /* ---------- Projects ---------- */
-#projects { counter-reset: project; }
+/* Numbered within each group: the groups reorder by chat role
+   (scripts/project-order.js), so a page-wide count would shift. */
+.projects-grid { counter-reset: project; }
 .wrap .group-title {
   padding-top: var(--s3);
   margin-bottom: var(--s5);

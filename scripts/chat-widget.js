@@ -1152,6 +1152,8 @@
     renderLog();
     updateClearVisibility();
     saveSession();
+    // Pages that adapt to the role (project-order.js) listen for this.
+    window.dispatchEvent(new CustomEvent('ycchat-role', { detail: { role: id } }));
     els.input.focus();
   }
 
