@@ -181,7 +181,8 @@ buildLauncher();
 var before = { stone: els.btn.classList.contains('is-stone'), label: els.btnLabel.textContent };
 if (lostHook) lostHook();
 process.stdout.write(JSON.stringify({ before: before, launchers: document.body.children.length,
-  canvasHidden: els.btn.children[0].attrs['aria-hidden'],
+  canvasHidden: els.btn.children.filter(function (c) { return c.tag === 'canvas'; })[0].attrs['aria-hidden'],
+  labelFirst: els.btn.children[0] === els.btnLabel,
   after: { stone: els.btn.classList.contains('is-stone'), label: els.btnLabel.textContent }, destroyed: destroyed }));
 """
         return run_node(script)
@@ -202,6 +203,7 @@ process.stdout.write(JSON.stringify({ before: before, launchers: document.body.c
         )
         self.assertEqual(got["before"], {"stone": True, "label": "STONE LABEL"})
         self.assertEqual(got["canvasHidden"], "true")
+        self.assertTrue(got["labelFirst"], "the label sits above the stone")
         self.assertEqual(got["after"], {"stone": False, "label": "TEXT BUTTON"})
         self.assertEqual(got["destroyed"], 1)
 

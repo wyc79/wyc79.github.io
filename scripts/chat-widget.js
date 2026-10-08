@@ -991,14 +991,16 @@
       // corners of the canvas stay with the page underneath.
       '.ycchat-btn canvas{display:none;}',
       '.ycchat-btn.is-stone{left:calc(.5rem + env(safe-area-inset-left,0px));bottom:calc(.25rem + env(safe-area-inset-bottom,0px));',
-      ' display:flex;align-items:center;padding:0;border:0;background:transparent;color:' + INK + ';pointer-events:none;}',
+      ' display:flex;flex-direction:column;align-items:center;padding:0;border:0;background:transparent;color:' + INK + ';pointer-events:none;}',
       '.ycchat-btn.is-stone:hover{background:transparent;color:' + INK + ';}',
-      '.ycchat-btn.is-stone canvas{display:block;width:84px;height:84px;clip-path:inset(17% 0);pointer-events:auto;cursor:pointer;}',
-      '.ycchat-btn.is-stone .ycchat-btn-label{pointer-events:auto;cursor:pointer;margin-left:-.35rem;padding:.3rem .4rem;background:' + PAPER + ';}',
+      // Label stacked above the stone; the canvas tucks up only into its own
+      // empty, unclickable top band, so the two never overlap visibly.
+      '.ycchat-btn.is-stone canvas{display:block;width:84px;height:84px;margin-top:-11px;clip-path:inset(17% 0);pointer-events:auto;cursor:pointer;}',
+      '.ycchat-btn.is-stone .ycchat-btn-label{position:relative;z-index:1;pointer-events:auto;cursor:pointer;padding:.2rem .4rem;background:' + PAPER + ';}',
       '.ycchat-btn.is-stone:hover .ycchat-btn-label{text-decoration:underline;text-decoration-color:' + ACCENT + ';text-underline-offset:.35em;}',
       '.ycchat-btn.is-stone:focus-visible{outline:none;}',
       '.ycchat-btn.is-stone:focus-visible .ycchat-btn-label{outline:2px solid ' + ACCENT + ';outline-offset:2px;}',
-      '@media (max-width:640px){.ycchat-btn.is-stone canvas{width:68px;height:68px;clip-path:inset(14% 0);}}',
+      '@media (max-width:640px){.ycchat-btn.is-stone canvas{width:68px;height:68px;margin-top:-7px;clip-path:inset(14% 0);}}',
       '.ycchat-panel{position:fixed;left:1.1rem;bottom:4.4rem;z-index:1200;width:min(400px,calc(100vw - 2rem));',
       ' height:min(560px,calc(100vh - 7rem));display:flex;flex-direction:column;background:' + PAPER + ';',
       ' color:' + INK + ';border:1px solid ' + INK + ';border-radius:0;',
@@ -1635,8 +1637,8 @@
     var canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     els.btnLabel = h('span', 'ycchat-btn-label', t('askBtn'));
-    btn.appendChild(canvas);
     btn.appendChild(els.btnLabel);
+    btn.appendChild(canvas);
     document.body.appendChild(btn);
     els.btn = btn;
     els.side = 'left';

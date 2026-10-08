@@ -1559,13 +1559,17 @@ html[lang="zh"] .p3-label { line-height: 1.02; }
   -webkit-touch-callout: none;
   clip-path: inset(12% 0 15% 0);
 }
+.p3-stone-label + canvas { margin-top: -11%; }
 .p3-object.is-dragging canvas { cursor: grabbing; }
-/* What the stone does, said plainly: a quiet label in the canvas's empty
-   top band, set like the site's other metadata - not like a menu row. */
+/* What the stone does, said plainly: a quiet label stacked above the stone,
+   set like the site's other metadata - not like a menu row. The canvas
+   tucks up under it only by part of its own empty, unclickable top band
+   (clip-path 12%), so the label never sits on anything drawn. */
 .p3-stone-label {
-  position: absolute;
-  top: 12%;
-  left: 0;
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: max-content;
   pointer-events: auto;
   cursor: pointer;
   font-family: var(--font);
@@ -1588,7 +1592,6 @@ html[lang="zh"] .p3-label { line-height: 1.02; }
 .p3-object.no-stone canvas { display: none; }
 .p3-object.no-stone .p3-stone { width: auto; display: inline-block; }
 .p3-object.no-stone .p3-stone-label {
-  position: static;
   display: inline-block;
   padding: .75rem 1rem;
   border: 1px solid var(--ink);
