@@ -598,6 +598,20 @@ def summary_chunks(chunks: list, lang: str | None) -> list:
     return out
 
 
+def pinned_chunks(chunks: list, lang: str | None) -> list:
+    """Curated chunks marked `pinned: true` in knowledge/about_*.md, in the
+    answering language: context on every general turn, whatever retrieval
+    returned. Exists for the dated timeline -- "what did YC do lately" names
+    no topic, so it ranked the timeline 14th while the system prompt's date
+    had nothing to compare against. Context only, never a source card, and
+    never a reason not to refuse: _chat's refusal looks at hits and page
+    context alone, or every question would be answerable."""
+    return [
+        c for c in chunks
+        if c.get("pinned") and (lang not in ("en", "zh") or c.get("lang") in (lang, None))
+    ]
+
+
 def sources_for_named(chunks: list, answer: str) -> list:
     """The subset of `chunks` whose page_title the answer actually names.
 
@@ -619,9 +633,10 @@ def sources_for_named(chunks: list, answer: str) -> list:
     ]
 
 
-def build_context_block(hits: list, page_ctx: list) -> str:
-    """The <chunk> block handed to the LLM: retrieved chunks first, then the
-    current page's own chunks tagged current_page="true".
+def build_context_block(hits: list, page_ctx: list, pinned: list = ()) -> str:
+    """The <chunk> block handed to the LLM: retrieved chunks first, then
+    pinned chunks tagged always_included="true", then the current page's own
+    chunks tagged current_page="true".
 
     That tag is the whole page-awareness mechanism. It lets the model
     distinguish "content that matched the question" from "content of the page
@@ -630,9 +645,12 @@ def build_context_block(hits: list, page_ctx: list) -> str:
     tuned score bonus. Pure and separate from the handler, like
     sources_from_hits, so the contract test can assert on it directly."""
     rows = []
-    chunks = [h["chunk"] for h in hits] + list(page_ctx)
-    for i, c in enumerate(chunks):
-        tag = ' current_page="true"' if i >= len(hits) else ""
+    tagged = (
+        [(h["chunk"], "") for h in hits]
+        + [(c, ' always_included="true"') for c in pinned]
+        + [(c, ' current_page="true"') for c in page_ctx]
+    )
+    for i, (c, tag) in enumerate(tagged):
         rows.append(
             '<chunk index="{}" page="{}" url="{}"{}>\n{}\n</chunk>'.format(
                 i + 1, c.get("page_title", ""), c.get("url", ""), tag, c.get("text", "")
@@ -1524,6 +1542,11 @@ class Handler(BaseHTTPRequestHandler):
                 c for c in page_chunks(_index["chunks"], page.get("url"), answer_lang)
                 if c.get("id") not in seen
             ]
+        # Not on the button intents: summarize_page is told to use only the
+        # page's chunks, and top_projects judges the whole catalogue.
+        pinned = [] if intent in ("summarize_page", "top_projects") else [
+            c for c in pinned_chunks(_index["chunks"], answer_lang) if c.get("id") not in seen
+        ]
 
         # Refuse only when BOTH are empty. Retrieval alone returning nothing is
         # the normal outcome for a deictic question, and refusing on it is what
@@ -1606,13 +1629,19 @@ class Handler(BaseHTTPRequestHandler):
             "today's date, and name the dates rather than only saying 'recently'. "
             "Do not guess a date the context does not give."
         )
+        if pinned:
+            system_head += (
+                ' Chunks tagged always_included="true" are sent with every '
+                "question, not because they matched this one; use them only when "
+                "the question needs them."
+            )
         if answer_lang == "zh":
             system_head += "\n\nAlways answer in Chinese (简体中文), regardless of the language the question is written in."
         elif answer_lang == "en":
             system_head += "\n\nAlways answer in English, regardless of the language the question is written in."
         system = (
             f"{system_head}\n\nContext retrieved from the site for this question:\n"
-            f"{build_context_block(hits, page_ctx)}"
+            f"{build_context_block(hits, page_ctx, pinned)}"
         )
         messages = list(body.get("history") or []) + [{"role": "user", "content": body["question"]}]
 
@@ -1652,6 +1681,7 @@ class Handler(BaseHTTPRequestHandler):
                 "system_head": system_head,
                 "contexts": log_contexts(hits),
                 "page_context": [c.get("id") for c in page_ctx],
+                "pinned_context": [c.get("id") for c in pinned],
                 "messages": [
                     {"role": m.get("role"), "content": clip(m.get("content"), LIMITS["log_msg_text"])}
                     for m in messages

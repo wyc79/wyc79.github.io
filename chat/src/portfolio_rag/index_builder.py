@@ -328,6 +328,8 @@ def build_index(site_root: Path | None = None) -> dict:
             # is also the right answer for an index built before this existed.
             if sec.curated:
                 chunk["curated"] = True
+            if sec.pinned:
+                chunk["pinned"] = True
             if lang is not None:
                 chunk["lang"] = lang
             chunks.append(chunk)

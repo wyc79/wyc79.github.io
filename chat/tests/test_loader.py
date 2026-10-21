@@ -100,6 +100,22 @@ def test_load_knowledge_parses_headings_links_and_text(tmp_path: Path) -> None:
     assert "CV highlights" in sec.text and "link:" not in sec.text
 
 
+def test_load_knowledge_parses_the_pinned_flag(tmp_path: Path) -> None:
+    from portfolio_rag.loader import load_knowledge
+
+    (tmp_path / "about_en.md").write_text(
+        "# header\n\n## A timeline of his work\nlink: pages/projects.html\npinned: true\n"
+        "In date order: Rochester from 2017 to 2021, Harvard from 2021 to 2022.\n\n"
+        "## An ordinary section\nlink: index.html\n"
+        "Resume and CV highlights of YC Wang, game developer and engineer.\n",
+        encoding="utf-8",
+    )
+    timeline, ordinary = load_knowledge(tmp_path, "en")
+    assert timeline.pinned and timeline.url == "pages/projects.html"
+    assert "pinned:" not in timeline.text
+    assert not ordinary.pinned
+
+
 def test_load_knowledge_short_cjk_section_survives_floor(tmp_path: Path) -> None:
     """A CJK character carries far more information than a Latin one, so a
     raw-character floor tuned for English silently drops short-but-complete

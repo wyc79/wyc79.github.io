@@ -632,6 +632,33 @@ def test_build_context_block_with_no_page_context_is_unchanged_in_shape() -> Non
     assert block.startswith('<chunk index="1" page="Skills" url="pages/skills.html">')
 
 
+def test_build_context_block_tags_pinned_chunks_apart_from_the_page() -> None:
+    mod = _load_backend()
+    hits = [{"chunk": {"page_title": "Skills", "url": "pages/skills.html", "text": "retrieved"},
+             "score": 0.42}]
+    pinned = [{"page_title": "Timeline", "url": "pages/projects.html", "text": "dated"}]
+    page_ctx = [{"page_title": "Prime Engine", "url": "pages/prime-engine.html", "text": "on-page"}]
+
+    rows = mod.build_context_block(hits, page_ctx, pinned).split("</chunk>")
+
+    assert "retrieved" in rows[0] and "always_included" not in rows[0]
+    assert "dated" in rows[1] and 'always_included="true"' in rows[1]
+    assert "current_page" not in rows[1], "the timeline is not the page the visitor is on"
+    assert "on-page" in rows[2] and 'current_page="true"' in rows[2]
+
+
+def test_pinned_chunks_selects_the_answering_language() -> None:
+    mod = _load_backend()
+    chunks = [
+        {"id": "t-en", "lang": "en", "pinned": True, "curated": True},
+        {"id": "t-zh", "lang": "zh", "pinned": True, "curated": True},
+        {"id": "other", "lang": "en", "curated": True},
+    ]
+    assert [c["id"] for c in mod.pinned_chunks(chunks, "en")] == ["t-en"]
+    assert [c["id"] for c in mod.pinned_chunks(chunks, "zh")] == ["t-zh"]
+    assert [c["id"] for c in mod.pinned_chunks(chunks, None)] == ["t-en", "t-zh"]
+
+
 def test_validate_chat_body_accepts_a_page_field_and_rejects_a_malformed_one() -> None:
     mod = _load_backend()
     base = {"question": "summarize this page", "history": []}
@@ -1208,6 +1235,73 @@ def test_system_prompt_carries_todays_date(monkeypatch) -> None:
     assert handler.responses[0][0] == 200
     chat = [r for r in records if r.get("type") == "chat"][0]
     assert "Today's date is 2031-02-03" in chat["in"]["system_head"]
+
+
+def _pinned_turn(monkeypatch, intent=None, retrieved=True, page="pages/prime-engine.html"):
+    """Run one /chat turn against an index holding an en and a zh timeline;
+    return the system prompt the LLM saw and the log records."""
+    mod = _load_backend()
+    hit = {"id": "h", "url": "pages/skills.html", "anchor": "", "lang": "en",
+           "page_title": "Skills", "section_title": "Skills", "text": "retrieved"}
+    monkeypatch.setattr(mod, "retrieve",
+                        lambda q: [{"chunk": hit, "score": 0.9}] if retrieved else [])
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    seen: list = []
+    monkeypatch.setattr(mod, "call_llm",
+                        lambda s, m: seen.append(s) or ("Steam Launch Window.", "m", {}, "stop"))
+    monkeypatch.setattr(mod, "load_roles", lambda: {
+        "default_role": "visitor", "base_system_prompt": "base",
+        "roles": {"visitor": {"label": "Visitor", "system_prompt": "x"}}})
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [
+        hit,
+        {"id": "p", "url": "pages/prime-engine.html", "anchor": "top", "lang": "en",
+         "page_title": "Prime Engine", "section_title": "Prime Engine", "text": "on-page"},
+        {"id": "t-en", "url": "pages/projects.html", "anchor": "", "lang": "en",
+         "curated": True, "pinned": True,
+         "page_title": "Timeline", "section_title": "Timeline", "text": "EN-TIMELINE"},
+        {"id": "t-zh", "url": "pages/projects.html", "anchor": "", "lang": "zh",
+         "curated": True, "pinned": True,
+         "page_title": "时间线", "section_title": "时间线", "text": "ZH-TIMELINE"},
+    ])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    records: list = []
+    monkeypatch.setattr(mod, "log", lambda r: records.append(r))
+    body = {"question": "What did YC do lately?", "history": [], "lang": "en"}
+    if page:
+        body["page"] = {"url": page}
+    if intent:
+        body["intent"] = intent
+    handler = _StubHandler(json.dumps(body).encode("utf-8"))
+    mod.Handler._chat(handler)
+    return (seen[0] if seen else ""), records, handler
+
+
+def test_pinned_timeline_reaches_the_model_whatever_retrieval_returned(monkeypatch) -> None:
+    """The timeline must not depend on the question's wording ranking it
+    top-4: "what did YC do lately" retrieved it at rank 14."""
+    system, records, handler = _pinned_turn(monkeypatch)
+    assert "EN-TIMELINE" in system and "ZH-TIMELINE" not in system
+    assert [s["id"] for s in handler.responses[0][1]["sources"]] == ["h"], (
+        "the timeline is context, never a source card")
+    chat = [r for r in records if r.get("type") == "chat"][0]
+    assert chat["in"]["pinned_context"] == ["t-en"]
+
+
+def test_pinned_timeline_does_not_rescue_an_empty_retrieval(monkeypatch) -> None:
+    """Refusal is decided on hits and page context alone: a chunk that is
+    always present would otherwise make every question answerable."""
+    system, _, handler = _pinned_turn(monkeypatch, retrieved=False, page=None)
+    assert handler.responses[0][1].get("refused") is True
+    assert system == "", "a refused turn never reaches the model"
+
+
+def test_pinned_timeline_stays_out_of_the_button_intents(monkeypatch) -> None:
+    """summarize_page is told to use only the page's chunks; top_projects
+    judges the catalogue. A timeline in either is noise."""
+    system, _, _ = _pinned_turn(monkeypatch, intent="summarize_page")
+    assert "EN-TIMELINE" not in system
 
 
 def test_today_iso_is_an_iso_date() -> None:

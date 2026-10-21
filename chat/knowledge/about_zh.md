@@ -305,8 +305,9 @@ link: pages/steam-launch-window.html
 
 ## 王元辰 2026 年做了哪些项目
 link: pages/projects.html
-2026 年，王元辰一边在南加州大学读硕士，一边做了本站的 AI 聊天助手；8 到 9 月独立完成了 AI 塔罗投射；10 月为 Ludum Dare 60 做了 Hold the Gate，并开始开发 Steam Launch Window。
+2026 年，王元辰一边在南加州大学读硕士，一边在 5 月完成了 Cemented Dreams 和 Prime Engine，做了本站的 AI 聊天助手；8 到 9 月独立完成了 AI 塔罗投射；10 月为 Ludum Dare 60 做了 Hold the Gate，并开始开发 Steam Launch Window。
 
 ## 王元辰的经历时间线
 link: pages/projects.html
-王元辰的经历按时间顺序：2017–2021 年在罗切斯特大学读本科，2021 年春季做了 Aegis Sword CAD 复刻；2021–2022 年在哈佛医学院读生物医学信息学硕士，2022 年秋季做了自动微分工具；2025 年 8 月起在南加州大学读计算机硕士，2025 年秋季完成了 3D 渲染项目和 CTIN 488 游戏设计工作坊；2026 年 8 到 9 月做了 AI 塔罗投射；2026 年 10 月做了 Hold the Gate，并开始开发 Steam Launch Window。
+pinned: true
+王元辰的经历按时间顺序：2017–2021 年在罗切斯特大学读本科，2021 年春季做了 Aegis Sword CAD 复刻；2021–2022 年在哈佛医学院读生物医学信息学硕士，2022 年秋季做了自动微分工具；2024 年 10 月做了 Gyrotris；在 Brackeys Game Jam 2025.1 做了 Nothing Can Go Wrong；2025 年 8 月起在南加州大学读计算机硕士，2025 年秋季完成了 3D 渲染项目、CTIN 488 游戏设计工作坊和 Codebreaker（9 到 12 月）；2025 年 12 月到 2026 年 5 月做了 Cemented Dreams；2026 年 1 到 5 月做了 Prime Engine；2026 年做了本站的 AI 聊天助手；2026 年 8 到 9 月做了 AI 塔罗投射；2026 年 10 月做了 Hold the Gate，并开始开发 Steam Launch Window。

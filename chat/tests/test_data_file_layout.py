@@ -299,3 +299,14 @@ def test_build_code_documents_why_there_is_no_chunks_zh_minilm() -> None:
         f"_build_zh_gate's docstring (where the zh gate is written) is "
         f"missing required explanatory phrase(s): {missing}"
     )
+
+
+def test_committed_index_pins_a_timeline_per_language() -> None:
+    """The backend's pinned_chunks sends these on every general turn so a
+    recency question has dates to compare against today's. A lost
+    `pinned: true` line, or a rebuild that drops the flag, would silently
+    send that question back to whatever retrieval happens to rank."""
+    chunks = json.loads(CHUNKS_E5_PATH.read_text(encoding="utf-8"))["chunks"]
+    pinned = [c for c in chunks if c.get("pinned")]
+    assert sorted(c["lang"] for c in pinned) == ["en", "zh"]
+    assert all(c.get("curated") for c in pinned), "only curated sections can be pinned"

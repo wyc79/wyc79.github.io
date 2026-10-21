@@ -497,16 +497,20 @@ Hold the Gate with a team for Ludum Dare 60.
 
 ## His projects in 2026
 link: pages/projects.html
-In 2026, while studying at USC, he built this site's chat agent, made AI
-Tarot Projection alone in August and September, then in October made Hold
-the Gate for Ludum Dare 60 and started Steam Launch Window.
+In 2026, while studying at USC, he finished Cemented Dreams and Prime
+Engine in May, built this site's chat agent, made AI Tarot Projection alone
+in August and September, then in October made Hold the Gate for Ludum Dare
+60 and started Steam Launch Window.
 
 ## A timeline of his work so far
 link: pages/projects.html
-In date order: bachelor's degrees at Rochester from 2017 to 2021, with the
-Aegis Sword CAD replica in spring 2021; the Harvard biomedical informatics
-master's from 2021 to 2022, with the automatic differentiation toolbox in
-fall 2022; the USC computer science master's from August 2025, with the 3D
-rendering project and the CTIN 488 game design workshop in fall 2025; AI
-Tarot Projection in August and September 2026; Hold the Gate and Steam
-Launch Window in October 2026.
+pinned: true
+In date order: Rochester bachelor's degrees 2017 to 2021, with the Aegis
+Sword CAD replica in spring 2021; Harvard biomedical informatics master's
+2021 to 2022, with the automatic differentiation toolbox in fall 2022;
+Gyrotris in October 2024; Nothing Can Go Wrong for Brackeys Game Jam 2025.1;
+USC computer science master's from August 2025; fall 2025: the 3D rendering
+project, the CTIN 488 game design workshop, and Codebreaker (September to
+December); Cemented Dreams, December 2025 to May 2026; Prime Engine, January
+to May 2026; this site's chat agent in 2026; AI Tarot Projection, August to
+September 2026; Hold the Gate and Steam Launch Window, October 2026.

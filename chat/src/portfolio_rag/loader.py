@@ -88,6 +88,12 @@ class Section:
     # structural signature for callers reading an index built before this field
     # existed; this is the authoritative version, recorded at build time.
     curated: bool = False
+    # A curated section marked `pinned: true` reaches the model on every
+    # general turn, not only when retrieval ranks it (the backend's
+    # pinned_chunks). For context the question's wording cannot be relied on
+    # to retrieve -- a dated timeline, which "what did he do lately" names no
+    # topic of.
+    pinned: bool = False
 
 
 def _select_language(soup: BeautifulSoup, lang: str) -> None:
@@ -219,7 +225,8 @@ def load_knowledge(knowledge_dir: Path, lang: str | None = None) -> list[Section
     Visitors phrase questions in vocabulary the site itself never uses
     ("resume", "CV", "highlights") — these authored chunks bridge that gap.
     Format: each `## Heading` starts a section; an optional `link: <url>` line
-    right after the heading sets where its source card points.
+    right after the heading sets where its source card points, and an
+    optional `pinned: true` line after that marks it Section.pinned.
 
     One folder holds both languages as `about_en.md` / `about_zh.md`; lang
     selects `*_{lang}.md` so each consumer gets a single-language corpus (the
@@ -237,11 +244,14 @@ def load_knowledge(knowledge_dir: Path, lang: str | None = None) -> list[Section
             if body and body[0].startswith("link:"):
                 url = body[0].split(":", 1)[1].strip()
                 body = body[1:]
+            pinned = bool(body) and body[0].strip() == "pinned: true"
+            if pinned:
+                body = body[1:]
             text = " ".join(" ".join(body).split())
             if _effective_length(text) >= _MIN_SECTION_LENGTH:
                 sections.append(
                     Section(url=url, anchor="", page_title=heading, section_title=heading,
-                            text=text, curated=True)
+                            text=text, curated=True, pinned=pinned)
                 )
     return sections
 
