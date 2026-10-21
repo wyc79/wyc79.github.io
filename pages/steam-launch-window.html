@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-en="Steam Launch Window: Launch Timing Tool &amp; Public Dataset | Yuanchen Wang" data-zh="Steam Launch Window：发售时机工具与公开数据集 | 王元辰">Steam Launch Window: Launch Timing Tool &amp; Public Dataset | Yuanchen Wang</title>
+  <meta name="description" content="Steam Launch Window helps indie developers pick a Steam launch week: how crowded each upcoming week is in their tag niche, where Steam sales and fests fall, and how similar past launches did by timing. Built on a scheduled pipeline over Steam's public endpoints and published as an open dataset on Hugging Face." data-zh="Steam Launch Window 帮助独立开发者挑选 Steam 发售周：在自己的标签细分领域里，接下来每一周有多拥挤、Steam 促销和游戏节落在哪里，以及类似的往期游戏在不同时机发售的表现。背后是一条基于 Steam 公开接口的定时数据管线，数据以公开数据集的形式发布在 Hugging Face 上。" />
+  <meta name="page-title" content="Steam Launch Window" data-zh="Steam Launch Window" />
+  <link rel="icon" type="image/png" href="../images/wyc.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
+  <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
+  <script src="../scripts/theme.js"></script>
+  <script src="../scripts/stone-renderer.js" defer></script>
+  <script src="../scripts/chat-widget.js" defer></script>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="page-head" data-page-header></header>
+
+    <main>
+      <!-- HERO -->
+      <section class="project-hero">
+        <span class="sr-only" role="img" aria-label="The Competition ahead heatmap for Roguelike and Deckbuilding: the next 13 weeks, each cell shaded by how many games are dated that week relative to a typical week, with Next Fest and the Winter Sale marked above." data-al-en="The Competition ahead heatmap for Roguelike and Deckbuilding: the next 13 weeks, each cell shaded by how many games are dated that week relative to a typical week, with Next Fest and the Winter Sale marked above." data-al-zh="“前方的竞争”热力图，以类 Rogue 和牌组构建为标签显示未来 13 周；每个格子的颜色表示该周已定档游戏数量相对于典型一周的水平，上方标出了新品节和冬季特卖。"></span>
+        <div class="project-hero__content">
+          <h2 class="project-hero__title"><span data-lang="en">Steam Launch Window - Launch Timing Tool &amp; Public Dataset</span><span data-lang="zh">Steam Launch Window - 发售时机工具与公开数据集</span></h2>
+          <div class="project-hero__meta">
+            <div class="project-hero__meta-item"><span data-lang="en">Role: Solo Developer - Data Pipeline, Analysis &amp; Website</span><span data-lang="zh">职责：独立开发者 - 数据管线、分析与网站</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tools: Python, pandas, statsmodels, GitHub Actions, Hugging Face Datasets, Vite, JavaScript (no framework)</span><span data-lang="zh">工具：Python、pandas、statsmodels、GitHub Actions、Hugging Face Datasets、Vite、JavaScript（无框架）</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Duration: Oct 2026 - present</span><span data-lang="zh">周期：2026 年 10 月至今</span></div>
+          </div>
+        </div>
+        <figure class="project-hero__media"><img src="../images/steam_launch_window.png" alt="" /></figure>
+      </section>
+
+      <section class="project-body">
+
+        <p class="meta">
+          <a href="https://wyc79.github.io/steam-launch-window/" target="_blank" rel="noopener"><span data-lang="en">Open the tool</span><span data-lang="zh">打开工具</span></a> &middot;
+          <a href="https://huggingface.co/datasets/strikeoo/steam-launch-data" target="_blank" rel="noopener"><span data-lang="en">Dataset on Hugging Face</span><span data-lang="zh">Hugging Face 上的数据集</span></a> &middot;
+          <a href="https://wyc79.github.io/steam-launch-window/methods.html" target="_blank" rel="noopener"><span data-lang="en">Methods</span><span data-lang="zh">方法说明</span></a> &middot;
+          <a href="https://github.com/wyc79/steam-launch-window" target="_blank" rel="noopener"><span data-lang="en">Source on GitHub</span><span data-lang="zh">在 GitHub 查看源码</span></a>
+        </p>
+
+        <!-- TOP: What | Main Achievements + Highlights -->
+        <section class="project-block">
+          <div class="two-col">
+            <div>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <p class="meta"><span data-lang="en">Launch timing is one of the few things a small team fully controls, yet most advice about it is folklore: &ldquo;never launch during a sale,&rdquo; &ldquo;avoid Next Fest week.&rdquo; Steam Launch Window collects the data to test that advice within each niche and is explicit about what the data can and cannot show.</span><span data-lang="zh">发售时机是小团队少数能完全自主决定的事情之一，但关于它的建议大多来自坊间经验：&ldquo;千万别在促销期间发售&rdquo;&ldquo;避开新品节那一周&rdquo;。Steam Launch Window 收集数据，按细分领域逐条检验这些说法，也明确说明数据能得出什么结论、不能得出什么结论。</span></p>
+              <p class="meta"><span data-lang="en">Enter your game&rsquo;s Steam tags, and the site shows how crowded each of the next 13 weeks is in that niche, where Steam sales and fests fall, which upcoming games are most anticipated, and how launch timing correlates with the performance of similar past releases.</span><span data-lang="zh">输入你的游戏在 Steam 上的标签，网站就会显示：未来 13 周在这个细分领域里分别有多拥挤；Steam 促销和各类游戏节落在哪几周；同领域最受期待的待发售游戏有哪些；以及发售时机与类似往期游戏的表现有何关联。</span></p>
+              <p class="meta"><span data-lang="en">The site is backed by a public dataset: daily snapshots of every coming-soon game, early review counts for every launch since 2022, and follower and player histories. It is republished weekly on Hugging Face so anyone can reproduce or challenge the analysis.</span><span data-lang="zh">网站背后是一份公开数据集：所有待发售游戏的每日快照、2022 年以来每款已发售游戏的早期评测数，以及关注者和在线玩家历史。数据每周重新发布到 Hugging Face，任何人都可以复现或复核这份分析。</span></p>
+            </div>
+
+            <div>
+              <h3><span data-lang="en">Main Achievements</span><span data-lang="zh">主要成果</span></h3>
+              <ul>
+                <li data-lang="en">Built a scheduled collector over Steam&rsquo;s public endpoints that snapshots roughly 60,000 coming-soon games every day in about 210 requests, with rate limiting, exponential backoff and resumable progress.</li>
+                <li data-lang="zh">基于 Steam 公开接口搭建定时采集器，每天用约 210 次请求为大约 6 万款待发售游戏生成快照，并支持限速、指数退避重试和断点续跑。</li>
+                <li data-lang="en">Published the data as a public Hugging Face dataset: about 1.9 million rows across 10 configs, with a dataset card that documents every caveat and a guard that rejects any upload that would drop a file or column, or shrink a table by more than 5%.</li>
+                <li data-lang="zh">将数据发布为 Hugging Face 公开数据集：10 个子集共约 190 万行；数据集说明逐条记录各项局限，上传前的保护检查会拒绝任何导致文件或列缺失，或让任一数据表缩小超过 5% 的上传。</li>
+                <li data-lang="en">Fitted a negative binomial timing model on about 80,000 Steam launches since 2022, with a placebo check and permutation tests that decide which patterns are allowed to become advice.</li>
+                <li data-lang="zh">在 2022 年以来约 80,000 款 Steam 游戏上拟合负二项时机模型，并用安慰剂检验和置换检验决定哪些规律才有资格成为建议。</li>
+                <li data-lang="en">Shipped a bilingual (English and Chinese) static site that rebuilds itself after every daily snapshot and weekly model run.</li>
+                <li data-lang="zh">上线了一个中英双语静态网站，每次每日快照和每周模型运行之后都会自动重建。</li>
+              </ul>
+
+              <h3><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
+              <p class="pill-list">
+                <span class="pill">Data pipeline</span>
+                <span class="pill">Steam Web API</span>
+                <span class="pill">GitHub Actions</span>
+                <span class="pill">Hugging Face dataset</span>
+                <span class="pill">Parquet</span>
+                <span class="pill">Negative binomial regression</span>
+                <span class="pill">Placebo &amp; permutation tests</span>
+                <span class="pill">Data visualization</span>
+                <span class="pill">Bilingual site</span>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="project-block">
+          <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
+
+          <h4><span data-lang="en">A pipeline that runs itself</span><span data-lang="zh">自己跑起来的数据管线</span></h4>
+          <p class="meta"><span data-lang="en">Python collectors run on GitHub Actions and commit their output to a separate <code>data</code> branch. A daily job snapshots every coming-soon game, recording its release date and precision, weighted tags, Top Wishlisted rank, demo availability and supported languages. A weekly job adds new releases and records their review counts after one day, one week and 30 days. The long, one-off backfill of every launch since 2022—about a day at one request per second—ran on an always-on server instead, leaving Actions to process only the small increments.</span><span data-lang="zh">Python 采集脚本运行在 GitHub Actions 上，结果提交到独立的 <code>data</code> 分支。每日任务为每款待发售游戏生成快照，记录发售日期及其精度、带权重的标签、热门心愿单排名、试玩版状态和支持语言。每周任务补录新发售的游戏，并记录它们发售后 1 天、7 天和 30 天的评测数。2022 年以来全部游戏的一次性回填耗时较长——按每秒一次请求约需一天——因此改在常驻服务器上完成，让 Actions 只处理小规模的增量更新。</span></p>
+          <p class="meta"><span data-lang="en">Every scheduled job is disabled until a repository variable switches it on, so a fresh fork never starts hammering Steam by accident. Each script waits between requests to the same host, retries with backoff, saves progress as it runs and resumes where it stopped. Steam&rsquo;s community site blocks an IP after about 60 requests, so follower and player histories come from <a href="https://games-popularity.com" target="_blank" rel="noopener">Games Popularity</a> instead: across 122 games, its figures differed from ours by a median of just 0.06%, and its owner gave permission to republish them. The daily request budget is allocated by priority, starting with data that would be lost for good if it were not fetched in time.</span><span data-lang="zh">所有定时任务默认关闭，只有设置仓库变量后才会启用，因此新 fork 出来的仓库不会意外地开始大量请求 Steam。每个脚本都会在对同一主机的连续请求之间等待，出错时退避重试，运行过程中持续保存进度，再次运行时从中断处继续。Steam 社区站点会在大约 60 次请求后封禁 IP，因此关注者与在线玩家历史改由 <a href="https://games-popularity.com" target="_blank" rel="noopener">Games Popularity</a> 提供：在 122 款游戏上，它与我们自采数据的差异中位数仅为 0.06%，其所有者也同意转载这些数据。每日请求额度按优先级分配，优先抓取那些错过时间窗口就再也无法补回的数据。</span></p>
+
+          <h4><span data-lang="en">The dataset</span><span data-lang="zh">数据集</span></h4>
+          <p class="meta"><span data-lang="en">A weekly job publishes the <code>data</code> branch to <a href="https://huggingface.co/datasets/strikeoo/steam-launch-data" target="_blank" rel="noopener">strikeoo/steam-launch-data</a> as Parquet, one file per month for the daily snapshots. Its configs include launch history (every game released since 2022), daily coming-soon snapshots, release-date changes, Games Popularity follower and hourly player histories, the hand-kept calendar of sales, fests and holidays (each with a source), and Steam&rsquo;s tag names in English and Simplified Chinese.</span><span data-lang="zh">每周任务把 <code>data</code> 分支以 Parquet 格式发布到 <a href="https://huggingface.co/datasets/strikeoo/steam-launch-data" target="_blank" rel="noopener">strikeoo/steam-launch-data</a>，每日快照按月合并为一个文件。子集包括：发售历史（2022 年以来每一款游戏）、每日待发售快照、发售日期变更记录、来自 Games Popularity 的关注者与逐小时在线玩家历史、手工维护并逐条注明出处的促销/游戏节/节假日日历，以及 Steam 标签的中英文名称。</span></p>
+          <p class="meta"><span data-lang="en">Before each upload, the new files are checked against the published ones: no missing files, no dropped columns and no table more than 5% smaller. If the published data changed in the meantime, the upload fails instead of overwriting it. The dataset card repeats every limitation—including the lack of wishlist counts, historical records that reflect today&rsquo;s store pages rather than their state at launch, and the use of reviews as a proxy for sales—so the caveats travel with the data.</span><span data-lang="zh">每次上传前，新文件都会与已发布版本比对：不能缺少文件或字段，任何一张表也不能缩小超过 5%。如果已发布的数据在此期间发生变化，上传会直接失败，不会覆盖对方的改动。数据集说明会完整列出各项局限，包括没有心愿单数量、历史记录反映的是商店页面当前而非发售时的状态，以及用评测数作为销量的替代指标，确保数据在传播时始终附带这些限制说明。</span></p>
+
+          <h4><span data-lang="en">Competition ahead</span><span data-lang="zh">前方的竞争</span></h4>
+          <p class="meta"><span data-lang="en">The heatmap above covers the current week and the next 12. Announced release dates vary in precision, so the site keeps exact and approximate dates separate. A game with an exact date adds 1 to its week. A &ldquo;November 2026&rdquo; or &ldquo;Q1 2027&rdquo; date is spread evenly across every day on which it could still fall, with each week receiving its share. Exact and distributed counts remain visible as separate halves of each cell. Each count is normalized against the niche&rsquo;s typical week over the past year, so 1.0 represents an ordinary week regardless of the niche&rsquo;s size. Weeks more than a month away are faded because many of their dates have yet to be finalized.</span><span data-lang="zh">上方的热力图覆盖本周及之后 12 周。已公布的发售日期精度不一，因此网站会将确切日期与模糊日期分开处理：有确切日期的游戏给对应周加 1；&ldquo;2026 年 11 月&rdquo;或&ldquo;2027 年第一季度&rdquo;这样的日期，则平均分摊到发售日仍可能落在的每一天，再按天数计入各周。确定日期数与按概率分摊的数量会在每个格子的上下两半分别显示。每项计数都以该细分领域过去一年的典型周为基准进行归一化，因此无论领域大小，1.0 都代表普通一周的水平。一个月以后的周会淡化显示，因为许多日期仍未最终确定。</span></p>
+
+          <h4><span data-lang="en">What history says, and when a pattern becomes advice</span><span data-lang="zh">历史数据说了什么，以及规律何时才算建议</span></h4>
+          <p class="meta"><span data-lang="en">Steam publishes no sales or wishlist counts, so the outcome measure is the number of reviews in the first 30 days; the site always says &ldquo;reviews,&rdquo; never &ldquo;sales.&rdquo; Separate negative binomial regressions are fitted to paid and free games, a model well suited to counts that are often zero and occasionally huge. The models adjust for niche competition, sales, fests, demos, major releases and holidays, along with price, Early Access, franchise status, publisher history, languages, tags and calendar effects. Standard errors are clustered by launch week because games released in the same week share news cycles and store traffic.</span><span data-lang="zh">Steam 不公开销量和心愿单数量，因此结果指标采用发售后 30 天内的评测数；网站也始终写&ldquo;评测&rdquo;，而不是&ldquo;销量&rdquo;。付费游戏与免费游戏分别拟合负二项回归，这种模型适合处理经常为零、偶尔又极大的计数。模型控制了细分领域竞争、促销、游戏节、试玩版、大作发售和节假日，以及价格、抢先体验、系列作品、发行商过往表现、支持语言、标签和日历效应。由于同一周发售的游戏共享新闻周期和商店流量，标准误按发售周聚类计算。</span></p>
+          <p class="meta"><span data-lang="en">A result becomes advice only when its 95% confidence interval excludes no effect. For events that occurred only a handful of times, a permutation test must agree: the event is removed, equally long placebo windows are placed on random weeks 1,000 times, and the real effect must be more extreme than the placebo effects. That rule is why the site recommends avoiding a seasonal sale (about a third fewer reviews) and releasing a demo before Next Fest (about 70% more reviews than for games whose demos appeared afterward), but offers no conclusion about Next Fest week itself, Thanksgiving or Christmas.</span><span data-lang="zh">一项结果只有在 95% 置信区间排除&ldquo;无影响&rdquo;时，才能转化为建议。对于只发生过寥寥几次的事件，还必须得到置换检验的支持：先从模型中移除该事件，再把相同长度的安慰剂窗口随机放到其他周，重复 1,000 次；真实效应必须比这些安慰剂效应更极端。正因为这条规则，网站会建议避开季节性促销（评测数约少三分之一），并在新品节前发布试玩版（相较于新品节后才发布试玩版的游戏，评测数约多 70%）；但对新品节当周、感恩节和圣诞节本身不下结论。</span></p>
+
+          <div class="figure">
+            <img src="../images/steam-launch-window/history.png" alt="The What history says section: past Roguelike and Deckbuilding launches split into quiet, normal and busy weeks with median, 75th and 90th percentile 30-day reviews, beside the launch timing advice that passed the model's tests." aria-label="The What history says section: past Roguelike and Deckbuilding launches split into quiet, normal and busy weeks with median, 75th and 90th percentile 30-day reviews, beside the launch timing advice that passed the model's tests." data-al-en="The What history says section: past Roguelike and Deckbuilding launches split into quiet, normal and busy weeks with median, 75th and 90th percentile 30-day reviews, beside the launch timing advice that passed the model's tests." data-al-zh="“历史数据怎么说”板块：左侧按冷清、普通和拥挤周展示往期类 Rogue 与牌组构建游戏发售后 30 天评测数的中位数、第 75 和第 90 百分位数；右侧列出通过模型检验的发售时机建议。" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">History for the same two tags. Left, past launches split into quiet, normal and busy weeks; busier weeks can look better here because stronger games often launch then. Right, the timing lines that passed the advice rule, each with its range, and the closing reminder that these are patterns, not proof of cause.</span><span data-lang="zh">同样两个标签的历史数据。左侧把往期游戏分为冷清、普通和拥挤三档；拥挤周在这里反而可能看起来更好，因为更强的游戏往往选在那时发售。右侧是通过建议规则的时机结论，每条都附带区间，最后一句提醒：这些只是规律，不是因果证明。</span></p>
+            </div>
+          </div>
+
+          <h4><span data-lang="en">Testing the obvious answer</span><span data-lang="zh">检验最直觉的结论</span></h4>
+          <p class="meta"><span data-lang="en">The obvious hypothesis is that &ldquo;busy weeks hurt,&rdquo; and at first the data agreed: ten additional same-niche launches in a week were associated with about 9% fewer reviews. The model therefore also counts the same competition eight weeks <em>after</em> launch, when it cannot possibly affect that launch. This placebo showed almost the same drop, indicating that most of the apparent effect reflects broader crowding on the store rather than the launch week itself. The site now describes the effect of weekly competition as &ldquo;small at most.&rdquo; A separate niche-trend signal turned out to measure mostly the gap between announced and completed launches, so it remains hidden until there is enough data to validate it.</span><span data-lang="zh">最直觉的假设是&ldquo;拥挤的周会吃亏&rdquo;，起初数据似乎也支持这一点：同一周、同一细分领域每多 10 款游戏发售，评测数就会少约 9%。因此，模型又统计了发售 <em>8 周之后</em>的同类竞争，而那时的竞争显然不可能影响此前的发售。这个安慰剂变量呈现出几乎相同的降幅，说明大部分表面效应反映的是商店中更广泛的拥挤程度，而非发售周本身。网站因此只把每周竞争的影响描述为&ldquo;至多很小&rdquo;。另一项细分领域趋势信号后来被发现主要衡量&ldquo;已公布&rdquo;与&ldquo;已发售&rdquo;游戏之间的差异，因此在有足够数据验证之前会一直隐藏。</span></p>
+
+          <div class="figure">
+            <img src="../images/steam-launch-window/season.png" alt="The Typical for this time of year chart: each coming week from October to April as a bar above or below 1.0, showing how busy that week usually is against the 13 weeks before it, with the Winter and Spring Sales and Next Fest marked below." aria-label="The Typical for this time of year chart: each coming week from October to April as a bar above or below 1.0, showing how busy that week usually is against the 13 weeks before it, with the Winter and Spring Sales and Next Fest marked below." data-al-en="The Typical for this time of year chart: each coming week from October to April as a bar above or below 1.0, showing how busy that week usually is against the 13 weeks before it, with the Winter and Spring Sales and Next Fest marked below." data-al-zh="“一年中这个时段的典型水平”图表：从 10 月到次年 4 月，每周以高于或低于 1.0 的柱形表示其相对于此前 13 周的通常拥挤程度，下方标出冬季特卖、春季特卖和新品节。" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">The seasonal view: how busy each coming week usually is across past years, with the spread across years behind each bar. The holiday weeks run quiet, and the chart&rsquo;s own caption makes the point the whole site is built around: quiet is not the same as good.</span><span data-lang="zh">季节视图：接下来每一周在往年通常有多拥挤，每根柱子后方的方框是各年份之间的波动范围。年末假日的几周一向冷清，而图表自己的说明正是整个网站的立足点：冷清不等于更好。</span></p>
+            </div>
+          </div>
+
+          <h4><span data-lang="en">The website</span><span data-lang="zh">网站</span></h4>
+          <p class="meta"><span data-lang="en">The site is static, built with Vite and plain JavaScript that reads files generated by the data pipeline; the browser never calls Steam directly. It is rebuilt and deployed to GitHub Pages after every daily snapshot, after each weekly model run and whenever the site changes on <code>main</code>. The site is available in English and Chinese, uses Steam&rsquo;s own Simplified Chinese tag names, and links every section to a Methods page that explains—with numbers—how each figure is measured and when it can mislead.</span><span data-lang="zh">网站是纯静态的，使用 Vite 和原生 JavaScript 读取数据管线生成的文件；浏览器不会直接请求 Steam。每次生成每日快照、完成每周模型运行，以及 <code>main</code> 分支上的网站代码发生变化后，网站都会重新构建并部署到 GitHub Pages。网站支持中英双语，中文页面采用 Steam 官方的简体中文标签名；每个板块都链接到方法说明页，用具体数字解释各项指标如何计算，以及它们在哪些情况下可能产生误导。</span></p>
+
+          <h4><span data-lang="en">Credits</span><span data-lang="zh">署名与许可</span></h4>
+          <p class="meta"><span data-lang="en">Follower and player histories come from <a href="https://games-popularity.com" target="_blank" rel="noopener">Games Popularity</a> and are republished with its owner&rsquo;s permission. The code is released under the MIT License. The data comes from Steam, which is owned by Valve; Valve has neither licensed nor endorsed this project, so the dataset carries no separate license.</span><span data-lang="zh">关注者与在线玩家历史来自 <a href="https://games-popularity.com" target="_blank" rel="noopener">Games Popularity</a>，经其所有者许可转载。代码采用 MIT 许可证。数据来自 Valve 旗下的 Steam；Valve 并未授权或认可本项目，因此数据集本身不附带单独许可。</span></p>
+        </section>
+
+        <p class="page-links">
+          <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p><span data-lang="en">© 2025–2026 Yuanchen Wang - HTML portfolio. Last updated 2026-10-20.</span><span data-lang="zh">© 2025–2026 Yuanchen Wang - 网页作品集。最后更新于 2026-10-20。</span></p>
+    </footer>
+  </div>
+</body>
+</html>

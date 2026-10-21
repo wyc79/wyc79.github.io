@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-en="Hold the Gate - Yuanchen Wang" data-zh="Hold the Gate - 王元辰">Hold the Gate - Yuanchen Wang</title>
+  <meta name="description" content="Hold the Gate, a Ludum Dare 60 team entry for the theme Old Tech: build timber barricades that physically hold or break under rifle fire, rockets and mortar shells. Yuanchen built the structural building system, designed levels, and generated the music with ElevenLabs Music v2.5." data-zh="Hold the Gate 是 Ludum Dare 60 的团队参赛作品，主题为&ldquo;旧科技&rdquo;：用木料搭建工事，看它能否扛住枪弹、火箭弹和迫击炮弹的攻击。王元辰负责结构建造系统、部分关卡设计，并用 ElevenLabs Music v2.5 生成了配乐。" />
+  <meta name="page-title" content="Hold the Gate" data-zh="Hold the Gate" />
+  <link rel="icon" type="image/png" href="../images/wyc.png" />
+  <link rel="stylesheet" href="../styles.css" />
+  <script src="../scripts/analytics.js" data-ga-id="G-C9FHKV9CXJ"></script>
+  <script src="../scripts/page-header.js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/project-hero.js"></script>
+  <script src="../scripts/theme.js"></script>
+  <script src="../scripts/stone-renderer.js" defer></script>
+  <script src="../scripts/chat-widget.js" defer></script>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="page-head" data-page-header></header>
+
+    <main>
+      <section class="project-hero">
+        <span class="sr-only" role="img" aria-label="Hold the Gate in the build phase: a two-storey timber tower with archers on top stands in front of the village, with the enemy portal on the far left and the build panel showing the timber budget." data-al-en="Hold the Gate in the build phase: a two-storey timber tower with archers on top stands in front of the village, with the enemy portal on the far left and the build panel showing the timber budget." data-al-zh="Hold the Gate 建造阶段：村庄前立着一座两层木塔，弓箭手站在塔顶；敌方传送门位于最左侧，建造面板显示着木料预算。"></span>
+        <div class="project-hero__content">
+          <h2 class="project-hero__title">Hold the Gate</h2>
+          <div class="project-hero__meta">
+            <div class="project-hero__meta-item"><span data-lang="en">Role: Structural Building Systems, Level Design &amp; Music</span><span data-lang="zh">职责：结构建造系统、关卡设计与配乐</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Tools: Unity 6, C#, URP 2D, ElevenLabs Music v2.5</span><span data-lang="zh">工具：Unity 6、C#、URP 2D、ElevenLabs Music v2.5</span></div>
+            <div class="project-hero__meta-item"><span data-lang="en">Event: Ludum Dare 60 (theme: Old Tech), Oct 2026</span><span data-lang="zh">活动：Ludum Dare 60（主题：旧科技），2026 年 10 月</span></div>
+          </div>
+        </div>
+        <figure class="project-hero__media"><img src="../images/hold_the_gate.jpg" alt="" /></figure>
+      </section>
+
+      <section class="project-body">
+
+        <p class="meta">
+          <a href="https://strikeoo.itch.io/holdthegate" target="_blank" rel="noopener"><span data-lang="en">Play on itch.io (browser or Windows)</span><span data-lang="zh">在 itch.io 上试玩（网页版或 Windows 版）</span></a>
+        </p>
+
+        <section class="project-block">
+          <div class="two-col">
+            <div>
+              <h3><span data-lang="en">What</span><span data-lang="zh">做了什么</span></h3>
+              <p class="meta"><span data-lang="en">A portal opens beside a village, and soldiers armed with pistols, rifles, rocket launchers and mortars march through it. The village has only old tech: spears, shields, bows, a catapult and timber. You are not the commander but the defensive engineer. Working within a timber budget, you build barricades from beams and panels, position your defenders, then begin the assault and see whether the wall holds. Combat is automatic; the battle hinges on the defenses you built.</span><span data-lang="zh">村庄旁出现了一道传送门，手持手枪、步枪、火箭筒和迫击炮的士兵从中涌出。村子里只有旧科技：长矛、盾牌、弓箭、一架投石机，还有木料。你不是指挥官，而是负责防御工事的工程师：在木料预算内用木梁和面板搭起工事，布置好守军，然后启动进攻波次，看防线能否撑住。战斗自动进行，胜负取决于你搭出的防线。</span></p>
+              <p class="meta"><span data-lang="en">Every piece of timber is simulated, so a failed design breaks in a way you can read: the brace that buckled, the panel that tore off, the wall that protected the villagers before falling on them. Your design is restored exactly when you return to the build phase, turning every failure into something to study and retry. We made the game as a team for Ludum Dare 60, whose theme was Old Tech.</span><span data-lang="zh">每根木梁、每块面板都参与物理模拟，因此失败的设计会以看得懂的方式垮掉：哪根斜撑先失稳，哪块面板被扯下，哪面墙先护住村民、又倒下来砸在他们身上。回到建造阶段时，原来的设计会被原样还原，让每一次失败都值得分析和重试。这是我们团队为 Ludum Dare 60 制作的作品，那一届的主题是&ldquo;旧科技&rdquo;。</span></p>
+            </div>
+
+            <div>
+              <h3><span data-lang="en">My Contributions</span><span data-lang="zh">我的贡献</span></h3>
+              <ul>
+                <li data-lang="en">Built the structural building system: the physics of beams and panels, how and when they fail, and the build/test loop around them.</li>
+                <li data-lang="zh">搭建了结构建造系统：实现木梁与面板的物理行为、损坏条件与方式，以及以此为核心的&ldquo;建造—测试&rdquo;循环。</li>
+                <li data-lang="en">Connected structures to the battle: members block movement and stop projectiles, falling debris hurts both sides, and spearmen can push a free-standing shield wall forward.</li>
+                <li data-lang="zh">把结构接入战斗：构件会阻挡移动、拦截弹丸，倒塌的残骸对敌我双方都造成伤害，长枪兵还能推着没有锚定的盾墙向前走。</li>
+                <li data-lang="en">Designed some of the campaign&rsquo;s levels, using a level-authoring tool I built so a level is edited directly in the Unity scene.</li>
+                <li data-lang="zh">设计了战役中的部分关卡，并为此做了关卡编辑工具，让关卡直接在 Unity 场景里编辑。</li>
+                <li data-lang="en">Generated the soundtrack with ElevenLabs Music v2.5 and wired it into the game.</li>
+                <li data-lang="zh">用 ElevenLabs Music v2.5 生成了游戏配乐，并接入游戏。</li>
+              </ul>
+              <p class="meta"><span data-lang="en">My teammates built the units and combat systems and handled combat balance.</span><span data-lang="zh">兵种、战斗系统和战斗数值平衡由队友负责。</span></p>
+
+              <h3><span data-lang="en">Highlights</span><span data-lang="zh">亮点</span></h3>
+              <p class="pill-list">
+                <span class="pill">Game jam</span>
+                <span class="pill">Structural physics</span>
+                <span class="pill">XPBD solver</span>
+                <span class="pill">Destruction</span>
+                <span class="pill">Level design</span>
+                <span class="pill">Editor tools</span>
+                <span class="pill">AI music</span>
+                <span class="pill">Unity</span>
+                <span class="pill">C#</span>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="project-block">
+          <h3><span data-lang="en">How</span><span data-lang="zh">如何实现</span></h3>
+
+          <h4><span data-lang="en">Proving the idea first</span><span data-lang="zh">先验证想法</span></h4>
+          <p class="meta"><span data-lang="en">The pitch was &ldquo;Angry Birds in reverse meets Poly Bridge&rdquo;: you build the thing that gets hit. That only works if changing the structure genuinely changes how the battle unfolds. Before any units existed, I built a structural proof of concept with a launcher firing at a relic and encoded the checks as tests: a triangle holds while an unbraced post falls over; a box frame folds and loses the relic, while a braced frame built with almost the same amount of timber survives. Once the structure mattered on its own, it was worth adding soldiers. If it did not, the plan warned, the units would become decoration.</span><span data-lang="zh">最初的设想是&ldquo;把《愤怒的小鸟》反过来玩，再加上 Poly Bridge&rdquo;：玩家搭的是挨打的一方。这个想法成立的前提，是改变结构真的能改变战斗走向。在还没有任何兵种之前，我先做了一个结构验证原型：让发射器朝一件遗物开火，并把判定标准写成自动化测试。三角形结构能立住，没有斜撑的立柱会倒；箱形框架会折垮、遗物被毁，而用料几乎相同、加了斜撑的框架却能撑住。只有当结构本身确实起作用，才值得加入士兵；计划里也写明，否则兵种只会沦为装饰。</span></p>
+
+          <h4><span data-lang="en">Beams, panels and how they break</span><span data-lang="zh">木梁、面板，以及它们怎样损坏</span></h4>
+          <p class="meta"><span data-lang="en">The structural simulation uses an XPBD solver with at least 20 substeps per frame. Joints are particles, and members are compliant distance constraints connected by pin joints—which is exactly why triangles matter. Loads are read back from the constraint forces, so each member can fail for a different reason. A timber beam can snap under tension, buckle (with longer beams failing sooner), or break from a lateral hit across a long span. A shield panel costs twice as much and absorbs impacts: it wears down and shatters after absorbing too much momentum, or tears away intact when its joint is overloaded. A snapped beam splits into two pieces of debris that continue to fall. The solver automatically adds substeps so even a fast shell cannot pass through a plank.</span><span data-lang="zh">结构模拟使用 XPBD 求解器，每帧至少运行 20 个子步。节点是质点，构件则是连接这些质点的柔性距离约束，连接处可以像铰链一样转动——这也正是三角形结构重要的原因。每根构件的载荷都从约束力中读出，因此会因不同原因损坏。木梁可能被拉断、发生屈曲失稳（越长越容易），也可能在大跨度处受到侧向冲击而折断；盾面板价格是木梁的两倍，用来吸收冲击：累计冲量超过阈值后会碎裂，连接处过载时则会整块脱落。断掉的木梁会分成两截残骸继续下落。求解器会自动增加子步数，确保再快的炮弹也不会穿过木板。</span></p>
+          <p class="meta"><span data-lang="en">The simulation is plain C# with no MonoBehaviours, so all of it runs in edit-mode tests. The design being edited and the structure being simulated are separate copies, making the return to build mode instant and lossless. Restarting reproduces the same battle exactly, which makes each failure worth studying.</span><span data-lang="zh">整个模拟使用纯 C# 编写，不依赖 MonoBehaviour，因此全部可以在编辑模式测试中运行。玩家编辑的设计与正在模拟的结构是两份独立数据，因此可以即时、无损地返回建造阶段；重新开始也会精确复现同一场战斗，这正是每次失败都值得研究的前提。</span></p>
+
+          <div class="figure">
+            <img src="../images/hold-the-gate/collapse.jpg" alt="A large improvised timber frame mid-collapse as the assault begins, with a 'panel torn off' label over one corner and defenders and a catapult underneath." aria-label="A large improvised timber frame mid-collapse as the assault begins, with a 'panel torn off' label over one corner and defenders and a catapult underneath." data-al-en="A large improvised timber frame mid-collapse as the assault begins, with a 'panel torn off' label over one corner and defenders and a catapult underneath." data-al-zh="进攻刚开始，一座大型临时木架正在倒塌；一角标着“面板脱落”，下方站着守军和一台投石机。" />
+            <div class="figure-caption">
+              <p class="meta"><span data-lang="en">An unstable structure in level four, less than a second into the assault: a shield panel has already torn away at its joint, and the rest is about to collapse onto the defenders below.</span><span data-lang="zh">第四关中的一座不稳定结构。进攻开始还不到一秒，一块盾面板已经从连接处脱落，其余部分也即将砸向下方的守军。</span></p>
+            </div>
+          </div>
+
+          <h4><span data-lang="en">Structures in the battle</span><span data-lang="zh">战斗中的结构</span></h4>
+          <p class="meta"><span data-lang="en">A few simple rules connect the structure to the units. A member above knee height blocks a soldier&rsquo;s path, but low debris can be stepped over. Every shell and arrow is a physics-driven projectile, so there is no line-of-sight code: trajectories decide, and an archer under its own roof cannot shoot. A member moving fast enough hurts any unit it hits, on either side, so a wall can protect the villagers before falling on them. Free-standing structures can be shoved: a hit pushes a mantlet back until terrain stops it, and spearmen can drive it forward into the enemy.</span><span data-lang="zh">几条简单规则把结构与兵种连在一起。高过膝盖的构件会挡住士兵的去路，低矮的残骸则可以跨过。每一发炮弹、每一支箭都是按物理规律运动的实体弹丸，因此不需要额外编写视线判定：一切由弹道决定，躲在自家屋顶下的弓箭手甚至会射不出去。高速移动的构件会伤到它撞上的任何单位，不分敌我，所以一面墙可能先护住村民，随后又倒下来砸到他们。未锚定的结构还可以被推动：盾车受击后会一路后退，直到被地形挡住；长枪兵也能推着它冲向敌人。</span></p>
+
+          <h4><span data-lang="en">Levels and the tool to make them</span><span data-lang="zh">关卡与关卡工具</span></h4>
+          <p class="meta"><span data-lang="en">In a jam there is no time for a separate level format, so the scene <em>is</em> the level. The build zone, anchors, terrain steps, village, defenders and attacker spawn times are all objects you move in the Scene view, and the starting structure is drawn there with the same beam and panel tools the player uses. Nothing has to be reconstructed from code on entering Play mode, so each tweak can be tested with the next press of Play. The campaign starts with a tutorial, then moves through levels built around pushing, shields, high ground and breaching; I used this tool to design some of them.</span><span data-lang="zh">Game Jam 中没有时间另做一套关卡数据格式，所以场景本身<em>就是</em>关卡。建造区、锚点、地形台阶、村庄、守军和敌人的出场时间，都是可以在 Scene 视图中直接拖动的对象；初始结构也直接在那里，用与玩家相同的木梁和面板工具画出。进入 Play 模式时无需通过代码重新生成关卡，因此每次调整都能在下一次按下 Play 时立刻测试。战役从教学关开始，之后的关卡分别围绕推进、盾牌、高地和破城展开；其中部分关卡是我用这套工具设计的。</span></p>
+
+          <h4><span data-lang="en">Music</span><span data-lang="zh">配乐</span></h4>
+          <p class="meta"><span data-lang="en">I generated the soundtrack with ElevenLabs Music v2.5: four 90-second loops for the title screen, campaign screen, build phase and battle. Two of them are below.</span><span data-lang="zh">我用 ElevenLabs Music v2.5 生成了游戏配乐：标题画面、战役界面、建造阶段和战斗各有一段 90 秒的循环配乐。下面是其中两段。</span></p>
+          <p class="meta"><span data-lang="en">Build phase</span><span data-lang="zh">建造阶段</span></p>
+          <audio controls preload="none" src="../audio/hold-the-gate/building.mp3" style="width: 100%;"></audio>
+          <p class="meta"><span data-lang="en">Battle</span><span data-lang="zh">战斗</span></p>
+          <audio controls preload="none" src="../audio/hold-the-gate/battlefield.mp3" style="width: 100%;"></audio>
+        </section>
+
+        <p class="page-links">
+          <a href="projects.html"><span data-lang="en">← Back to Projects</span><span data-lang="zh">← 返回项目</span></a>
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p><span data-lang="en">© 2025–2026 Yuanchen Wang - HTML portfolio. Last updated 2026-10-20.</span><span data-lang="zh">© 2025–2026 Yuanchen Wang - 网页作品集。最后更新于 2026-10-20。</span></p>
+    </footer>
+  </div>
+</body>
+</html>

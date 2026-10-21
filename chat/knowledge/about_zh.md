@@ -262,3 +262,39 @@ AI 塔罗投射里，大模型每局做三类受 schema 约束的判断：开场
 ## 塔罗应用的符号包可以替换
 link: pages/ai-tarot-projection.html
 王元辰把塔罗做成了通用反思引擎上的一个符号包：牌组、牌位释义、人设和少样本示例都是带 schema 校验的静态数据文件，改一改读牌人的口吻只要存一次文件，fork 之后也能换上自己的牌。
+
+## Steam Launch Window 是什么
+link: pages/steam-launch-window.html
+Steam Launch Window 是王元辰从 2026 年 10 月起独立开发的工具，帮助独立开发者挑选 Steam 发售周：输入游戏的 Steam 标签，就能看到在这个细分领域里接下来 13 周每周有多拥挤、Steam 促销和游戏节落在哪里，以及类似的往期游戏在不同时机发售的表现。工具已上线在 wyc79.github.io/steam-launch-window，源码放在 GitHub 上。
+
+## Steam 发售数据管线和公开数据集
+link: pages/steam-launch-window.html
+Steam Launch Window 背后是王元辰在 GitHub Actions 上搭的 Python 数据管线：每天为 Steam 上约 60,000 款待发售游戏做快照，并收集 2022 年以来每款已发售游戏的早期评测数。数据每周发布为 Hugging Face 公开数据集 strikeoo/steam-launch-data，约 190 万行，上传前会检查，一旦会丢文件、丢列或让表缩水就拒绝上传。
+
+## 发售时机模型和建议规则
+link: pages/steam-launch-window.html
+王元辰为 Steam Launch Window 在约 80,000 款 Steam 游戏上拟合了负二项回归，用首 30 天评测数代替销量。只有置信区间排除无影响、并且通过置换检验的规律才会成为建议；安慰剂检验还表明，拥挤周看起来的劣势大多来自商店整体的拥挤，而不是发售那一周本身。
+
+## Hold the Gate 是什么
+link: pages/hold-the-gate.html
+Hold the Gate 是王元辰所在团队为 Ludum Dare 60 用 Unity 制作的游戏，主题是旧科技：玩家扮演防御工程师，用木梁和面板搭建工事，在步枪、火箭和迫击炮面前真实地撑住或垮掉。可以在 itch.io 上用网页或 Windows 版试玩。
+
+## 王元辰在 Hold the Gate 里负责什么
+link: pages/hold-the-gate.html
+在 Hold the Gate 中，王元辰负责结构建造系统，把结构接入战斗，用自己做的关卡工具设计了部分关卡，并用 ElevenLabs Music v2.5 生成了配乐；兵种、战斗系统和战斗数值由队友负责。
+
+## Hold the Gate 的结构物理
+link: pages/hold-the-gate.html
+Hold the Gate 的结构由王元辰用纯 C# 写的 XPBD 求解器模拟：木梁会因受拉、失稳或侧向撞击而断裂，盾面板会磨损碎裂或在连接处过载时被整块扯下；每次测试后设计都会被原样还原，倒塌可以反复研究、重试。
+
+## 在哪里看他的视频
+link: index.html
+除了邮箱、LinkedIn 和 GitHub，网站页头还链接到王元辰的 B 站（哔哩哔哩）主页，上面有他项目的游戏视频。
+
+## 数据工程与公开数据集经验
+link: pages/steam-launch-window.html
+王元辰最有代表性的数据工程经历是 Steam Launch Window：他搭建了每日、每周定时采集 Steam 商店数据的数据管线，把结果作为公开数据集发布到 Hugging Face，并在此基础上做统计分析，为独立开发者提供发售时机建议。
+
+## 在游戏里用过哪些生成式 AI 工具
+link: pages/hold-the-gate.html
+王元辰在 Hold the Gate 里用生成式 AI 做了游戏音频：标题画面、战役界面、建造阶段和战斗的四段循环配乐由 ElevenLabs Music v2.5 生成，再由他接入游戏。

@@ -132,10 +132,10 @@ the same third-person action game.
 ## How the projects page is organized
 link: pages/projects.html
 The projects page is split into a games section (Cemented Dreams, Nothing
-Can Go Wrong, Code Breaker, Gyrotris), an agentic AI section (AI Tarot
+Can Go Wrong, Hold the Gate, Code Breaker, Gyrotris), an agentic AI section (AI Tarot
 Projection and the chat agent), and an "other game related works" section
-covering Prime Engine, physical game prototypes, the 3D rendering project,
-Aegis Sword, and the automatic differentiation toolbox.
+covering Steam Launch Window, Prime Engine, physical game prototypes, the 3D
+rendering project, Aegis Sword, and the automatic differentiation toolbox.
 
 ## Shipped games versus supporting engineering work
 link: pages/projects.html
@@ -424,3 +424,67 @@ engine: the deck, per-position meanings, persona, and few-shot examples
 are static files with a schema validator, so changing how the reader
 sounds is a file save rather than a redeploy, and a fork can drop in its
 own deck.
+
+## What Steam Launch Window is
+link: pages/steam-launch-window.html
+Steam Launch Window is a tool he built alone, starting in October 2026, that
+helps indie developers pick a Steam launch week: given a game's Steam tags,
+it shows how crowded each of the next 13 weeks is in that niche, where Steam
+sales and fests fall, and how similar past launches did by timing. It is live
+at wyc79.github.io/steam-launch-window with the source on GitHub.
+
+## The Steam launch data pipeline and public dataset
+link: pages/steam-launch-window.html
+Behind Steam Launch Window is a Python pipeline on GitHub Actions that
+snapshots all of Steam's roughly 60,000 coming-soon games every day, plus
+every launch since 2022 with its early review counts. He publishes the data
+weekly as a public Hugging Face dataset, strikeoo/steam-launch-data, of
+about 1.9 million rows, with checks that refuse an upload that would drop a
+file, a column, or part of a table.
+
+## The launch timing model and when a pattern becomes advice
+link: pages/steam-launch-window.html
+For Steam Launch Window he fitted a negative binomial regression on about
+80,000 Steam launches, using 30-day reviews as a stand-in for sales. A
+pattern only becomes advice when its interval excludes no effect and a
+permutation test agrees, and a placebo check showed most of the apparent
+busy-week penalty is general store crowding rather than the launch week.
+
+## What Hold the Gate is
+link: pages/hold-the-gate.html
+Hold the Gate is a team game made for Ludum Dare 60, theme Old Tech, in
+Unity: the player is a defensive engineer who builds timber beam and panel
+barricades that physically hold or break against soldiers with rifles,
+rockets and mortars. It is playable on itch.io in the browser or on Windows.
+
+## His role on Hold the Gate
+link: pages/hold-the-gate.html
+On Hold the Gate he built the structural building system, connected the
+structures to the battle, designed some of the levels with a level tool he
+made, and generated the soundtrack with ElevenLabs Music v2.5. His
+teammates handled the units, combat, and battle balancing.
+
+## Structural physics in Hold the Gate
+link: pages/hold-the-gate.html
+The structures in Hold the Gate run on an XPBD solver he wrote in plain C#:
+beams fail by tension, buckling, or side hits, shield panels wear out or
+tear off at overloaded joints, and the build is restored exactly after each
+test so a collapse can be studied and retried.
+
+## Where to find his videos
+link: index.html
+Besides email, LinkedIn and GitHub, the site header links to his Bilibili
+channel, where videos of his projects are posted.
+
+## Steam game data he collected and published
+link: pages/steam-launch-window.html
+Steam Launch Window rests on data Yuanchen collects himself: a daily record
+of all upcoming Steam games and a weekly record of launches since 2022,
+which he publishes as an open Hugging Face dataset and analyses for launch
+timing.
+
+## Using ElevenLabs to make game audio
+link: pages/hold-the-gate.html
+On the Hold the Gate jam team he was also responsible for audio: he
+generated the background tracks with the ElevenLabs Music v2.5 model and
+hooked them into the Unity game.

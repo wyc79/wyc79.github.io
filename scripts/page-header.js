@@ -62,14 +62,15 @@
           '<a href="mailto:ywang217@usc.edu">EMAIL</a>',
           '<a href="https://www.linkedin.com/in/yuanchen-wang-9b1854271" target="_blank" rel="noopener">LINKEDIN</a>',
           '<a href="https://github.com/wyc79" target="_blank" rel="noopener">GITHUB</a>',
+          '<a href="https://space.bilibili.com/3747569427548260" target="_blank" rel="noopener">BILIBILI</a>',
         '</div>',
         '<div class="mast-utils">',
           // data-fixed-label: i18n.js leaves this label alone; CSS marks the
           // active option from <html lang>.
-          '<button type="button" id="languageToggle" class="mast-toggle" data-fixed-label aria-label="Change language">',
+          '<button type="button" id="languageToggle" class="mast-toggle" data-fixed-label aria-label="Change language" data-al-en="Change language" data-al-zh="切换语言">',
             '<span data-opt="en" lang="en">EN</span><span class="mast-slash" aria-hidden="true">/</span><span data-opt="zh" lang="zh">中文</span>',
           '</button>',
-          '<button type="button" id="themeToggle" class="mast-toggle" aria-label="Toggle theme">',
+          '<button type="button" id="themeToggle" class="mast-toggle" aria-label="Toggle theme" data-al-en="Toggle theme" data-al-zh="切换主题">',
             '<span data-opt="light"><span data-lang="en">LIGHT</span><span data-lang="zh">浅色</span></span>',
             '<span class="mast-slash" aria-hidden="true">/</span>',
             '<span data-opt="dark"><span data-lang="en">DARK</span><span data-lang="zh">深色</span></span>',

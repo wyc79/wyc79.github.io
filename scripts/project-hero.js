@@ -49,6 +49,8 @@
       back.className = 'project-hero__back';
       back.href = BACK_HREF;
       back.setAttribute('aria-label', 'Back to Projects');
+      back.setAttribute('data-al-en', 'Back to Projects');
+      back.setAttribute('data-al-zh', '返回项目');
       back.setAttribute('title', 'Back to Projects');
       back.innerHTML =
         '<span aria-hidden="true">' + ARROW + '</span>' +
@@ -68,7 +70,7 @@
     var bar = document.createElement('div');
     bar.className = 'project-hero-bar';
     bar.innerHTML =
-      '<a class="project-hero-bar__back" href="' + BACK_HREF + '" aria-label="Back to Projects" title="Back to Projects">' + ARROW + '</a>' +
+      '<a class="project-hero-bar__back" href="' + BACK_HREF + '" aria-label="Back to Projects" data-al-en="Back to Projects" data-al-zh="返回项目" title="Back to Projects">' + ARROW + '</a>' +
       '<div class="project-hero-bar__label">' +
         '<span data-lang="en">' + esc(compact.en) + '</span>' +
         '<span data-lang="zh">' + esc(compact.zh) + '</span>' +
