@@ -20,6 +20,14 @@ SHARED_ROLE = "shared"          # negatives belong to no role
 ADJACENCY = ("easy", "adjacent")  # off_topic only; injections are always adjacent
 
 POSITIVES_PER_CELL = 12
+# Single-turn positives a role's cells hold ON TOP of POSITIVES_PER_CELL.
+# visitor carries 2 recency cases per language ("what has he been up to
+# lately"): the question names no topic, so whether retrieval surfaces the
+# dated timeline sections is its own thing to measure, and visitor is the
+# default role -- where an unprompted "what's new" lands. Declared per role
+# rather than raising the base quota, so the other cells keep exactly 12 and
+# a stray extra case anywhere else still fails the composition test.
+EXTRA_POSITIVES_PER_ROLE = {"visitor": 2}
 # Multi-turn ("follow-up") positives are a SEPARATE measurement track from the
 # POSITIVES_PER_CELL quota above, not a slice of it: they exercise the
 # escalated rewrite-and-regate path (GoldenCase.history, CaseResult.rescued,

@@ -36,7 +36,11 @@ One JSON object per line. Adding a case is a one-line diff.
 
 **Positives are per (role, lang).** Every `(role, lang)` cell holds exactly
 12 `positive` cases with no `history` (`POSITIVES_PER_CELL` in
-`evaluation.py`) — one cell per role in `roles.json` crossed with `en`/`zh`.
+`evaluation.py`) — one cell per role in `roles.json` crossed with `en`/`zh` —
+plus any per-role extras declared in `EXTRA_POSITIVES_PER_ROLE`. Today that is
+`visitor`'s 2 recency cases per language (`visitor-{en,zh}-13/14`, "what has he
+been up to lately"), which measure whether a topic-less question retrieves the
+dated timeline sections; visitor cells therefore hold 14.
 Multi-turn positives (see below) are **not** part of this count — they are
 excluded from it deliberately, both in the dataset invariant
 (`test_positive_cells_have_the_right_composition`) and in

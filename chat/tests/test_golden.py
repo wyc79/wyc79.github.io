@@ -14,6 +14,7 @@ from portfolio_rag.evaluation import (
     ADJACENCY,
     BASELINE_PATH,
     CASE_TYPES,
+    EXTRA_POSITIVES_PER_ROLE,
     FOLLOWUP_POSITIVES_PER_LANG,
     GOLDEN_PATH,
     NEGATIVES_PER_LANG,
@@ -142,12 +143,17 @@ def test_positive_cells_have_the_right_composition(cases) -> None:
     for c in cases:
         if c.type == "positive" and not c.history:
             by_cell.setdefault(c.cell, Counter())["positive"] += 1
+    def want(cell: str) -> int:
+        return POSITIVES_PER_CELL + EXTRA_POSITIVES_PER_ROLE.get(cell.split("/")[0], 0)
+
     wrong = {
-        cell: dict(counts)
+        cell: {**dict(counts), "want": want(cell)}
         for cell, counts in by_cell.items()
-        if dict(counts) != {"positive": POSITIVES_PER_CELL}
+        if dict(counts) != {"positive": want(cell)}
     }
-    assert not wrong, f"positive cells with the wrong count (want {POSITIVES_PER_CELL}): {wrong}"
+    assert not wrong, f"positive cells with the wrong count: {wrong}"
+    undeclared = set(EXTRA_POSITIVES_PER_ROLE) - set(ROLES)
+    assert not undeclared, f"EXTRA_POSITIVES_PER_ROLE names unknown roles: {undeclared}"
 
 
 def test_followup_positive_pool_has_the_right_composition(cases) -> None:

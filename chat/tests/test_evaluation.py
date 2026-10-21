@@ -289,9 +289,12 @@ def test_load_cases_accepts_the_real_golden_set() -> None:
     added -- see FOLLOWUP_POSITIVES_PER_LANG's comment and KNOWN_ISSUES.md
     Finding Q: at this project's current zh gate calibration, essentially
     any natural zh follow-up question passes the gate standing alone, so
-    there is no rescue phenomenon for a zh case to measure."""
+    there is no rescue phenomenon for a zh case to measure.
+
+    126 -> 130: 2 recency positives per language in the visitor cells
+    (EXTRA_POSITIVES_PER_ROLE)."""
     cases = load_cases(GOLDEN_PATH)
-    assert len(cases) == 126
+    assert len(cases) == 130
     assert all(c.adjacency in ADJACENCY for c in cases if c.type == "off_topic")
     assert not any(c.adjacency for c in cases if c.type != "off_topic")
 
