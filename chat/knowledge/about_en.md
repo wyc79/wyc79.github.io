@@ -488,3 +488,25 @@ link: pages/hold-the-gate.html
 On the Hold the Gate jam team he was also responsible for audio: he
 generated the background tracks with the ElevenLabs Music v2.5 model and
 hooked them into the Unity game.
+
+## What he has been working on most recently
+link: pages/steam-launch-window.html
+His most recent work dates from October 2026: he started Steam Launch
+Window that month and is still building it, and the same month he made
+Hold the Gate with a team for Ludum Dare 60.
+
+## His projects in 2026
+link: pages/projects.html
+In 2026, while studying at USC, he built this site's chat agent, made AI
+Tarot Projection alone in August and September, then in October made Hold
+the Gate for Ludum Dare 60 and started Steam Launch Window.
+
+## A timeline of his work so far
+link: pages/projects.html
+In date order: bachelor's degrees at Rochester from 2017 to 2021, with the
+Aegis Sword CAD replica in spring 2021; the Harvard biomedical informatics
+master's from 2021 to 2022, with the automatic differentiation toolbox in
+fall 2022; the USC computer science master's from August 2025, with the 3D
+rendering project and the CTIN 488 game design workshop in fall 2025; AI
+Tarot Projection in August and September 2026; Hold the Gate and Steam
+Launch Window in October 2026.

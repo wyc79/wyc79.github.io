@@ -1179,6 +1179,42 @@ def test_top_projects_uses_the_catalogue_and_does_not_retrieve(monkeypatch) -> N
     assert "most worth their time" in head
 
 
+def test_system_prompt_carries_todays_date(monkeypatch) -> None:
+    """"What has he done recently" needs a "now" to compare the context's dates
+    against; the model has no clock of its own, so the server supplies one.
+    Logged as part of system_head, so a replayed turn sees the same date."""
+    mod = _load_backend()
+    monkeypatch.setattr(mod, "today_iso", lambda: "2031-02-03")
+    monkeypatch.setattr(mod, "retrieve", lambda q: [])
+    monkeypatch.setattr(mod, "rate_limited", lambda *a, **k: False)
+    monkeypatch.setattr(mod, "call_llm", lambda s, m: ("Steam Launch Window.", "m", {}, "stop"))
+    monkeypatch.setattr(mod, "load_roles", lambda: {
+        "default_role": "visitor", "base_system_prompt": "base",
+        "roles": {"visitor": {"label": "Visitor", "system_prompt": "x"}}})
+    monkeypatch.setitem(mod._embed, "session", object())
+    monkeypatch.setitem(mod._index, "matrix", object())
+    monkeypatch.setitem(mod._index, "chunks", [
+        {"id": "1", "url": "pages/steam-launch-window.html", "anchor": "top", "lang": "en",
+         "page_title": "Steam Launch Window", "section_title": "Steam Launch Window", "text": "s"}])
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    records: list = []
+    monkeypatch.setattr(mod, "log", lambda r: records.append(r))
+
+    handler = _StubHandler(json.dumps({
+        "question": "What has he been working on recently?", "history": [], "lang": "en",
+        "page": {"url": "pages/steam-launch-window.html"}}).encode("utf-8"))
+    mod.Handler._chat(handler)
+
+    assert handler.responses[0][0] == 200
+    chat = [r for r in records if r.get("type") == "chat"][0]
+    assert "Today's date is 2031-02-03" in chat["in"]["system_head"]
+
+
+def test_today_iso_is_an_iso_date() -> None:
+    mod = _load_backend()
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", mod.today_iso())
+
+
 def test_top_projects_recommends_nothing_it_cannot_link(monkeypatch) -> None:
     """Complement: if the answer names no page, the card strip is empty rather
     than falling back to the whole catalogue."""

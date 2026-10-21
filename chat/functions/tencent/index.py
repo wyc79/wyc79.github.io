@@ -802,6 +802,13 @@ def log(record: dict) -> None:
     print(json.dumps(record, ensure_ascii=False), flush=True)
 
 
+def today_iso() -> str:
+    """Today's UTC date for the system prompt. UTC rather than the site
+    owner's zone: a day of skew does not change what counts as "recent",
+    and the function's runtime is not guaranteed to ship tz data."""
+    return time.strftime("%Y-%m-%d", time.gmtime())
+
+
 def new_request_id() -> str:
     """Short, time-ordered, human-scannable id for one request (vs the opaque
     uuid session). Scannable in 日志查询; sortable by time within an instance."""
@@ -1590,6 +1597,15 @@ class Handler(BaseHTTPRequestHandler):
                     "Summarize what this page covers, using only the chunks above, "
                     "and keep it proportionate to how much the page actually says."
                 )
+        # The model has no clock: without this, "what has he done recently"
+        # is answered against its training cutoff. Inside system_head, so the
+        # logged input carries the date the answer was actually made against.
+        system_head += (
+            f"\n\nToday's date is {today_iso()}. When the visitor asks about recent, "
+            "latest, or current work, compare the dates in the context against "
+            "today's date, and name the dates rather than only saying 'recently'. "
+            "Do not guess a date the context does not give."
+        )
         if answer_lang == "zh":
             system_head += "\n\nAlways answer in Chinese (简体中文), regardless of the language the question is written in."
         elif answer_lang == "en":
