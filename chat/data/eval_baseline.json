@@ -1,7 +1,7 @@
 {
   "k": 4,
-  "generated_at": "2026-08-06T00:25:01+00:00",
-  "index_built_at": "2026-08-05T05:20:06+00:00",
+  "generated_at": "2026-10-21T07:20:39+00:00",
+  "index_built_at": "2026-10-21T07:04:53+00:00",
   "gate": {
     "en": {
       "stat": "top",
@@ -10,8 +10,8 @@
     },
     "zh": {
       "stat": "top",
-      "threshold": 0.3979,
-      "margin": 0.0589
+      "threshold": 0.4067,
+      "margin": 0.019
     }
   },
   "cells": {
@@ -21,9 +21,9 @@
       "n_positive": 12,
       "n_negative": 0,
       "gate_pass": 12,
-      "hit_at_4": 11,
-      "hit_at_4_page_only": 8,
-      "keywords_found": 14,
+      "hit_at_4": 10,
+      "hit_at_4_page_only": 7,
+      "keywords_found": 13,
       "keywords_total": 20,
       "gate_available": true,
       "retrieved_langs": {
@@ -38,9 +38,9 @@
       "n_positive": 12,
       "n_negative": 0,
       "gate_pass": 12,
-      "hit_at_4": 10,
-      "hit_at_4_page_only": 6,
-      "keywords_found": 12,
+      "hit_at_4": 9,
+      "hit_at_4_page_only": 5,
+      "keywords_found": 10,
       "keywords_total": 15,
       "gate_available": true,
       "retrieved_langs": {
@@ -56,7 +56,7 @@
       "n_negative": 0,
       "gate_pass": 12,
       "hit_at_4": 11,
-      "hit_at_4_page_only": 9,
+      "hit_at_4_page_only": 7,
       "keywords_found": 17,
       "keywords_total": 24,
       "gate_available": true,
@@ -72,9 +72,9 @@
       "n_positive": 12,
       "n_negative": 0,
       "gate_pass": 12,
-      "hit_at_4": 10,
-      "hit_at_4_page_only": 7,
-      "keywords_found": 17,
+      "hit_at_4": 11,
+      "hit_at_4_page_only": 8,
+      "keywords_found": 18,
       "keywords_total": 25,
       "gate_available": true,
       "retrieved_langs": {
@@ -89,9 +89,9 @@
       "n_positive": 12,
       "n_negative": 0,
       "gate_pass": 12,
-      "hit_at_4": 12,
+      "hit_at_4": 11,
       "hit_at_4_page_only": 7,
-      "keywords_found": 16,
+      "keywords_found": 15,
       "keywords_total": 24,
       "gate_available": true,
       "retrieved_langs": {
@@ -108,7 +108,7 @@
       "gate_pass": 12,
       "hit_at_4": 11,
       "hit_at_4_page_only": 10,
-      "keywords_found": 18,
+      "keywords_found": 16,
       "keywords_total": 24,
       "gate_available": true,
       "retrieved_langs": {
@@ -120,16 +120,16 @@
     "visitor/en": {
       "role": "visitor",
       "lang": "en",
-      "n_positive": 12,
+      "n_positive": 14,
       "n_negative": 0,
-      "gate_pass": 12,
+      "gate_pass": 14,
       "hit_at_4": 11,
-      "hit_at_4_page_only": 8,
-      "keywords_found": 20,
-      "keywords_total": 24,
+      "hit_at_4_page_only": 9,
+      "keywords_found": 19,
+      "keywords_total": 26,
       "gate_available": true,
       "retrieved_langs": {
-        "en": 48
+        "en": 56
       },
       "n_followup": 0,
       "followup_rescued": 0
@@ -137,16 +137,16 @@
     "visitor/zh": {
       "role": "visitor",
       "lang": "zh",
-      "n_positive": 12,
+      "n_positive": 14,
       "n_negative": 0,
-      "gate_pass": 12,
-      "hit_at_4": 12,
-      "hit_at_4_page_only": 10,
-      "keywords_found": 17,
-      "keywords_total": 23,
+      "gate_pass": 14,
+      "hit_at_4": 14,
+      "hit_at_4_page_only": 9,
+      "keywords_found": 18,
+      "keywords_total": 25,
       "gate_available": true,
       "retrieved_langs": {
-        "zh": 48
+        "zh": 56
       },
       "n_followup": 0,
       "followup_rescued": 0
